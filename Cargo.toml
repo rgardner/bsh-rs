@@ -1,0 +1,4 @@
+[package]
+name = "bsh-rs"
+version = "0.1.0"
+authors = ["Robert Gardner <rhg259@nyu.edu>"]
