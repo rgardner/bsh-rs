@@ -1,4 +1,13 @@
 [package]
-name = "bsh-rs"
-version = "0.1.0"
 authors = ["Robert Gardner <rhg259@nyu.edu>"]
+description = "Command line shell"
+name = "bsh-rs"
+readme = "README.md"
+version = "0.1.0"
+
+[dependencies]
+clippy = {version = "0.0.22", optional = true}
+
+[features]
+default = []
+dev = ["clippy"]
