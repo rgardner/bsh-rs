@@ -6,7 +6,11 @@ readme = "README.md"
 version = "0.1.0"
 
 [dependencies]
-clippy = {version = "0.0.22", optional = true}
+quick-error = "0.1.4"
+
+[dependencies.clippy]
+optional = true
+version = "0.0.22"
 
 [features]
 default = []
