@@ -1,11 +1,21 @@
-extern crate bsh_rs;
+#![feature(path_relative_from)]
 
+extern crate bsh_rs;
 use bsh_rs::parse::ParseInfo;
+use std::env;
 use std::io::{self, Write};
+use std::path::Path;
 use std::process;
 
 fn prompt(buf: &mut String) -> io::Result<usize> {
-    print!("$ ");
+    let cwd = env::current_dir().unwrap();
+    let home = env::home_dir().unwrap();
+    let rel = match cwd.relative_from(&home) {
+        Some(rel) => Path::new("~/").join(rel),
+        None => cwd.clone(),
+    };
+
+    print!("{} $ ", rel.display());
     io::stdout().flush().unwrap();
     io::stdin().read_line(buf)
 }
