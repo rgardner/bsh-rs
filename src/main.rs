@@ -25,20 +25,31 @@ fn main() {
         let mut input = String::new();
         if let Ok(n) = prompt(&mut input) {
             if n == 0 {
-                println!("");
+                println!("exit");
                 process::exit(0);
             }
         } else {
             panic!("failed to read line.");
         }
-        let command = match ParseInfo::parse(&input) {
+        let info = match ParseInfo::parse(&input) {
             Ok(Some(info)) => info,
             Err(err) => {
                 println!("{:?}", err);
-                continue
+                continue;
             }
             _ => continue,
         };
-        println!("parsed command: {:?}", command);
+        println!("parsed info: {:?}", info);
+
+        for mut command in info.commands {
+            let output = match command.output() {
+                Ok(output) => output,
+                Err(e) => {
+                    println!("bsh: {}", e);
+                    continue;
+                }
+            };
+            println!("{}", String::from_utf8_lossy(&output.stdout));
+        }
     }
 }

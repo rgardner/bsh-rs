@@ -26,10 +26,14 @@ quick_error! {
 /// Represents all information associated with a user input
 #[derive(Debug)]
 pub struct ParseInfo {
-    infile: Option<String>,
-    outfile: Option<String>,
-    background: bool,
-    commands: Vec<Command>,
+    /// The name of the input file, if one is specified
+    pub infile: Option<String>,
+    /// The file to write stdout to, if one is specified
+    pub outfile: Option<String>,
+    /// Run the command in the background, defaults to false
+    pub background: bool,
+    /// The commands to execute
+    pub commands: Vec<Command>,
 }
 
 impl ParseInfo {
