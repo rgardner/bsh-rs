@@ -1,26 +1,10 @@
-#![feature(path_relative_from)]
-
 extern crate bsh_rs;
 use bsh_rs::parse::ParseInfo;
-use std::env;
+use bsh_rs::shell::Shell;
 use std::fs::{File, OpenOptions};
 use std::io::{self, Read, Write};
-use std::path::Path;
 use std::process::{Stdio};
 use std::process;
-
-fn prompt(buf: &mut String) -> io::Result<usize> {
-    let cwd = env::current_dir().unwrap();
-    let home = env::home_dir().unwrap();
-    let rel = match cwd.relative_from(&home) {
-        Some(rel) => Path::new("~/").join(rel),
-        None => cwd.clone(),
-    };
-
-    print!("{} $ ", rel.display());
-    io::stdout().flush().unwrap();
-    io::stdin().read_line(buf)
-}
 
 fn execute_job(job: &mut ParseInfo) -> Result<(), io::Error> {
     let mut command = job.commands.get_mut(0).unwrap();
@@ -58,7 +42,7 @@ fn execute_job(job: &mut ParseInfo) -> Result<(), io::Error> {
 fn main() {
     loop {
         let mut input = String::new();
-        if let Ok(n) = prompt(&mut input) {
+        if let Ok(n) = Shell::prompt(&mut input) {
             if n == 0 {
                 println!("exit");
                 process::exit(0);
