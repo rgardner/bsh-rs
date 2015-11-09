@@ -1,4 +1,5 @@
 extern crate bsh_rs;
+
 use bsh_rs::parse::ParseInfo;
 use bsh_rs::shell::Shell;
 use std::fs::{File, OpenOptions};
@@ -33,7 +34,7 @@ fn execute_job(job: &mut ParseInfo) -> Result<(), io::Error> {
         try!(stdout.read_to_end(&mut buf));
         try!(file.write_all(&buf));
     } else {
-        println!("{}",
+        print!("{}",
                  String::from_utf8_lossy(&child.wait_with_output().unwrap().stdout));
     }
     Ok(())
@@ -42,13 +43,13 @@ fn execute_job(job: &mut ParseInfo) -> Result<(), io::Error> {
 fn main() {
     loop {
         let mut input = String::new();
-        if let Ok(n) = Shell::prompt(&mut input) {
-            if n == 0 {
+        match Shell::prompt(&mut input) {
+            Ok(0) => {
                 println!("exit");
                 process::exit(0);
-            }
-        } else {
-            panic!("failed to read line.");
+            },
+            Err(_) => panic!("failed to read line."),
+            _ => {},
         }
         let mut info = match ParseInfo::parse(&input) {
             Ok(Some(info)) => info,
