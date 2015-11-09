@@ -1,7 +1,7 @@
 //! Bsh - Shell Module
 //!
-//! The Shell itself is responsible for managing background jobs and for maintaining a history of
-//! previous commands.
+//! The Shell itself is responsible for managing background jobs and for
+//! maintaining a history of previous commands.
 
 use parse::ParseInfo;
 use history::HistoryState;
@@ -83,7 +83,7 @@ impl Shell {
             self.add_to_background(child);
         } else if !job.background {
             print!("{}",
-                     String::from_utf8_lossy(&child.wait_with_output().unwrap().stdout));
+                   String::from_utf8_lossy(&child.wait_with_output().unwrap().stdout));
         }
 
         Ok(())

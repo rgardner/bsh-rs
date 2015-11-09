@@ -14,9 +14,9 @@ fn main() {
             Ok(0) => {
                 println!("exit");
                 process::exit(0);
-            },
+            }
             Err(_) => panic!("failed to read line."),
-            _ => {},
+            _ => {}
         }
         let mut info = match ParseInfo::parse(&input) {
             Ok(Some(info)) => info,

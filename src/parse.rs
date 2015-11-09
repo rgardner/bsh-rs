@@ -169,7 +169,8 @@ mod tests {
         let mut cmd = Command::new("cmd");
         cmd.args(&vec!["var1", "var2", "var3"]);
         let info = ParseInfoBuilder::new().command(cmd).build();
-        assert_eq!(info, ParseInfo::parse("cmd var1 var2 var3").unwrap().unwrap());
+        assert_eq!(info,
+                   ParseInfo::parse("cmd var1 var2 var3").unwrap().unwrap());
     }
 
     #[test]
