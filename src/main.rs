@@ -20,6 +20,19 @@ fn prompt(buf: &mut String) -> io::Result<usize> {
     io::stdin().read_line(buf)
 }
 
+fn execute_job(job: ParseInfo) {
+    for mut command in job.commands {
+        let output = match command.output() {
+            Ok(output) => output,
+            Err(e) => {
+                println!("bsh: {}", e);
+                continue;
+            }
+        };
+        println!("{}", String::from_utf8_lossy(&output.stdout));
+    }
+}
+
 fn main() {
     loop {
         let mut input = String::new();
@@ -41,15 +54,6 @@ fn main() {
         };
         println!("parsed info: {:?}", info);
 
-        for mut command in info.commands {
-            let output = match command.output() {
-                Ok(output) => output,
-                Err(e) => {
-                    println!("bsh: {}", e);
-                    continue;
-                }
-            };
-            println!("{}", String::from_utf8_lossy(&output.stdout));
-        }
+        execute_job(info);
     }
 }
