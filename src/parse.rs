@@ -26,6 +26,8 @@ quick_error! {
 /// Represents all information associated with a user input
 #[derive(Debug)]
 pub struct ParseInfo {
+    /// Command line, used for messages
+    pub command: String,
     /// The name of the input file, if one is specified
     pub infile: Option<String>,
     /// The file to write stdout to, if one is specified
@@ -44,7 +46,7 @@ impl ParseInfo {
             return Ok(None);
         }
 
-        let mut info = ParseInfoBuilder::new();
+        let mut info = ParseInfoBuilder::new(input);
         let mut cmd = Command::new(argv[0]);
 
         let mut infile = false;
@@ -82,6 +84,7 @@ impl ParseInfo {
 /// Build Parse Info
 #[derive(Debug)]
 pub struct ParseInfoBuilder {
+    command: String,
     infile: Option<String>,
     outfile: Option<String>,
     background: bool,
@@ -97,8 +100,9 @@ impl ParseInfoBuilder {
     /// * No program or commands
     ///
     /// Builder methods are provided to change these defaults and otherwise configure the job.
-    pub fn new() -> ParseInfoBuilder {
+    pub fn new(command: &str) -> ParseInfoBuilder {
         ParseInfoBuilder {
+            command: String::from(command),
             infile: None,
             outfile: None,
             background: false,
@@ -133,6 +137,7 @@ impl ParseInfoBuilder {
     /// Build the final job.
     pub fn build(self) -> ParseInfo {
         ParseInfo {
+            command: self.command,
             infile: self.infile,
             outfile: self.outfile,
             background: self.background,

@@ -4,6 +4,7 @@
 //! previous commands.
 
 use parse::ParseInfo;
+use history::HistoryState;
 use std::env;
 use std::io::{self, Write};
 use std::path::Path;
@@ -12,15 +13,15 @@ use std::path::Path;
 #[derive(Debug)]
 pub struct Shell {
     jobs: Vec<ParseInfo>,
-    history: Vec<ParseInfo>,
+    history: HistoryState,
 }
 
 impl Shell {
     /// Constructs a new Shell to manage running jobs and command history.
-    pub fn new() -> Shell {
+    pub fn new(history_capacity: usize) -> Shell {
         Shell {
             jobs: Vec::new(),
-            history: Vec::new(),
+            history: HistoryState::new(history_capacity),
         }
     }
 
@@ -36,5 +37,10 @@ impl Shell {
         print!("{} $ ", rel.display());
         io::stdout().flush().unwrap();
         io::stdin().read_line(buf)
+    }
+
+    /// Add a job to the history.
+    pub fn add_history(&mut self, job: &ParseInfo) {
+        self.history.push(job);
     }
 }

@@ -10,5 +10,6 @@
 #[macro_use]
 extern crate quick_error;
 
-pub mod parse;
+mod history;
 pub mod shell;
+pub mod parse;

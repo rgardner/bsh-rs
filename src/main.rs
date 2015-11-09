@@ -7,6 +7,8 @@ use std::io::{self, Read, Write};
 use std::process::{Stdio};
 use std::process;
 
+static HISTORY_CAPACITY: usize = 10;
+
 fn execute_job(job: &mut ParseInfo) -> Result<(), io::Error> {
     let mut command = job.commands.get_mut(0).unwrap();
     // if it's a builtin, call the builtin
@@ -41,6 +43,7 @@ fn execute_job(job: &mut ParseInfo) -> Result<(), io::Error> {
 }
 
 fn main() {
+    let mut shell = Shell::new(HISTORY_CAPACITY);
     loop {
         let mut input = String::new();
         match Shell::prompt(&mut input) {
@@ -60,6 +63,8 @@ fn main() {
             _ => continue,
         };
         println!("parsed info: {:?}", info);
+
+        shell.add_history(&info);
 
         if let Err(e) = execute_job(&mut info) {
             println!("bsh: {}", e);
