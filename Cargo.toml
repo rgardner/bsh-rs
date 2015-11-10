@@ -6,7 +6,9 @@ readme = "README.md"
 version = "0.1.0"
 
 [dependencies]
+odds = "0.2.8"
 quick-error = "0.1.4"
+wait-timeout = "0.1"
 
 [dependencies.clippy]
 optional = true

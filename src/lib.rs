@@ -7,8 +7,10 @@
         unsafe_code,
         unused_import_braces, unused_qualifications)]
 
+extern crate odds;
 #[macro_use]
 extern crate quick_error;
+extern crate wait_timeout;
 
 mod history;
 pub mod shell;

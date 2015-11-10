@@ -9,6 +9,7 @@ static HISTORY_CAPACITY: usize = 2;
 fn main() {
     let mut shell = Shell::new(HISTORY_CAPACITY);
     loop {
+        shell.check_jobs();
         let mut input = String::new();
         match Shell::prompt(&mut input) {
             Ok(0) => {

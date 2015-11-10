@@ -5,12 +5,14 @@
 
 use parse::ParseInfo;
 use history::HistoryState;
+use odds::vec::VecExt;
 use std::env;
 use std::fmt;
 use std::fs::{File, OpenOptions};
 use std::io::{self, Read, Write};
 use std::path::Path;
 use std::process::{Child, Stdio};
+use wait_timeout::ChildExt;
 
 /// Bsh Shell
 pub struct Shell {
@@ -87,6 +89,20 @@ impl Shell {
         }
 
         Ok(())
+    }
+
+    /// Check on the status of background jobs, removing exited ones.
+    pub fn check_jobs(&mut self) {
+        self.jobs
+            .retain_mut(|mut child| {
+                match child.wait_timeout_ms(0).unwrap() {
+                    Some(status) => {
+                        println!("[{}]+", status.code());
+                        false
+                    }
+                    None => true
+                }
+            });
     }
 }
 
