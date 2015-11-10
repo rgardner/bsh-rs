@@ -16,7 +16,8 @@ use wait_timeout::ChildExt;
 
 /// Bsh Shell
 pub struct Shell {
-    jobs: Vec<Child>,
+    jobs: Vec<BackgroundJob>,
+    job_count: usize,
     history: HistoryState,
 }
 
@@ -25,6 +26,7 @@ impl Shell {
     pub fn new(history_capacity: usize) -> Shell {
         Shell {
             jobs: Vec::new(),
+            job_count: 0,
             history: HistoryState::with_capacity(history_capacity),
         }
     }
@@ -51,7 +53,13 @@ impl Shell {
     /// Add a job to the background.
     pub fn add_to_background(&mut self, child: Child) {
         println!("[{}]: {}", self.jobs.len(), child.id());
-        self.jobs.push(child);
+        self.job_count += 1;
+        let job = BackgroundJob {
+            command: "".to_string(),
+            child: child,
+            idx: self.job_count as u32,
+        };
+        self.jobs.push(job);
     }
 
     /// Run a job.
@@ -94,15 +102,18 @@ impl Shell {
     /// Check on the status of background jobs, removing exited ones.
     pub fn check_jobs(&mut self) {
         self.jobs
-            .retain_mut(|mut child| {
-                match child.wait_timeout_ms(0).unwrap() {
+            .retain_mut(|mut job| {
+                match job.child.wait_timeout_ms(0).unwrap() {
                     Some(status) => {
-                        println!("[{}]+", status.code());
+                        println!("[{}]+\t{}\t{}", job.idx, status, job.command);
                         false
                     }
                     None => true
                 }
             });
+        if self.jobs.is_empty() {
+            self.job_count = 0;
+        }
     }
 }
 
@@ -110,4 +121,10 @@ impl fmt::Debug for Shell {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{} jobs\n{}", self.jobs.len(), self.history)
     }
+}
+
+struct BackgroundJob {
+    command: String,
+    child: Child,
+    idx: u32,
 }
