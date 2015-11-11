@@ -250,8 +250,10 @@ mod tests {
         infob.command(ProcessBuilder::new("cmd").build());
         infob.infile("infile");
         let info = infob.build();
-        assert_eq!(info.infile, ParseInfo::parse(input_no_space).unwrap().unwrap().infile);
-        assert_eq!(info.infile, ParseInfo::parse(input_with_space).unwrap().unwrap().infile);
+        assert_eq!(info.infile,
+                   ParseInfo::parse(input_no_space).unwrap().unwrap().infile);
+        assert_eq!(info.infile,
+                   ParseInfo::parse(input_with_space).unwrap().unwrap().infile);
     }
 
     #[test]
@@ -267,8 +269,10 @@ mod tests {
         infob.command(ProcessBuilder::new("cmd").build());
         infob.outfile("outfile");
         let info = infob.build();
-        assert_eq!(info.outfile, ParseInfo::parse(input_no_space).unwrap().unwrap().outfile);
-        assert_eq!(info.outfile, ParseInfo::parse(input_with_space).unwrap().unwrap().outfile);
+        assert_eq!(info.outfile,
+                   ParseInfo::parse(input_no_space).unwrap().unwrap().outfile);
+        assert_eq!(info.outfile,
+                   ParseInfo::parse(input_with_space).unwrap().unwrap().outfile);
     }
 
     #[test]

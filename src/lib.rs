@@ -12,6 +12,8 @@ extern crate odds;
 extern crate quick_error;
 extern crate wait_timeout;
 
+mod builtins;
+mod error;
 mod history;
 pub mod shell;
 pub mod parse;

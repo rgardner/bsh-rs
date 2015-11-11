@@ -3,6 +3,8 @@
 //! The Shell itself is responsible for managing background jobs and for
 //! maintaining a history of previous commands.
 
+use builtins;
+use error::BshError;
 use parse::ParseInfo;
 use history::HistoryState;
 use odds::vec::VecExt;
@@ -63,8 +65,12 @@ impl Shell {
     }
 
     /// Run a job.
-    pub fn run(&mut self, job: &mut ParseInfo) -> Result<(), io::Error> {
-        let mut command = job.commands.get_mut(0).unwrap().to_command();
+    pub fn run(&mut self, job: &mut ParseInfo) -> Result<(), BshError> {
+        let process = job.commands.get_mut(0).unwrap();
+        if builtins::is_builtin(&process.program) {
+            return builtins::run(&process);
+        }
+        let mut command = process.to_command();
         // if it's a builtin, call the builtin
 
         if let Some(_) = job.infile {
@@ -101,16 +107,15 @@ impl Shell {
 
     /// Check on the status of background jobs, removing exited ones.
     pub fn check_jobs(&mut self) {
-        self.jobs
-            .retain_mut(|mut job| {
-                match job.child.wait_timeout_ms(0).unwrap() {
-                    Some(status) => {
-                        println!("[{}]+\t{}\t{}", job.idx, status, job.command);
-                        false
-                    }
-                    None => true
+        self.jobs.retain_mut(|mut job| {
+            match job.child.wait_timeout_ms(0).unwrap() {
+                Some(status) => {
+                    println!("[{}]+\t{}\t{}", job.idx, status, job.command);
+                    false
                 }
-            });
+                None => true,
+            }
+        });
         if self.jobs.is_empty() {
             self.job_count = 0;
         }
