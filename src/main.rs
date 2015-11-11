@@ -4,7 +4,7 @@ use bsh_rs::parse::ParseInfo;
 use bsh_rs::shell::Shell;
 use std::process;
 
-static HISTORY_CAPACITY: usize = 2;
+static HISTORY_CAPACITY: usize = 10;
 
 fn main() {
     let mut shell = Shell::new(HISTORY_CAPACITY);

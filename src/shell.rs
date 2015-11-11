@@ -17,7 +17,7 @@ use wait_timeout::ChildExt;
 /// Bsh Shell
 pub struct Shell {
     jobs: Vec<BackgroundJob>,
-    job_count: usize,
+    job_count: u32,
     history: HistoryState,
 }
 
@@ -57,7 +57,7 @@ impl Shell {
         let job = BackgroundJob {
             command: "".to_string(),
             child: child,
-            idx: self.job_count as u32,
+            idx: self.job_count,
         };
         self.jobs.push(job);
     }
