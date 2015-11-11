@@ -51,9 +51,12 @@ pub fn run(process: &Process) -> Result<()> {
 fn cd(args: Vec<String>) -> Result<()> {
     let dir = match args.get(0).map(|x| &x[..]) {
         Some("~") | None =>
-            try!(env::home_dir().ok_or(BshError::BuiltinError(Error::InvalidArgs(String::from("cd: HOME not set"), 1)))),
+            try!(env::home_dir().ok_or(Error::InvalidArgs(String::from("cd: HOME not set"), 1))),
         Some("-") => match env::var_os("OLDPWD") {
-            Some(val) => Path::new(val.as_os_str()).to_path_buf(),
+            Some(val) => {
+                println!("{}", val.to_str().unwrap());
+                Path::new(val.as_os_str()).to_path_buf()
+            }
             None => {
                 return Err(BshError::BuiltinError(Error::InvalidArgs(String::from("cd: OLDPWD not set"), 1)));
             }
