@@ -27,13 +27,10 @@ fn main() {
             }
             _ => continue,
         };
-        println!("parsed info: {:?}", info);
-
         shell.add_history(&info);
 
         if let Err(e) = shell.run(&mut info) {
             println!("bsh: {}", e);
         }
-        println!("{:?}", shell);
     }
 }
