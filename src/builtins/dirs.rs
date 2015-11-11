@@ -12,11 +12,10 @@ impl BuiltinCommand for Cd {
 
     fn help() -> String {
         String::from("\
-cd [dir]
+cd: cd [dir]
     Change the current directory to DIR. The variable $HOME is the default dir.
     If DIR is '-', then the current directory will be the variable $OLDPWD,
-    which is the last working directory.
-")
+    which is the last working directory.")
     }
 
     fn run(args: Vec<String>) -> Result<()> {

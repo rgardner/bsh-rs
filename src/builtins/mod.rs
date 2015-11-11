@@ -15,6 +15,7 @@ mod dirs;
 
 const CD: &'static str = "cd";
 const EXIT: &'static str = "exit";
+const HELP: &'static str = "help";
 const HISTORY: &'static str = "history";
 
 /// A specialized Result type for Parse operations.
@@ -44,7 +45,7 @@ pub trait BuiltinCommand {
 }
 
 pub fn is_builtin(program: &str) -> bool {
-    [CD, HISTORY, EXIT].contains(&program)
+    [CD, HELP, HISTORY, EXIT].contains(&program)
 }
 
 /// precondition: process is a builtin.
@@ -52,8 +53,52 @@ pub fn run(process: &Process) -> Result<()> {
     match &*process.program {
         CD => Cd::run(process.args.clone()),
         EXIT => exit(process.args.clone()),
+        HELP =>  Help::run(process.args.clone()),
         HISTORY => history(process.args.clone()),
         _ => unreachable!(),
+    }
+}
+
+struct Help;
+
+impl BuiltinCommand for Help {
+    fn name() -> String {
+        String::from("help")
+    }
+
+    fn help() -> String {
+        String::from("\
+help: help [pattern ...]
+    Display helpful information about builtin commands. If PATTERN is specified,
+    gives detailed help on all commands matching PATTERN, otherwise a list of the
+    builtins is printed.")
+    }
+
+    fn run(args: Vec<String>) -> Result<()> {
+        if args.is_empty() {
+            println!("{}", Help::help());
+        } else {
+            let mut all_invalid = true;
+            for arg in &args {
+                let msg = match (*arg).as_ref() {
+                    CD => Some(Cd::help()),
+                    EXIT => Some(String::new()),
+                    HELP => Some(Help::help()),
+                    HISTORY => Some(String::new()),
+                    _ => None,
+                };
+                if let Some(msg) = msg {
+                    println!("{}", msg);
+                    all_invalid = false;
+                }
+            }
+            if all_invalid {
+                let cmd = args.last().unwrap();
+                let msg = format!("help: no help topics match {}", cmd);
+                return Err(BshError::BuiltinError(Error::InvalidArgs(msg, 1)));
+            }
+        }
+        Ok(())
     }
 }
 
