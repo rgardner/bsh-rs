@@ -4,12 +4,14 @@
 //! Where possible the
 //! commands conform to their standard Bash counterparts.
 
+pub use self::dirs::*;
+
 use error::BshError;
 use parse::Process;
-use std::env;
-use std::path::Path;
 use std::process;
 use std::result;
+
+mod dirs;
 
 const CD: &'static str = "cd";
 const EXIT: &'static str = "exit";
@@ -34,6 +36,13 @@ quick_error! {
     }
 }
 
+/// Represents a Bsh builtin command such as cd or help.
+pub trait BuiltinCommand {
+    fn name() -> String;
+    fn help() -> String;
+    fn run(args: Vec<String>) -> Result<()>;
+}
+
 pub fn is_builtin(program: &str) -> bool {
     [CD, HISTORY, EXIT].contains(&program)
 }
@@ -41,31 +50,11 @@ pub fn is_builtin(program: &str) -> bool {
 /// precondition: process is a builtin.
 pub fn run(process: &Process) -> Result<()> {
     match &*process.program {
-        CD => cd(process.args.clone()),
+        CD => Cd::run(process.args.clone()),
         EXIT => exit(process.args.clone()),
         HISTORY => history(process.args.clone()),
         _ => unreachable!(),
     }
-}
-
-fn cd(args: Vec<String>) -> Result<()> {
-    let dir = match args.get(0).map(|x| &x[..]) {
-        Some("~") | None =>
-            try!(env::home_dir().ok_or(Error::InvalidArgs(String::from("cd: HOME not set"), 1))),
-        Some("-") => match env::var_os("OLDPWD") {
-            Some(val) => {
-                println!("{}", val.to_str().unwrap());
-                Path::new(val.as_os_str()).to_path_buf()
-            }
-            None => {
-                return Err(BshError::BuiltinError(Error::InvalidArgs(String::from("cd: OLDPWD not set"), 1)));
-            }
-        },
-        Some(val) => Path::new(val).to_path_buf(),
-    };
-    env::set_var("OLDPWD", try!(env::current_dir()));
-    try!(env::set_current_dir(dir));
-    Ok(())
 }
 
 fn exit(args: Vec<String>) -> Result<()> {
