@@ -42,7 +42,7 @@ fn execute_command(mut shell: Shell, command: &str) {
     if let Err(e) = shell.run(&mut info) {
         println!("bsh: {}", e);
         process::exit(1);
-    };
+    }
 }
 
 fn main() {

@@ -53,7 +53,7 @@ pub fn run(process: &Process) -> Result<()> {
     match &*process.program {
         CD => Cd::run(process.args.clone()),
         EXIT => exit(process.args.clone()),
-        HELP =>  Help::run(process.args.clone()),
+        HELP => Help::run(process.args.clone()),
         HISTORY => history(process.args.clone()),
         _ => unreachable!(),
     }
