@@ -1,4 +1,6 @@
 # bsh-rs
+[![Build Status](https://magnum.travis-ci.com/rgardner/bsh-rs.svg?token=PKiUsiwCCXnqdp7dRvmq&branch=master)](https://magnum.travis-ci.com/rgardner/bsh-rs)
+
 This is the [Rust](https://www.rust-lang.org/) version of my
 [bsh](htttps://github.com/rgardner/bsh) program. This program uses unstable
 features (see the [unstable](#unstable) section below) and thus requires Rust
