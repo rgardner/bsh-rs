@@ -64,7 +64,7 @@ impl Shell {
 
     /// Run a job.
     pub fn run(&mut self, job: &mut ParseInfo) -> Result<(), io::Error> {
-        let mut command = job.commands.get_mut(0).unwrap();
+        let mut command = job.commands.get_mut(0).unwrap().to_command();
         // if it's a builtin, call the builtin
 
         if let Some(_) = job.infile {

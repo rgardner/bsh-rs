@@ -3,6 +3,61 @@
 use std::result;
 use std::process::Command;
 
+/// The `Process` type acts a wrapper around `Commands`, facilitating testing.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Process {
+    /// The program to execute.
+    pub program: String,
+    /// The arguments to the program.
+    pub args: Vec<String>,
+}
+
+impl Process {
+    /// Copies `command` and `args` into a `Command`.
+    pub fn to_command(&self) -> Command {
+        let mut cmd = Command::new(self.program.clone());
+        cmd.args(&self.args.clone());
+        cmd
+    }
+}
+
+/// Builds Processes.
+#[derive(Clone, Debug)]
+pub struct ProcessBuilder {
+    program: String,
+    args: Vec<String>,
+}
+
+impl ProcessBuilder {
+    /// Initializes a new ProcessBuilder with the given program and no arguments.
+    pub fn new(program: &str) -> ProcessBuilder {
+        ProcessBuilder {
+            program: String::from(program),
+            args: Vec::new(),
+        }
+    }
+
+    /// Add an argument to pass to the program.
+    pub fn arg(&mut self, arg: &str) -> &mut ProcessBuilder {
+        self.args.push(String::from(arg));
+        self
+    }
+
+    /// Add an argument to pass to the program.
+    pub fn args(&mut self, args: &[&str]) -> &mut ProcessBuilder {
+        self.args.extend(args.iter().map(|x| x.to_string()));
+        self
+    }
+
+    /// Consumes the builder to build a Process.
+    pub fn build(self) -> Process {
+        Process {
+            program: self.program,
+            args: self.args,
+        }
+    }
+}
+
 /// A specialized Result type for Parse operations.
 ///
 /// This type is used because parsing can cause an error.
@@ -24,7 +79,7 @@ quick_error! {
 }
 
 /// Represents all information associated with a user input
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ParseInfo {
     /// Command line, used for messages
     pub command: String,
@@ -35,7 +90,7 @@ pub struct ParseInfo {
     /// Run the command in the background, defaults to false
     pub background: bool,
     /// The commands to execute
-    pub commands: Vec<Command>,
+    pub commands: Vec<Process>,
 }
 
 impl ParseInfo {
@@ -47,7 +102,7 @@ impl ParseInfo {
         }
 
         let mut info = ParseInfoBuilder::new(input);
-        let mut cmd = Command::new(argv[0]);
+        let mut cmd = ProcessBuilder::new(argv[0]);
 
         let mut infile = false;
         let mut outfile = false;
@@ -76,7 +131,10 @@ impl ParseInfo {
                 cmd.arg(arg);
             }
         }
-        info.command(cmd);
+        if infile || outfile {
+            return Err(ParseError::SyntaxError(input.into()));
+        }
+        info.command(cmd.build());
         Ok(Some(info.build()))
     }
 }
@@ -88,7 +146,7 @@ pub struct ParseInfoBuilder {
     infile: Option<String>,
     outfile: Option<String>,
     background: bool,
-    commands: Vec<Command>,
+    commands: Vec<Process>,
 }
 
 impl ParseInfoBuilder {
@@ -129,7 +187,7 @@ impl ParseInfoBuilder {
     }
 
     /// Add a new command.
-    pub fn command(&mut self, command: Command) -> &mut ParseInfoBuilder {
+    pub fn command(&mut self, command: Process) -> &mut ParseInfoBuilder {
         self.commands.push(command);
         self
     }
@@ -149,7 +207,6 @@ impl ParseInfoBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::process::Command;
 
     #[test]
     fn empty() {
@@ -157,52 +214,65 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn single_cmd() {
-        let info = ParseInfoBuilder::new().command(Command::new("cmd")).build();
-        assert_eq!(info, ParseInfo::parse("cmd").unwrap().unwrap());
+        let input = "cmd";
+        let process = ProcessBuilder::new("cmd").build();
+        let mut info = ParseInfoBuilder::new(input);
+        info.command(process);
+        assert_eq!(info.build(), ParseInfo::parse(input).unwrap().unwrap());
     }
 
     #[test]
-    #[ignore]
     fn single_cmd_with_args() {
-        let mut cmd = Command::new("cmd");
-        cmd.args(&vec!["var1", "var2", "var3"]);
-        let info = ParseInfoBuilder::new().command(cmd).build();
-        assert_eq!(info,
-                   ParseInfo::parse("cmd var1 var2 var3").unwrap().unwrap());
+        let input = "cmd var1 var2 var3";
+        let mut process = ProcessBuilder::new("cmd");
+        process.args(&["var1", "var2", "var3"]);
+        let mut info = ParseInfoBuilder::new(input);
+        info.command(process.build());
+        assert_eq!(info.build(), ParseInfo::parse(input).unwrap().unwrap());
     }
 
     #[test]
-    #[ignore]
     fn single_cmd_with_arg() {
-        let mut cmd = Command::new("cmd");
-        cmd.arg("var1");
-        let info = ParseInfoBuilder::new().command(cmd).build();
-        assert_eq!(info, ParseInfo::parse("cmd var1").unwrap().unwrap());
+        let input = "cmd var1";
+        let mut process = ProcessBuilder::new("cmd");
+        process.arg("var1");
+        let mut info = ParseInfoBuilder::new(input);
+        info.command(process.build());
+        assert_eq!(info.build(), ParseInfo::parse("cmd var1").unwrap().unwrap());
     }
 
     #[test]
     fn infile_valid() {
-        let info = ParseInfoBuilder::new().command(Command::new("cmd")).infile("infile").build();
-        assert_eq!(info, ParseInfo::parse("cmd <infile").unwrap().unwrap());
-        assert_eq!(info, ParseInfo::parse("cmd < infile").unwrap().unwrap());
+        let input_no_space = "cmd <infile";
+        let input_with_space = "cmd < infile";
+        let mut infob = ParseInfoBuilder::new(input_no_space);
+        infob.command(ProcessBuilder::new("cmd").build());
+        infob.infile("infile");
+        let info = infob.build();
+        assert_eq!(info.infile, ParseInfo::parse(input_no_space).unwrap().unwrap().infile);
+        assert_eq!(info.infile, ParseInfo::parse(input_with_space).unwrap().unwrap().infile);
     }
 
     #[test]
     fn infile_invalid() {
-        assert!(ParseInfo::parse("cmd <").unwrap().is_none());
+        assert!(ParseInfo::parse("cmd <").is_err());
     }
 
     #[test]
     fn outfile_valid() {
-        let info = ParseInfoBuilder::new().command(Command::new("cmd")).outfile("outfile").build();
-        assert_eq!(info, ParseInfo::parse("cmd >outfile").unwrap().unwrap());
-        assert_eq!(info, ParseInfo::parse("cmd < outfile").unwrap().unwrap());
+        let input_no_space = "cmd >outfile";
+        let input_with_space = "cmd > outfile";
+        let mut infob = ParseInfoBuilder::new(input_no_space);
+        infob.command(ProcessBuilder::new("cmd").build());
+        infob.outfile("outfile");
+        let info = infob.build();
+        assert_eq!(info.outfile, ParseInfo::parse(input_no_space).unwrap().unwrap().outfile);
+        assert_eq!(info.outfile, ParseInfo::parse(input_with_space).unwrap().unwrap().outfile);
     }
 
     #[test]
     fn outfile_invalid() {
-        assert!(ParseInfo::parse("cmd >").unwrap().is_none());
+        assert!(ParseInfo::parse("cmd >").is_err());
     }
 }
