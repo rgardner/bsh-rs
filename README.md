@@ -22,3 +22,14 @@ used:
     current working directory relative to home when it's in a child directory
     and to otherwise show the full path. e.g. it will show `/usr/local/bin` and
     `~/Desktop`.
+- compiler plugins
+  + Docopt can automatically generate an `Args` struct for us given the usage
+    string. This saves us some boilerplate, but will be removed in favor of
+    Rust stable.
+
+## Installation
+```bash
+git clone https://github.com/rgardner/bsh-rs
+cd bsh-rs
+cargo run
+```
