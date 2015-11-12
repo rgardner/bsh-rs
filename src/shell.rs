@@ -12,7 +12,6 @@ use std::env;
 use std::fmt;
 use std::fs::{File, OpenOptions};
 use std::io::{self, Read, Write};
-use std::path::Path;
 use std::process::{Child, Stdio};
 use wait_timeout::ChildExt;
 
@@ -35,16 +34,7 @@ impl Shell {
 
     /// Custom prompt to output to the user.
     pub fn prompt(buf: &mut String) -> io::Result<usize> {
-        let cwd = env::current_dir().unwrap();
-        let home = env::home_dir().unwrap();
-        let rel = match cwd.relative_from(&home) {
-            Some(rel) => Path::new("~/").join(rel),
-            None => cwd.clone(),
-        };
-
-        print!("{} $ ", rel.display());
-        io::stdout().flush().unwrap();
-        io::stdin().read_line(buf)
+        prompt(buf)
     }
 
     /// Add a job to the history.
@@ -132,4 +122,29 @@ struct BackgroundJob {
     command: String,
     child: Child,
     idx: u32,
+}
+
+#[cfg(feature="unstable")]
+/// Custom prompt to output to the user.
+fn prompt(buf: &mut String) -> io::Result<usize> {
+    use std::path::Path;
+    let cwd = env::current_dir().unwrap();
+    let home = env::home_dir().unwrap();
+    let rel = match cwd.relative_from(&home) {
+        Some(rel) => Path::new("~/").join(rel),
+        None => cwd.clone(),
+    };
+
+    print!("{} $ ", rel.display());
+    io::stdout().flush().unwrap();
+    io::stdin().read_line(buf)
+}
+
+#[cfg(not(feature="unstable"))]
+/// Prompt the user for input.
+fn prompt(buf: &mut String) -> io::Result<usize> {
+    let cwd = env::current_dir().unwrap();
+    print!("{} $ ", cwd.display());
+    io::stdout().flush().unwrap();
+    io::stdin().read_line(buf)
 }
