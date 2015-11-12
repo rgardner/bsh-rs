@@ -1,15 +1,13 @@
 //! Bsh builtins
 //!
 //! This module includes the implementations of common shell builtin commands.
-//! Where possible the
-//! commands conform to their standard Bash counterparts.
+//! Where possible the commands conform to their standard Bash counterparts.
 
 pub use self::dirs::*;
 
-use error::BshError;
+use error::{self, Result};
 use parse::ParseCommand;
 use std::process;
-use std::result;
 
 mod dirs;
 
@@ -17,14 +15,6 @@ const CD: &'static str = "cd";
 const EXIT: &'static str = "exit";
 const HELP: &'static str = "help";
 const HISTORY: &'static str = "history";
-
-/// A specialized Result type for Parse operations.
-///
-/// This type is used because parsing can cause an error.
-///
-/// Like std::io::Result, users of this alias should generally use parse::Result instead of
-/// importing this directly.
-pub type Result<T> = result::Result<T, BshError>;
 
 quick_error! {
     #[derive(Debug)]
@@ -98,7 +88,7 @@ help: help [pattern ...]
             if all_invalid {
                 let cmd = args.last().unwrap();
                 let msg = format!("help: no help topics match {}", cmd);
-                return Err(BshError::BuiltinError(Error::InvalidArgs(msg, 1)));
+                return Err(error::Error::BuiltinError(Error::InvalidArgs(msg, 1)));
             }
         }
         Ok(())

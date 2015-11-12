@@ -4,7 +4,7 @@
 //! maintaining a history of previous commands.
 
 use builtins;
-use error::BshError;
+use error;
 use parse::ParseJob;
 use history::HistoryState;
 use odds::vec::VecExt;
@@ -47,7 +47,7 @@ impl Shell {
         println!("[{}]: {}", self.jobs.len(), child.id());
         self.job_count += 1;
         let job = BackgroundJob {
-            command: "".to_string(),
+            command: String::new(),
             child: child,
             idx: self.job_count,
         };
@@ -55,7 +55,7 @@ impl Shell {
     }
 
     /// Run a job.
-    pub fn run(&mut self, job: &mut ParseJob) -> Result<(), BshError> {
+    pub fn run(&mut self, job: &mut ParseJob) -> error::Result<()> {
         let process = job.commands.get_mut(0).unwrap();
         if builtins::is_builtin(&process.program) {
             return builtins::run(&process);

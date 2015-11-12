@@ -1,5 +1,5 @@
-use error::BshError;
-use builtins::{BuiltinCommand, Error, Result};
+use error::{self, Result};
+use builtins::{BuiltinCommand, Error};
 use std::env;
 use std::path::Path;
 
@@ -28,7 +28,7 @@ cd: cd [dir]
                     Path::new(val.as_os_str()).to_path_buf()
                 }
                 None => {
-                    return Err(BshError::BuiltinError(Error::InvalidArgs(String::from("cd: OLDPWD not set"), 1)));
+                    return Err(error::Error::BuiltinError(Error::InvalidArgs(String::from("cd: OLDPWD not set"), 1)));
                 }
             },
             Some(val) => Path::new(val).to_path_buf(),

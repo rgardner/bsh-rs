@@ -1,6 +1,5 @@
 //! BSH Parser
 
-use std::result;
 use std::process::Command;
 
 /// The `ParseCommand` type acts a wrapper around `Commands`, facilitating testing.
@@ -45,7 +44,7 @@ impl ParseCommandBuilder {
 
     /// Add an argument to pass to the program.
     pub fn args(&mut self, args: &[&str]) -> &mut ParseCommandBuilder {
-        self.args.extend(args.iter().map(|x| x.to_string()));
+        self.args.extend(args.iter().map(|x| (*x).to_owned()));
         self
     }
 
@@ -57,14 +56,6 @@ impl ParseCommandBuilder {
         }
     }
 }
-
-/// A specialized Result type for Parse operations.
-///
-/// This type is used because parsing can cause an error.
-///
-/// Like std::io::Result, users of this alias should generally use parse::Result instead of
-/// importing this directly.
-pub type Result<T> = result::Result<T, ParseError>;
 
 quick_error! {
     #[derive(Debug)]
@@ -95,7 +86,7 @@ pub struct ParseJob {
 
 impl ParseJob {
     /// Parses input string into ParseJob
-    pub fn parse(input: &str) -> Result<Option<ParseJob>> {
+    pub fn parse(input: &str) -> Result<Option<ParseJob>, ParseError> {
         let argv: Vec<_> = input.trim().split_whitespace().collect();
         if argv.is_empty() {
             return Ok(None);
