@@ -1,6 +1,3 @@
-#![feature(plugin)]
-#![plugin(docopt_macros)]
-
 extern crate bsh_rs;
 extern crate docopt;
 extern crate rustc_serialize;
@@ -12,7 +9,7 @@ use std::process;
 
 static HISTORY_CAPACITY: usize = 10;
 
-docopt!(Args derive Debug, "
+const USAGE: &'static str = "
 bsh.
 
 Usage:
@@ -26,7 +23,15 @@ Options:
     --version    Show version.
     -c           If the -c option is present, then commands are read from the first non-option
                      argument command_string.
-");
+";
+
+/// Docopts input arguments.
+#[derive(Debug, RustcDecodable)]
+struct Args {
+    flag_version: bool,
+    flag_c: bool,
+    arg_command: Option<String>,
+}
 
 /// Execute a command string in the context of the shell.
 fn execute_command(mut shell: Shell, command: &str) {
@@ -46,7 +51,7 @@ fn execute_command(mut shell: Shell, command: &str) {
 }
 
 fn main() {
-    let args: Args = Args::docopt().decode().unwrap_or_else(|e| e.exit());
+    let args: Args = Docopt::new(USAGE).and_then(|d| d.decode()).unwrap_or_else(|e| e.exit());
 
     if args.flag_version {
         println!("bsh version {}", env!("CARGO_PKG_VERSION"));
@@ -55,7 +60,7 @@ fn main() {
 
     let mut shell = Shell::new(HISTORY_CAPACITY);
     if args.flag_c {
-        execute_command(shell, &args.arg_command);
+        execute_command(shell, &args.arg_command.unwrap());
         process::exit(0);
     }
 
