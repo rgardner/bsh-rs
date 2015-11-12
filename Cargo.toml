@@ -5,6 +5,9 @@ name = "bsh-rs"
 readme = "README.md"
 version = "0.1.0"
 
+[[bin]]
+name = "bsh"
+
 [dependencies]
 docopt = "0.6.75"
 docopt_macros = "0.6.75"
