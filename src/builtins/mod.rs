@@ -39,8 +39,11 @@ quick_error! {
 
 /// Represents a Bsh builtin command such as cd or help.
 pub trait BuiltinCommand {
+    /// The name of the command.
     fn name() -> String;
+    /// The help string used for displaying to the user.
     fn help() -> String;
+    /// Runs the command with the given arguments.
     fn run(args: Vec<String>) -> Result<()>;
 }
 
