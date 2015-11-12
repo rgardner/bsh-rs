@@ -5,7 +5,7 @@ extern crate bsh_rs;
 extern crate docopt;
 extern crate rustc_serialize;
 
-use bsh_rs::parse::ParseInfo;
+use bsh_rs::parse::ParseJob;
 use bsh_rs::shell::Shell;
 use docopt::Docopt;
 use std::process;
@@ -30,7 +30,7 @@ Options:
 
 /// Execute a command string in the context of the shell.
 fn execute_command(mut shell: Shell, command: &str) {
-    let mut info = match ParseInfo::parse(command) {
+    let mut info = match ParseJob::parse(command) {
         Ok(Some(info)) => info,
         Err(err) => {
             println!("{:?}", err);
@@ -70,7 +70,7 @@ fn main() {
             Err(_) => panic!("failed to read line."),
             _ => {}
         }
-        let mut info = match ParseInfo::parse(&input) {
+        let mut info = match ParseJob::parse(&input) {
             Ok(Some(info)) => info,
             Err(err) => {
                 println!("{:?}", err);

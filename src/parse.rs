@@ -3,16 +3,16 @@
 use std::result;
 use std::process::Command;
 
-/// The `Process` type acts a wrapper around `Commands`, facilitating testing.
+/// The `ParseCommand` type acts a wrapper around `Commands`, facilitating testing.
 #[derive(Clone, Debug, PartialEq)]
-pub struct Process {
+pub struct ParseCommand {
     /// The program to execute.
     pub program: String,
     /// The arguments to the program.
     pub args: Vec<String>,
 }
 
-impl Process {
+impl ParseCommand {
     /// Copies `command` and `args` into a `Command`.
     pub fn to_command(&self) -> Command {
         let mut cmd = Command::new(self.program.clone());
@@ -21,37 +21,37 @@ impl Process {
     }
 }
 
-/// Builds Processes.
+/// Builds ParseCommandes.
 #[derive(Clone, Debug)]
-pub struct ProcessBuilder {
+pub struct ParseCommandBuilder {
     program: String,
     args: Vec<String>,
 }
 
-impl ProcessBuilder {
-    /// Initializes a new ProcessBuilder with the given program and no arguments.
-    pub fn new(program: &str) -> ProcessBuilder {
-        ProcessBuilder {
+impl ParseCommandBuilder {
+    /// Initializes a new ParseCommandBuilder with the given program and no arguments.
+    pub fn new(program: &str) -> ParseCommandBuilder {
+        ParseCommandBuilder {
             program: String::from(program),
             args: Vec::new(),
         }
     }
 
     /// Add an argument to pass to the program.
-    pub fn arg(&mut self, arg: &str) -> &mut ProcessBuilder {
+    pub fn arg(&mut self, arg: &str) -> &mut ParseCommandBuilder {
         self.args.push(String::from(arg));
         self
     }
 
     /// Add an argument to pass to the program.
-    pub fn args(&mut self, args: &[&str]) -> &mut ProcessBuilder {
+    pub fn args(&mut self, args: &[&str]) -> &mut ParseCommandBuilder {
         self.args.extend(args.iter().map(|x| x.to_string()));
         self
     }
 
-    /// Consumes the builder to build a Process.
-    pub fn build(self) -> Process {
-        Process {
+    /// Consumes the builder to build a ParseCommand.
+    pub fn build(self) -> ParseCommand {
+        ParseCommand {
             program: self.program,
             args: self.args,
         }
@@ -80,7 +80,7 @@ quick_error! {
 
 /// Represents all information associated with a user input
 #[derive(Clone, Debug, PartialEq)]
-pub struct ParseInfo {
+pub struct ParseJob {
     /// Command line, used for messages
     pub command: String,
     /// The name of the input file, if one is specified
@@ -90,19 +90,19 @@ pub struct ParseInfo {
     /// Run the command in the background, defaults to false
     pub background: bool,
     /// The commands to execute
-    pub commands: Vec<Process>,
+    pub commands: Vec<ParseCommand>,
 }
 
-impl ParseInfo {
-    /// Parses input string into ParseInfo
-    pub fn parse(input: &str) -> Result<Option<ParseInfo>> {
+impl ParseJob {
+    /// Parses input string into ParseJob
+    pub fn parse(input: &str) -> Result<Option<ParseJob>> {
         let argv: Vec<_> = input.trim().split_whitespace().collect();
         if argv.is_empty() {
             return Ok(None);
         }
 
-        let mut info = ParseInfoBuilder::new(input);
-        let mut cmd = ProcessBuilder::new(argv[0]);
+        let mut info = ParseJobBuilder::new(input);
+        let mut cmd = ParseCommandBuilder::new(argv[0]);
 
         let mut infile = false;
         let mut outfile = false;
@@ -141,16 +141,16 @@ impl ParseInfo {
 
 /// Build Parse Info
 #[derive(Debug)]
-pub struct ParseInfoBuilder {
+pub struct ParseJobBuilder {
     command: String,
     infile: Option<String>,
     outfile: Option<String>,
     background: bool,
-    commands: Vec<Process>,
+    commands: Vec<ParseCommand>,
 }
 
-impl ParseInfoBuilder {
-    /// Construct a new `ParseInfoBuilder` for parsing commands, with the following default
+impl ParseJobBuilder {
+    /// Construct a new `ParseJobBuilder` for parsing commands, with the following default
     /// configuration:
     ///
     /// * No input/output redirection
@@ -158,8 +158,8 @@ impl ParseInfoBuilder {
     /// * No program or commands
     ///
     /// Builder methods are provided to change these defaults and otherwise configure the job.
-    pub fn new(command: &str) -> ParseInfoBuilder {
-        ParseInfoBuilder {
+    pub fn new(command: &str) -> ParseJobBuilder {
+        ParseJobBuilder {
             command: String::from(command),
             infile: None,
             outfile: None,
@@ -169,32 +169,32 @@ impl ParseInfoBuilder {
     }
 
     /// Add input redirection from the specified filename.
-    pub fn infile(&mut self, filename: &str) -> &mut ParseInfoBuilder {
+    pub fn infile(&mut self, filename: &str) -> &mut ParseJobBuilder {
         self.infile = Some(String::from(filename));
         self
     }
 
     /// Add output redirection to the specified filename.
-    pub fn outfile(&mut self, filename: &str) -> &mut ParseInfoBuilder {
+    pub fn outfile(&mut self, filename: &str) -> &mut ParseJobBuilder {
         self.outfile = Some(String::from(filename));
         self
     }
 
     /// Configure job to run in the background.
-    pub fn background(&mut self, background: bool) -> &mut ParseInfoBuilder {
+    pub fn background(&mut self, background: bool) -> &mut ParseJobBuilder {
         self.background = background;
         self
     }
 
     /// Add a new command.
-    pub fn command(&mut self, command: Process) -> &mut ParseInfoBuilder {
+    pub fn command(&mut self, command: ParseCommand) -> &mut ParseJobBuilder {
         self.commands.push(command);
         self
     }
 
     /// Build the final job.
-    pub fn build(self) -> ParseInfo {
-        ParseInfo {
+    pub fn build(self) -> ParseJob {
+        ParseJob {
             command: self.command,
             infile: self.infile,
             outfile: self.outfile,
@@ -210,73 +210,73 @@ mod tests {
 
     #[test]
     fn empty() {
-        assert!(ParseInfo::parse("").unwrap().is_none());
+        assert!(ParseJob::parse("").unwrap().is_none());
     }
 
     #[test]
     fn single_cmd() {
         let input = "cmd";
-        let process = ProcessBuilder::new("cmd").build();
-        let mut info = ParseInfoBuilder::new(input);
+        let process = ParseCommandBuilder::new("cmd").build();
+        let mut info = ParseJobBuilder::new(input);
         info.command(process);
-        assert_eq!(info.build(), ParseInfo::parse(input).unwrap().unwrap());
+        assert_eq!(info.build(), ParseJob::parse(input).unwrap().unwrap());
     }
 
     #[test]
     fn single_cmd_with_args() {
         let input = "cmd var1 var2 var3";
-        let mut process = ProcessBuilder::new("cmd");
+        let mut process = ParseCommandBuilder::new("cmd");
         process.args(&["var1", "var2", "var3"]);
-        let mut info = ParseInfoBuilder::new(input);
+        let mut info = ParseJobBuilder::new(input);
         info.command(process.build());
-        assert_eq!(info.build(), ParseInfo::parse(input).unwrap().unwrap());
+        assert_eq!(info.build(), ParseJob::parse(input).unwrap().unwrap());
     }
 
     #[test]
     fn single_cmd_with_arg() {
         let input = "cmd var1";
-        let mut process = ProcessBuilder::new("cmd");
+        let mut process = ParseCommandBuilder::new("cmd");
         process.arg("var1");
-        let mut info = ParseInfoBuilder::new(input);
+        let mut info = ParseJobBuilder::new(input);
         info.command(process.build());
-        assert_eq!(info.build(), ParseInfo::parse("cmd var1").unwrap().unwrap());
+        assert_eq!(info.build(), ParseJob::parse("cmd var1").unwrap().unwrap());
     }
 
     #[test]
     fn infile_valid() {
         let input_no_space = "cmd <infile";
         let input_with_space = "cmd < infile";
-        let mut infob = ParseInfoBuilder::new(input_no_space);
-        infob.command(ProcessBuilder::new("cmd").build());
+        let mut infob = ParseJobBuilder::new(input_no_space);
+        infob.command(ParseCommandBuilder::new("cmd").build());
         infob.infile("infile");
         let info = infob.build();
         assert_eq!(info.infile,
-                   ParseInfo::parse(input_no_space).unwrap().unwrap().infile);
+                   ParseJob::parse(input_no_space).unwrap().unwrap().infile);
         assert_eq!(info.infile,
-                   ParseInfo::parse(input_with_space).unwrap().unwrap().infile);
+                   ParseJob::parse(input_with_space).unwrap().unwrap().infile);
     }
 
     #[test]
     fn infile_invalid() {
-        assert!(ParseInfo::parse("cmd <").is_err());
+        assert!(ParseJob::parse("cmd <").is_err());
     }
 
     #[test]
     fn outfile_valid() {
         let input_no_space = "cmd >outfile";
         let input_with_space = "cmd > outfile";
-        let mut infob = ParseInfoBuilder::new(input_no_space);
-        infob.command(ProcessBuilder::new("cmd").build());
+        let mut infob = ParseJobBuilder::new(input_no_space);
+        infob.command(ParseCommandBuilder::new("cmd").build());
         infob.outfile("outfile");
         let info = infob.build();
         assert_eq!(info.outfile,
-                   ParseInfo::parse(input_no_space).unwrap().unwrap().outfile);
+                   ParseJob::parse(input_no_space).unwrap().unwrap().outfile);
         assert_eq!(info.outfile,
-                   ParseInfo::parse(input_with_space).unwrap().unwrap().outfile);
+                   ParseJob::parse(input_with_space).unwrap().unwrap().outfile);
     }
 
     #[test]
     fn outfile_invalid() {
-        assert!(ParseInfo::parse("cmd >").is_err());
+        assert!(ParseJob::parse("cmd >").is_err());
     }
 }

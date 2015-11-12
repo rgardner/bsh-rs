@@ -5,7 +5,7 @@
 
 use builtins;
 use error::BshError;
-use parse::ParseInfo;
+use parse::ParseJob;
 use history::HistoryState;
 use odds::vec::VecExt;
 use std::env;
@@ -48,7 +48,7 @@ impl Shell {
     }
 
     /// Add a job to the history.
-    pub fn add_history(&mut self, job: &ParseInfo) {
+    pub fn add_history(&mut self, job: &ParseJob) {
         self.history.push(&job);
     }
 
@@ -65,7 +65,7 @@ impl Shell {
     }
 
     /// Run a job.
-    pub fn run(&mut self, job: &mut ParseInfo) -> Result<(), BshError> {
+    pub fn run(&mut self, job: &mut ParseJob) -> Result<(), BshError> {
         let process = job.commands.get_mut(0).unwrap();
         if builtins::is_builtin(&process.program) {
             return builtins::run(&process);

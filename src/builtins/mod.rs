@@ -7,7 +7,7 @@
 pub use self::dirs::*;
 
 use error::BshError;
-use parse::Process;
+use parse::ParseCommand;
 use std::process;
 use std::result;
 
@@ -49,7 +49,7 @@ pub fn is_builtin(program: &str) -> bool {
 }
 
 /// precondition: process is a builtin.
-pub fn run(process: &Process) -> Result<()> {
+pub fn run(process: &ParseCommand) -> Result<()> {
     match &*process.program {
         CD => Cd::run(process.args.clone()),
         EXIT => exit(process.args.clone()),

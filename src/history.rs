@@ -1,4 +1,4 @@
-use parse::ParseInfo;
+use parse::ParseJob;
 use std::fmt;
 
 #[derive(Debug)]
@@ -22,7 +22,7 @@ impl HistoryState {
         }
     }
 
-    pub fn push(&mut self, job: &ParseInfo) {
+    pub fn push(&mut self, job: &ParseJob) {
         let idx = self.count % self.entries.capacity();
         let entry = HistoryEntry {
             line: job.command.clone(),
