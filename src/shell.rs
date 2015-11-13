@@ -43,6 +43,9 @@ impl Shell {
     }
 
     /// Add a job to the background.
+    ///
+    /// Job ids start at 1 and increment upwards as long as all the job list is non-empty. When
+    /// all jobs have finished executing, the next background job id will be 1.
     pub fn add_to_background(&mut self, child: Child) {
         println!("[{}]: {}", self.jobs.len(), child.id());
         self.job_count += 1;
@@ -125,7 +128,7 @@ struct BackgroundJob {
 }
 
 #[cfg(feature="unstable")]
-/// Custom prompt to output to the user.
+/// Print the current directory relative to $HOME and prompt the user for input.
 fn prompt(buf: &mut String) -> io::Result<usize> {
     use std::path::Path;
     let cwd = env::current_dir().unwrap();
@@ -141,7 +144,7 @@ fn prompt(buf: &mut String) -> io::Result<usize> {
 }
 
 #[cfg(not(feature="unstable"))]
-/// Prompt the user for input.
+/// Print the full directory and prompt the user for input.
 fn prompt(buf: &mut String) -> io::Result<usize> {
     let cwd = env::current_dir().unwrap();
     print!("{} $ ", cwd.display());
