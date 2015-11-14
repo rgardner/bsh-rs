@@ -3,7 +3,9 @@ FEATURES ?= --features "dev"
 all: build
 
 build:
-	cargo clean
-	multirust run nightly cargo build $(FEATURES)
+	cargo build
 
-.PHONY: all build
+dev:
+	multirust run nightly cargo do clean, build $(FEATURES)
+
+.PHONY: all build dev
