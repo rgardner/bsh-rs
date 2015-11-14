@@ -7,6 +7,7 @@ pub use self::dirs::*;
 
 use error::{self, Result};
 use parse::ParseCommand;
+use shell::Shell;
 use std::process;
 
 mod dirs;
@@ -33,8 +34,8 @@ pub trait BuiltinCommand {
     fn name() -> String;
     /// The help string used for displaying to the user.
     fn help() -> String;
-    /// Runs the command with the given arguments.
-    fn run(args: Vec<String>) -> Result<()>;
+    /// Runs the command with the given arguments in the `shell` environment.
+    fn run(shell: &Shell, args: Vec<String>) -> Result<()>;
 }
 
 pub fn is_builtin(program: &str) -> bool {
@@ -42,12 +43,12 @@ pub fn is_builtin(program: &str) -> bool {
 }
 
 /// precondition: process is a builtin.
-pub fn run(process: &ParseCommand) -> Result<()> {
+pub fn run(shell: &Shell, process: &ParseCommand) -> Result<()> {
     match &*process.program {
-        CD => Cd::run(process.args.clone()),
-        EXIT => Exit::run(process.args.clone()),
-        HELP => Help::run(process.args.clone()),
-        HISTORY => History::run(process.args.clone()),
+        CD => Cd::run(&shell, process.args.clone()),
+        EXIT => Exit::run(&shell, process.args.clone()),
+        HELP => Help::run(&shell, process.args.clone()),
+        HISTORY => History::run(&shell, process.args.clone()),
         _ => unreachable!(),
     }
 }
@@ -67,7 +68,7 @@ help: help [pattern ...]
     builtins is printed.")
     }
 
-    fn run(args: Vec<String>) -> Result<()> {
+    fn run(_shell: &Shell, args: Vec<String>) -> Result<()> {
         if args.is_empty() {
             println!("{}", Help::help());
         } else {
@@ -109,7 +110,11 @@ exit: exit [n]
     is 0.")
     }
 
-    fn run(args: Vec<String>) -> Result<()> {
+    fn run(shell: &Shell, args: Vec<String>) -> Result<()> {
+        if shell.has_background_jobs() {
+            println!("There are stopped jobs.");
+            return Ok(());
+        }
         println!("exit");
         if let Some(code) = args.get(0) {
             let code: i32 = match code.parse() {
@@ -143,8 +148,8 @@ history: history [-c] [n]
     the history list to be cleared by deleting all of the entries.")
     }
 
-    fn run(_args: Vec<String>) -> Result<()> {
-        // TODO(rgardner): needs access to the shell. Need to rethink design.
+    fn run(shell: &Shell, _args: Vec<String>) -> Result<()> {
+        println!("{}", shell.history);
         Ok(())
     }
 }

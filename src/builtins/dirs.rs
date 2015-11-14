@@ -1,5 +1,6 @@
 use error::{self, Result};
 use builtins::{BuiltinCommand, Error};
+use shell::Shell;
 use std::env;
 use std::path::Path;
 
@@ -18,7 +19,7 @@ cd: cd [dir]
     which is the last working directory.")
     }
 
-    fn run(args: Vec<String>) -> Result<()> {
+    fn run(_shell: &Shell, args: Vec<String>) -> Result<()> {
         let dir = match args.get(0).map(|x| &x[..]) {
             Some("~") | None =>
                 try!(env::home_dir().ok_or(Error::InvalidArgs(String::from("cd: HOME not set"), 1))),

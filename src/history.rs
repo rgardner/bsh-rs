@@ -38,11 +38,13 @@ impl HistoryState {
 
 impl fmt::Display for HistoryState {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let entries = self.entries
-                          .iter()
-                          .map(|e| format!("\t{}\t{}", e.timestamp.clone(), e.line.clone()))
-                          .collect::<Vec<String>>()
-                          .join("\n");
+        let idx = self.count % self.entries.capacity();
+        let (end, start) = self.entries.split_at(idx);
+        let entries = start.iter()
+                           .chain(end.iter())
+                           .map(|e| format!("\t{}\t{}", e.timestamp.clone(), e.line.clone()))
+                           .collect::<Vec<String>>()
+                           .join("\n");
         write!(f, "{}", entries)
     }
 }

@@ -19,7 +19,8 @@ use wait_timeout::ChildExt;
 pub struct Shell {
     jobs: Vec<BackgroundJob>,
     job_count: u32,
-    history: HistoryState,
+    /// History of previously executed shell commands.
+    pub history: HistoryState,
 }
 
 impl Shell {
@@ -61,7 +62,7 @@ impl Shell {
     pub fn run(&mut self, job: &mut ParseJob) -> error::Result<()> {
         let process = job.commands.get_mut(0).unwrap();
         if builtins::is_builtin(&process.program) {
-            return builtins::run(&process);
+            return builtins::run(&self, &process);
         }
         let mut command = process.to_command();
         // if it's a builtin, call the builtin
@@ -96,6 +97,11 @@ impl Shell {
         }
 
         Ok(())
+    }
+
+    /// Returns `true` if the shell does not have any background jobs.
+    pub fn has_background_jobs(&self) -> bool {
+        self.jobs.is_empty()
     }
 
     /// Check on the status of background jobs, removing exited ones.

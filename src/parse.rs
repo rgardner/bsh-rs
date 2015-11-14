@@ -87,12 +87,13 @@ pub struct ParseJob {
 impl ParseJob {
     /// Parses input string into ParseJob
     pub fn parse(input: &str) -> Result<Option<ParseJob>, ParseError> {
-        let argv: Vec<_> = input.trim().split_whitespace().collect();
+        let input_trimmed = input.trim();
+        let argv: Vec<_> = input_trimmed.split_whitespace().collect();
         if argv.is_empty() {
             return Ok(None);
         }
 
-        let mut info = ParseJobBuilder::new(input);
+        let mut info = ParseJobBuilder::new(input_trimmed);
         let mut cmd = ParseCommandBuilder::new(argv[0]);
 
         let mut infile = false;
