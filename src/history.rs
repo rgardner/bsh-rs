@@ -26,7 +26,7 @@ impl HistoryState {
         let idx = self.count % self.entries.capacity();
         let entry = HistoryEntry {
             line: job.command.clone(),
-            timestamp: self.count,
+            timestamp: self.count + 1,
         };
         match self.entries.get(idx) {
             Some(_) => self.entries[idx] = entry,
@@ -34,6 +34,19 @@ impl HistoryState {
         }
         self.count += 1;
     }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
+        self.count = 0;
+    }
+
+    //pub fn display(&self, last: u32) -> Option<&str> {
+        //if count == 0 || last > self.entries.capacity() {
+            //return None;
+        //}
+        //let idx = self.count & self.entries.capacity();
+        //let (end, start) = self.entries.split_at(idx);
+    //}
 }
 
 impl fmt::Display for HistoryState {

@@ -19,7 +19,7 @@ cd: cd [dir]
     which is the last working directory.")
     }
 
-    fn run(_shell: &Shell, args: Vec<String>) -> Result<()> {
+    fn run(_shell: &mut Shell, args: Vec<String>) -> Result<()> {
         let dir = match args.get(0).map(|x| &x[..]) {
             Some("~") | None =>
                 try!(env::home_dir().ok_or(Error::InvalidArgs(String::from("cd: HOME not set"), 1))),

@@ -62,7 +62,7 @@ impl Shell {
     pub fn run(&mut self, job: &mut ParseJob) -> error::Result<()> {
         let process = job.commands.get_mut(0).unwrap();
         if builtins::is_builtin(&process.program) {
-            return builtins::run(&self, &process);
+            return builtins::run(self, &process);
         }
         let mut command = process.to_command();
         // if it's a builtin, call the builtin
