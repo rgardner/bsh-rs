@@ -156,13 +156,13 @@ history: history [-c] [n]
         let arg = args.first().unwrap();
         match &**arg {
             "-c" => shell.history.clear(),
-            s => match s.parse::<u32>() {
-                Ok(num) => println!("TODO: print last {} entries", num),
+            s => match s.parse::<usize>() {
+                Ok(num) => println!("{}", shell.history.display(num)),
                 Err(_) => {
-                    let msg = format!("history: {}: numeric argument required", s);
+                    let msg = format!("history: {}: nonnegative numeric argument required", s);
                     return Err(error::Error::BuiltinError(Error::InvalidArgs(msg, 1)));
                 }
-            }
+            },
         }
         Ok(())
     }

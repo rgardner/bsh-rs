@@ -1,4 +1,5 @@
 use parse::ParseJob;
+use std::cmp;
 use std::fmt;
 
 #[derive(Debug)]
@@ -40,24 +41,22 @@ impl HistoryState {
         self.count = 0;
     }
 
-    //pub fn display(&self, last: u32) -> Option<&str> {
-        //if count == 0 || last > self.entries.capacity() {
-            //return None;
-        //}
-        //let idx = self.count & self.entries.capacity();
-        //let (end, start) = self.entries.split_at(idx);
-    //}
+    pub fn display(&self, last: usize) -> String {
+        let len = self.entries.len();
+        let skip = len - cmp::min(last, len);
+        let idx = self.count % self.entries.capacity();
+        let (end, start) = self.entries.split_at(idx);
+        start.iter()
+             .chain(end.iter())
+             .skip(skip)
+             .map(|e| format!("\t{}\t{}", e.timestamp.clone(), e.line.clone()))
+             .collect::<Vec<String>>()
+             .join("\n")
+    }
 }
 
 impl fmt::Display for HistoryState {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let idx = self.count % self.entries.capacity();
-        let (end, start) = self.entries.split_at(idx);
-        let entries = start.iter()
-                           .chain(end.iter())
-                           .map(|e| format!("\t{}\t{}", e.timestamp.clone(), e.line.clone()))
-                           .collect::<Vec<String>>()
-                           .join("\n");
-        write!(f, "{}", entries)
+        write!(f, "{}", self.display(self.count))
     }
 }
