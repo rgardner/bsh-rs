@@ -49,11 +49,16 @@ impl HistoryState {
         match size.cmp(&capacity) {
             Ordering::Equal => return,
             Ordering::Less => {
-                self.clear();
-                self.entries.truncate(size);
+                self.entries.clear();
                 self.entries.shrink_to_fit();
+                self.entries.reserve_exact(size);
             }
-            Ordering::Greater => self.entries.reserve_exact(size - capacity),
+            Ordering::Greater => {
+                // Empty vectors: reserve_exact(size) = || capacity = size;
+                // Nonempty vectors: reserve_exact(size) = || capacity += size;
+                let reserve = if self.count > 0 { size - self.entries.capacity() } else { size };
+                self.entries.reserve_exact(reserve);
+            }
         }
     }
 
@@ -82,56 +87,85 @@ mod tests {
     use super::*;
     use super::super::parse::ParseJob;
 
+    fn alloc_history_state(capacity: usize, full: usize) -> HistoryState {
+        assert!(full <= capacity);
+        let mut state = HistoryState::with_capacity(capacity);
+        let job = ParseJob::parse("cmd").unwrap().unwrap();
+        for _ in 0..full {
+            state.push(&job.clone());
+        }
+        state
+    }
+
     #[test]
     fn init_with_capacity() {
-        let init_size = 10;
-        let state = HistoryState::with_capacity(init_size);
-        assert_eq!(init_size, state.entries.capacity());
+        let capacity = 10;
+        let state = HistoryState::with_capacity(capacity);
+        assert_eq!(capacity, state.entries.capacity());
         assert!(state.entries.is_empty());
         assert_eq!(0, state.count);
     }
 
     #[test]
     fn clear() {
-        let init_size = 10;
-        let mut state = HistoryState::with_capacity(init_size);
-        let jobs = "cmd1 cmd2 cmd3".split_whitespace().map(|c| ParseJob::parse(c).unwrap().unwrap());
-        for j in jobs {
-            state.push(&j);
-        }
+        let capacity = 10;
+        let mut state = alloc_history_state(capacity, 5);
         state.clear();
         assert!(state.entries.is_empty());
+        assert_eq!(capacity, state.entries.capacity());
         assert_eq!(0, state.count);
     }
 
     #[test]
     fn set_size_equal() {
-        let init_size = 10;
-        let mut state = HistoryState::with_capacity(init_size);
-        assert_eq!(init_size, state.entries.capacity());
-        state.set_size(init_size);
-        assert_eq!(init_size, state.entries.capacity());
+        let init_capacity = 10;
+
+        // empty history state
+        let mut state = HistoryState::with_capacity(init_capacity);
+        assert_eq!(init_capacity, state.entries.capacity());
+        state.set_size(init_capacity);
+        assert_eq!(init_capacity, state.entries.capacity());
+
+        // full history state
+        let mut state = alloc_history_state(init_capacity, init_capacity);
+        assert_eq!(init_capacity, state.entries.capacity());
+        state.set_size(init_capacity);
+        assert_eq!(init_capacity, state.entries.capacity());
     }
 
     #[test]
-    #[ignore]
     fn set_size_greater() {
-        let init_size = 10;
-        let new_size = 15;
-        let mut state = HistoryState::with_capacity(init_size);
-        assert_eq!(init_size, state.entries.capacity());
-        state.set_size(new_size);
-        assert_eq!(new_size, state.entries.capacity());
+        let init_capacity = 10;
+        let new_capacity = 15;
+
+        // empty history state
+        let mut state = HistoryState::with_capacity(init_capacity);
+        assert_eq!(init_capacity, state.entries.capacity());
+        state.set_size(new_capacity);
+        assert_eq!(new_capacity, state.entries.capacity());
+
+        // full history state
+        let mut state = alloc_history_state(init_capacity, init_capacity);
+        assert_eq!(init_capacity, state.entries.capacity());
+        state.set_size(new_capacity);
+        assert_eq!(new_capacity, state.entries.capacity());
     }
 
     #[test]
-    #[ignore]
     fn set_size_less() {
-        let init_size = 10;
-        let new_size = 5;
-        let mut state = HistoryState::with_capacity(init_size);
-        assert_eq!(init_size, state.entries.capacity());
-        state.set_size(new_size);
-        assert_eq!(new_size, state.entries.capacity());
+        let init_capacity = 10;
+        let new_capacity = 5;
+
+        // empty history state
+        let mut state = HistoryState::with_capacity(init_capacity);
+        assert_eq!(init_capacity, state.entries.capacity());
+        state.set_size(new_capacity);
+        assert_eq!(new_capacity, state.entries.capacity());
+
+        // full history state
+        let mut state = alloc_history_state(init_capacity, init_capacity);
+        assert_eq!(init_capacity, state.entries.capacity());
+        state.set_size(new_capacity);
+        assert_eq!(new_capacity, state.entries.capacity());
     }
 }
