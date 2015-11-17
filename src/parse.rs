@@ -86,6 +86,17 @@ pub struct ParseJob {
 
 impl ParseJob {
     /// Parses input string into ParseJob
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate bsh_rs;
+    /// # fn main() {
+    ///     use bsh_rs::parse::ParseJob;
+    ///     assert!(ParseJob::parse("echo test").unwrap().is_some());
+    /// # }
+    ///
+    /// ```
     pub fn parse(input: &str) -> Result<Option<ParseJob>, ParseError> {
         let input_trimmed = input.trim();
         let argv: Vec<_> = input_trimmed.split_whitespace().collect();
