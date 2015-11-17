@@ -156,8 +156,15 @@ history: history [-c] [n]
         let arg = args.first().unwrap();
         match &**arg {
             "-c" => shell.history.clear(),
+            "-s" => {
+                if let Some(s) = args.get(2) {
+                    if let Ok(n) = s.parse::<usize>() {
+                        shell.history.set_size(n);
+                    }
+                }
+            }
             s => match s.parse::<usize>() {
-                Ok(num) => println!("{}", shell.history.display(num)),
+                Ok(n) => println!("{}", shell.history.display(n)),
                 Err(_) => {
                     let msg = format!("history: {}: nonnegative numeric argument required", s);
                     return Err(error::Error::BuiltinError(Error::InvalidArgs(msg, 1)));
