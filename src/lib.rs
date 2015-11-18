@@ -16,6 +16,9 @@ extern crate odds;
 extern crate quick_error;
 extern crate wait_timeout;
 
+pub use self::shell::Shell;
+pub use self::parse::{ParseCommand, ParseJob};
+
 mod builtins;
 pub mod error;
 mod history;

@@ -6,8 +6,7 @@ extern crate bsh_rs;
 extern crate docopt;
 extern crate rustc_serialize;
 
-use bsh_rs::parse::ParseJob;
-use bsh_rs::shell::Shell;
+use bsh_rs::{ParseJob, Shell};
 use docopt::Docopt;
 use std::process;
 

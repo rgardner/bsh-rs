@@ -48,8 +48,8 @@ impl Shell {
     /// Job ids start at 1 and increment upwards as long as all the job list is non-empty. When
     /// all jobs have finished executing, the next background job id will be 1.
     pub fn add_to_background(&mut self, child: Child) {
-        println!("[{}]: {}", self.jobs.len(), child.id());
         self.job_count += 1;
+        println!("[{}] {}", self.job_count, child.id());
         let job = BackgroundJob {
             command: String::new(),
             child: child,
@@ -119,6 +119,20 @@ impl Shell {
             self.job_count = 0;
         }
     }
+
+    /// Kills a child with the corresponding jobid.
+    ///
+    /// Returns `true` if a corresponding job exists; `false`, otherwise.
+    pub fn kill_job(&mut self, jobid: u32) -> error::Result<Option<BackgroundJob>> {
+        match self.jobs.iter().position(|j| j.idx == jobid) {
+            Some(n) => {
+                let mut job = self.jobs.remove(n);
+                try!(job.child.kill());
+                Ok(Some(job))
+            }
+            None => Ok(None),
+        }
+    }
 }
 
 impl fmt::Debug for Shell {
@@ -127,10 +141,22 @@ impl fmt::Debug for Shell {
     }
 }
 
-struct BackgroundJob {
-    command: String,
+/// A job running in the background that the shell is responsible for.
+pub struct BackgroundJob {
+    /// The original command string entered.
+    pub command: String,
     child: Child,
     idx: u32,
+}
+
+impl fmt::Debug for BackgroundJob {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f,
+               "command: {}\tpid: {}\tidx: {}",
+               self.command,
+               self.child.id(),
+               self.idx)
+    }
 }
 
 #[cfg(feature="unstable")]

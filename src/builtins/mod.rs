@@ -8,7 +8,7 @@ pub use self::dirs::*;
 use error::{self, Result};
 use parse::ParseCommand;
 use shell::Shell;
-use std::process;
+use std::process::{self, Command};
 
 mod dirs;
 
@@ -16,6 +16,7 @@ const CD: &'static str = "cd";
 const EXIT: &'static str = "exit";
 const HELP: &'static str = "help";
 const HISTORY: &'static str = "history";
+const KILL: &'static str = "kill";
 
 quick_error! {
     #[derive(Debug)]
@@ -39,7 +40,7 @@ pub trait BuiltinCommand {
 }
 
 pub fn is_builtin(program: &str) -> bool {
-    [CD, HELP, HISTORY, EXIT].contains(&program)
+    [CD, EXIT, HELP, HISTORY, KILL].contains(&program)
 }
 
 /// precondition: process is a builtin.
@@ -49,6 +50,7 @@ pub fn run(shell: &mut Shell, process: &ParseCommand) -> Result<()> {
         EXIT => Exit::run(shell, process.args.clone()),
         HELP => Help::run(shell, process.args.clone()),
         HISTORY => History::run(shell, process.args.clone()),
+        KILL => Kill::run(shell, process.args.clone()),
         _ => unreachable!(),
     }
 }
@@ -79,6 +81,7 @@ help: help [pattern ...]
                     EXIT => Some(Exit::help()),
                     HELP => Some(Help::help()),
                     HISTORY => Some(History::help()),
+                    KILL => Some(Kill::help()),
                     _ => None,
                 };
                 if let Some(msg) = msg {
@@ -172,5 +175,64 @@ history: history [-c] [n]
             },
         }
         Ok(())
+    }
+}
+
+struct Kill;
+
+impl BuiltinCommand for Kill {
+    fn name() -> String {
+        String::from("kill")
+    }
+
+    fn help() -> String {
+        String::from("\
+kill: kill pid | %jobspec
+    Send a signal to a job.
+
+    Send SIGTERM to the processes identified by JOBSPEC.
+
+    Kill is a shell builtin for two reasons: it allows job IDs
+    to be used instead of process IDs.
+
+    Exit Status:
+    Returns success unless an invalid option is given or an error occurs.")
+    }
+
+    fn run(shell: &mut Shell, args: Vec<String>) -> Result<()> {
+        if let None = args.first() {
+            println!("{}", Kill::help());
+            let msg = Kill::help().lines().nth(0).unwrap().to_owned();
+            return Err(error::Error::BuiltinError(Error::InvalidArgs(msg, 2)));
+        }
+
+        let arg = args.first().unwrap();
+        if arg.starts_with("%") {
+            match arg[1..].parse::<u32>() {
+                Ok(n) => match shell.kill_job(n) {
+                    Ok(Some(job)) => {
+                        println!("[{}]+\tTerminated: 15\t{}", n, job.command);
+                        Ok(())
+                    }
+                    Ok(None) => {
+                        let msg = format!("kill: {}: no such job", arg);
+                        Err(error::Error::BuiltinError(Error::InvalidArgs(msg, 1)))
+                    }
+                    Err(e) => Err(e),
+                },
+                Err(_) => {
+                    let msg = format!("kill: {}: arguments must be job IDs", arg);
+                    Err(error::Error::BuiltinError(Error::InvalidArgs(msg, 1)))
+                }
+            }
+        } else {
+            match Command::new("kill").args(&args).output() {
+                Ok(output) => {
+                    print!("{}", String::from_utf8_lossy(&output.stdout));
+                    Ok(())
+                }
+                Err(e) => Err(error::Error::Io(e)),
+            }
+        }
     }
 }

@@ -56,7 +56,11 @@ impl HistoryState {
             Ordering::Greater => {
                 // Empty vectors: reserve_exact(size) = || capacity = size;
                 // Nonempty vectors: reserve_exact(size) = || capacity += size;
-                let reserve = if self.count > 0 { size - self.entries.capacity() } else { size };
+                let reserve = if self.count > 0 {
+                    size - self.entries.capacity()
+                } else {
+                    size
+                };
                 self.entries.reserve_exact(reserve);
             }
         }
