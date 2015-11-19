@@ -21,15 +21,18 @@ cd: cd [dir]
 
     fn run(_shell: &mut Shell, args: Vec<String>) -> Result<()> {
         let dir = match args.get(0).map(|x| &x[..]) {
-            Some("~") | None =>
-                try!(env::home_dir().ok_or(Error::InvalidArgs(String::from("cd: HOME not set"), 1))),
+            Some("~") | None => {
+                let msg = String::from("cd: HOME not set");
+                try!(env::home_dir().ok_or(Error::InvalidArgs(msg, 1)))
+            }
             Some("-") => match env::var_os("OLDPWD") {
                 Some(val) => {
                     println!("{}", val.to_str().unwrap());
                     Path::new(val.as_os_str()).to_path_buf()
                 }
                 None => {
-                    return Err(error::Error::BuiltinError(Error::InvalidArgs(String::from("cd: OLDPWD not set"), 1)));
+                    let msg = String::from("cd: OLDPWD not set");
+                    return Err(error::Error::BuiltinError(Error::InvalidArgs(msg, 1)));
                 }
             },
             Some(val) => Path::new(val).to_path_buf(),
