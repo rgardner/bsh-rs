@@ -55,6 +55,11 @@ pub fn run(shell: &mut Shell, process: &ParseCommand) -> Result<()> {
     }
 }
 
+/// Returns the first line of a command's help string.
+pub fn usage(help: &str) -> String {
+    help.lines().nth(0).unwrap().to_owned()
+}
+
 struct Help;
 
 impl BuiltinCommand for Help {
@@ -64,15 +69,19 @@ impl BuiltinCommand for Help {
 
     fn help() -> String {
         String::from("\
-help: help [pattern ...]
-    Display helpful information about builtin commands. If PATTERN is specified,
-    gives detailed help on all commands matching PATTERN, otherwise a list of the
+help: help [command ...]
+    Display helpful information about builtin commands. If COMMAND is specified,
+    gives detailed help on all commands matching COMMAND, otherwise a list of the
     builtins is printed.")
     }
 
     fn run(_shell: &mut Shell, args: Vec<String>) -> Result<()> {
         if args.is_empty() {
-            println!("{}", Help::help());
+            println!("{}", usage(&Cd::help()));
+            println!("{}", usage(&Exit::help()));
+            println!("{}", usage(&Help::help()));
+            println!("{}", usage(&History::help()));
+            println!("{}", usage(&Kill::help()));
         } else {
             let mut all_invalid = true;
             for arg in &args {
@@ -145,10 +154,11 @@ impl BuiltinCommand for History {
 
     fn help() -> String {
         String::from("\
-history: history [-c] [n]
+history: history [-c] [-s size] [n]
     Display the history list with line numbers. Argument of N
     says to list only the last N lines. The `-c' option causes
-    the history list to be cleared by deleting all of the entries.")
+    the history list to be cleared by deleting all of the entries.
+    The `-s' option sets the size of the history list.")
     }
 
     fn run(shell: &mut Shell, args: Vec<String>) -> Result<()> {
@@ -202,7 +212,7 @@ kill: kill pid | %jobspec
     fn run(shell: &mut Shell, args: Vec<String>) -> Result<()> {
         if let None = args.first() {
             println!("{}", Kill::help());
-            let msg = Kill::help().lines().nth(0).unwrap().to_owned();
+            let msg = usage(&Kill::help());
             return Err(error::Error::BuiltinError(Error::InvalidArgs(msg, 2)));
         }
 
