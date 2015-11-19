@@ -4,7 +4,7 @@
 //! maintaining a history of previous commands.
 
 use builtins;
-use error;
+use error::{self, Error};
 use parse::ParseJob;
 use history::HistoryState;
 use odds::vec::VecExt;
@@ -12,30 +12,33 @@ use std::env;
 use std::fmt;
 use std::fs::{File, OpenOptions};
 use std::io::{self, Read, Write};
-use std::process::{Child, Stdio};
+use std::process::{self, Child, Stdio};
 use wait_timeout::ChildExt;
 
 /// Bsh Shell
 pub struct Shell {
-    jobs: Vec<BackgroundJob>,
-    job_count: u32,
     /// History of previously executed shell commands.
     pub history: HistoryState,
+    jobs: Vec<BackgroundJob>,
+    job_count: u32,
+    /// Exit status of last command executed.
+    last_exit_status: i32,
 }
 
 impl Shell {
     /// Constructs a new Shell to manage running jobs and command history.
     pub fn new(history_capacity: usize) -> Shell {
         Shell {
+            history: HistoryState::with_capacity(history_capacity),
             jobs: Vec::new(),
             job_count: 0,
-            history: HistoryState::with_capacity(history_capacity),
+            last_exit_status: 0,
         }
     }
 
     /// Custom prompt to output to the user.
-    pub fn prompt(buf: &mut String) -> io::Result<usize> {
-        prompt(buf)
+    pub fn prompt(&self, buf: &mut String) -> io::Result<usize> {
+        prompt(&self, buf)
     }
 
     /// Add a job to the history.
@@ -62,7 +65,16 @@ impl Shell {
     pub fn run(&mut self, job: &mut ParseJob) -> error::Result<()> {
         let process = job.commands.get_mut(0).unwrap();
         if builtins::is_builtin(&process.program) {
-            return builtins::run(self, &process);
+            let res = builtins::run(self, &process);
+            self.last_exit_status = if let Err(ref e) = res {
+                match *e {
+                    Error::Io(_) => 1,
+                    Error::BuiltinError(builtins::Error::InvalidArgs(_, code)) => code,
+                }
+            } else {
+                0
+            };
+            return res;
         }
         let mut command = process.to_command();
         // if it's a builtin, call the builtin
@@ -99,9 +111,9 @@ impl Shell {
         Ok(())
     }
 
-    /// Returns `true` if the shell does not have any background jobs.
+    /// Returns `true` if the shell has background jobs.
     pub fn has_background_jobs(&self) -> bool {
-        self.jobs.is_empty()
+        !self.jobs.is_empty()
     }
 
     /// Check on the status of background jobs, removing exited ones.
@@ -133,6 +145,29 @@ impl Shell {
             None => Ok(None),
         }
     }
+
+    /// Exit the shell.
+    ///
+    /// Valid exit codes are between 0 and 255. Like bash and its descendents, it automatically
+    /// converts exit codes to a u8 such that positive n becomes n & 256 and negative n becomes
+    /// 256 + n % 256.
+    ///
+    /// Exit the shell with a status of n. If n is None, then the exit status is that of the last
+    /// command executed.
+    pub fn exit(&mut self, n: Option<i32>) {
+        println!("exit");
+        let code = match n {
+            Some(n) => n,
+            None => self.last_exit_status,
+        };
+        let code_like_u8 = if code < 0 {
+            256 + code % 256
+        } else {
+            code % 256
+        };
+        process::exit(code_like_u8);
+    }
+
 }
 
 impl fmt::Debug for Shell {
@@ -161,7 +196,7 @@ impl fmt::Debug for BackgroundJob {
 
 #[cfg(feature="unstable")]
 /// Print the current directory relative to $HOME and prompt the user for input.
-fn prompt(buf: &mut String) -> io::Result<usize> {
+fn prompt(shell: &Shell, buf: &mut String) -> io::Result<usize> {
     use std::path::Path;
     let cwd = env::current_dir().unwrap();
     let home = env::home_dir().unwrap();
@@ -170,16 +205,16 @@ fn prompt(buf: &mut String) -> io::Result<usize> {
         None => cwd.clone(),
     };
 
-    print!("{} $ ", rel.display());
+    print!("{}|{} $ ", shell.last_exit_status, rel.display());
     io::stdout().flush().unwrap();
     io::stdin().read_line(buf)
 }
 
 #[cfg(not(feature="unstable"))]
 /// Print the full directory and prompt the user for input.
-fn prompt(buf: &mut String) -> io::Result<usize> {
+fn prompt(shell: &Shell, buf: &mut String) -> io::Result<usize> {
     let cwd = env::current_dir().unwrap();
-    print!("{} $ ", cwd.display());
+    print!("{}|{} $ ", shell.last_exit_status, cwd.display());
     io::stdout().flush().unwrap();
     io::stdin().read_line(buf)
 }

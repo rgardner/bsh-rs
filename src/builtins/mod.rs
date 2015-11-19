@@ -8,7 +8,7 @@ pub use self::dirs::*;
 use error::{self, Result};
 use parse::ParseCommand;
 use shell::Shell;
-use std::process::{self, Command};
+use std::process::Command;
 
 mod dirs;
 
@@ -127,20 +127,13 @@ exit: exit [n]
             println!("There are stopped jobs.");
             return Ok(());
         }
-        println!("exit");
-        if let Some(code) = args.get(0) {
-            let code: i32 = match code.parse() {
-                Ok(num) => num,
-                Err(_) => {
-                    println!("bsh: exit: {}: numeric argument required", code);
-                    2
-                }
-            };
-            process::exit(code);
-        } else {
-            // TODO(rgardner): the exit code should be the last child's exit code.
-            process::exit(0);
-        }
+        shell.exit(args.get(0).map(|arg| {
+            arg.parse::<i32>().unwrap_or_else(|_| {
+                println!("bsh: exit: {}: numeric argument required", arg);
+                2
+            })
+        }));
+        unreachable!()
     }
 }
 

@@ -70,11 +70,8 @@ fn main() {
     loop {
         shell.check_jobs();
         let mut input = String::new();
-        match Shell::prompt(&mut input) {
-            Ok(0) => {
-                println!("exit");
-                process::exit(0);
-            }
+        match shell.prompt(&mut input) {
+            Ok(0) => shell.exit(None),
             Err(_) => panic!("failed to read line."),
             _ => {}
         }
