@@ -77,7 +77,6 @@ impl Shell {
             return res;
         }
         let mut command = process.to_command();
-        // if it's a builtin, call the builtin
 
         if let Some(_) = job.infile {
             command.stdin(Stdio::piped());
@@ -104,8 +103,9 @@ impl Shell {
         } else if job.background {
             self.add_to_background(child);
         } else if !job.background {
-            print!("{}",
-                   String::from_utf8_lossy(&child.wait_with_output().unwrap().stdout));
+            let output = child.wait_with_output().unwrap();
+            self.last_exit_status = output.status.code().unwrap_or(0);
+            print!("{}", String::from_utf8_lossy(&output.stdout));
         }
 
         Ok(())
