@@ -42,7 +42,7 @@ impl Shell {
     }
 
     /// Add a job to the history.
-    pub fn add_history(&mut self, job: &ParseJob) {
+    pub fn add_history(&mut self, job: &str) {
         self.history.push(&job);
     }
 

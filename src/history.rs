@@ -1,4 +1,3 @@
-use parse::ParseJob;
 use std::cmp::{self, Ordering};
 use std::fmt;
 
@@ -23,10 +22,10 @@ impl HistoryState {
         }
     }
 
-    pub fn push(&mut self, job: &ParseJob) {
+    pub fn push(&mut self, job: &str) {
         let idx = self.count % self.entries.capacity();
         let entry = HistoryEntry {
-            line: job.command.clone(),
+            line: job.to_owned(),
             timestamp: self.count + 1,
         };
         match self.entries.get(idx) {

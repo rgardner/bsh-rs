@@ -75,6 +75,11 @@ fn main() {
             Err(_) => panic!("failed to read line."),
             _ => {}
         }
+
+        input = input.trim().to_owned();
+
+        shell.add_history(&input);
+
         let mut info = match ParseJob::parse(&input) {
             Ok(Some(info)) => info,
             Err(err) => {
@@ -83,7 +88,6 @@ fn main() {
             }
             _ => continue,
         };
-        shell.add_history(&info);
 
         if let Err(e) = shell.run(&mut info) {
             println!("bsh: {}", e);
