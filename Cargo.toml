@@ -10,6 +10,7 @@ name = "bsh"
 
 [dependencies]
 docopt = "0.6.75"
+nom = "1.0.1"
 odds = "0.2.8"
 quick-error = "0.1.4"
 rustc-serialize = "0.3.16"

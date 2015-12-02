@@ -78,6 +78,10 @@ fn main() {
 
         input = input.trim().to_owned();
 
+        if let Err(e) = shell.expand_history(&mut input) {
+            println!("bsh: {}", e);
+            continue;
+        };
         shell.add_history(&input);
 
         let mut info = match ParseJob::parse(&input) {

@@ -11,6 +11,8 @@
 #![cfg_attr(feature="dev", feature(plugin))]
 #![cfg_attr(feature="dev", plugin(clippy))]
 
+#[macro_use]
+extern crate nom;
 extern crate odds;
 #[macro_use]
 extern crate quick_error;

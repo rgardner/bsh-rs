@@ -1,5 +1,9 @@
+use error;
+use builtins;
 use std::cmp::{self, Ordering};
 use std::fmt;
+use std::str::{self, FromStr};
+use nom::{digit, IResult};
 
 #[derive(Debug)]
 struct HistoryEntry {
@@ -77,6 +81,38 @@ impl HistoryState {
              .collect::<Vec<String>>()
              .join("\n")
     }
+
+
+    /// Perform history expansion.
+    pub fn expand(&self, command: &mut String) -> error::Result<()> {
+        named!(unum<isize>, map_res!(map_res!(digit, str::from_utf8), FromStr::from_str));
+        named!(inum<isize>, alt!(unum | chain!(tag!("-") ~ n: unum, || { -n })));
+        named!(event<isize>, preceded!(tag!("!"), inum));
+        let raw_n = match event(command.as_bytes()) {
+            IResult::Done(_, n) => n,
+            _ => return Ok(()),
+        };
+
+        let n: usize = match raw_n {
+            0 => {
+                let msg = format!("{}: event not found", command);
+                return Err(error::Error::BuiltinError(builtins::Error::InvalidArgs(msg, 1)));
+            }
+            n if n < 0 => (n + (self.entries.len() as isize)) as usize,
+            n => (n - 1) as usize,
+        };
+        match self.entries.get(n) {
+            Some(entry) => {
+                command.clear();
+                command.push_str(&entry.line);
+            }
+            None => {
+                let msg = format!("{}: event not found", command);
+                return Err(error::Error::BuiltinError(builtins::Error::InvalidArgs(msg, 1)));
+            }
+        };
+        Ok(())
+    }
 }
 
 impl fmt::Display for HistoryState {
@@ -84,6 +120,13 @@ impl fmt::Display for HistoryState {
         write!(f, "{}", self.display(self.count))
     }
 }
+
+impl fmt::Display for HistoryEntry {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "\t{}\t{}", self.timestamp, self.line)
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -170,5 +213,32 @@ mod tests {
         assert_eq!(init_capacity, state.entries.capacity());
         state.set_size(new_capacity);
         assert_eq!(new_capacity, state.entries.capacity());
+    }
+
+    #[test]
+    fn expand_empty_command() {
+        let cmd = "";
+        let state = alloc_history_state(1, 1);
+        assert!(expand(cmd).is_none());
+    }
+
+    #[test]
+    fn expand_empty_history() {
+        let state = alloc_history_state(0, 0);
+    }
+
+    #[test]
+    fn expand_positive_nth_command() {
+        let state = alloc_history_state(10, 10);
+    }
+
+    #[test]
+    fn expand_negative_nth_command() {
+        let state = alloc_history_state(10, 10);
+    }
+
+    #[test]
+    fn expand_search_string() {
+        let state = alloc_history_state(10, 10);
     }
 }

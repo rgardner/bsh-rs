@@ -41,6 +41,15 @@ impl Shell {
         prompt(&self, buf)
     }
 
+    /// Perform history expansions.
+    ///
+    /// !n -> repeat command numbered n in the list of commands (starting at 1)
+    /// !-n -> repeat last nth command (starting at -1)
+    /// !string -> searches through history for first item that matches the string (via contains)
+    pub fn expand_history(&self, job: &mut String) -> error::Result<()> {
+        self.history.expand(job)
+    }
+
     /// Add a job to the history.
     pub fn add_history(&mut self, job: &str) {
         self.history.push(&job);
