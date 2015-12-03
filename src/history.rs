@@ -1,9 +1,9 @@
 use error;
-use builtins;
+use builtins::Error;
 use std::cmp::{self, Ordering};
 use std::fmt;
-use std::str::{self, FromStr};
-use nom::{IResult, digit};
+use std::str;
+use nom::IResult;
 
 #[derive(Debug)]
 struct HistoryEntry {
@@ -88,30 +88,40 @@ impl HistoryState {
 
     /// Perform history expansion.
     pub fn expand(&self, command: &mut String) -> error::Result<()> {
-        named!(unum<isize>, map_res!(map_res!(digit, str::from_utf8), FromStr::from_str));
-        named!(inum<isize>, alt!(unum | chain!(tag!("-") ~ n: unum, || { -n })));
-        named!(event<isize>, preceded!(tag!("!"), inum));
-        let raw_n = match event(command.as_bytes()) {
-            IResult::Done(_, n) => n,
+        named!(event<&str>, map_res!(preceded!(tag!("!"), is_not!(" ")), str::from_utf8));
+        let input = command.clone();
+        let arg = match event(input.as_bytes()) {
+            IResult::Done(_, a) => a,
             _ => return Ok(()),
         };
 
-        let n: usize = match raw_n {
-            0 => {
-                let msg = format!("{}: event not found", command);
-                return Err(error::Error::BuiltinError(builtins::Error::InvalidArgs(msg, 1)));
+        let entry = match arg.parse::<isize>() {
+            Ok(raw_n) => {
+                let n = match raw_n {
+                    0 => {
+                        let msg = format!("{}: event not found", command);
+                        return Err(error::Error::BuiltinError(Error::InvalidArgs(msg, 1)));
+                    }
+                    n if n < 0 => (n + (self.entries.len() as isize)) as usize,
+                    n => (n - 1) as usize,
+                };
+                self.entries.get(n)
             }
-            n if n < 0 => (n + (self.entries.len() as isize)) as usize,
-            n => (n - 1) as usize,
+            Err(_) => {
+                let idx = self.count % self.entries.capacity();
+                let (end, start) = self.entries.split_at(idx);
+                start.iter().chain(end.iter()).rev().find(|&e| e.line.starts_with(arg))
+            }
         };
-        match self.entries.get(n) {
-            Some(entry) => {
+
+        match entry {
+            Some(e) => {
                 command.clear();
-                command.push_str(&entry.line);
+                command.push_str(&e.line);
             }
             None => {
                 let msg = format!("{}: event not found", command);
-                return Err(error::Error::BuiltinError(builtins::Error::InvalidArgs(msg, 1)));
+                return Err(error::Error::BuiltinError(Error::InvalidArgs(msg, 1)));
             }
         }
         Ok(())
@@ -271,5 +281,18 @@ mod tests {
             assert!(state.expand(&mut buf).is_ok());
             assert_eq!(format!("cmd{}", full - i - 1), buf);
         }
+    }
+
+    #[test]
+    fn expand_string() {
+        let state = alloc_history_state(10, 10);
+
+        let mut buf = String::from("!c");
+        assert!(state.expand(&mut buf).is_ok());
+        assert_eq!("cmd9", buf);
+
+        buf = String::from("!cmd1");
+        assert!(state.expand(&mut buf).is_ok());
+        assert_eq!("cmd1", buf);
     }
 }
