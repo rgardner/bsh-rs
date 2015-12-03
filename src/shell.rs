@@ -169,11 +169,7 @@ impl Shell {
             Some(n) => n,
             None => self.last_exit_status,
         };
-        let code_like_u8 = if code < 0 {
-            256 + code % 256
-        } else {
-            code % 256
-        };
+        let code_like_u8 = if code < 0 { 256 + code % 256 } else { code % 256 };
         process::exit(code_like_u8);
     }
 

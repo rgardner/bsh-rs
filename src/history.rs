@@ -3,7 +3,7 @@ use builtins;
 use std::cmp::{self, Ordering};
 use std::fmt;
 use std::str::{self, FromStr};
-use nom::{digit, IResult};
+use nom::{IResult, digit};
 
 #[derive(Debug)]
 struct HistoryEntry {
@@ -66,11 +66,7 @@ impl HistoryState {
             Ordering::Greater => {
                 // Empty vectors: reserve_exact(size) = || capacity = size;
                 // Nonempty vectors: reserve_exact(size) = || capacity += size;
-                let reserve = if self.count > 0 {
-                    size - self.entries.capacity()
-                } else {
-                    size
-                };
+                let reserve = if self.count > 0 { size - self.entries.capacity() } else { size };
                 self.entries.reserve_exact(reserve);
             }
         }
@@ -117,7 +113,7 @@ impl HistoryState {
                 let msg = format!("{}: event not found", command);
                 return Err(error::Error::BuiltinError(builtins::Error::InvalidArgs(msg, 1)));
             }
-        };
+        }
         Ok(())
     }
 }
