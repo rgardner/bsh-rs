@@ -28,15 +28,22 @@ impl HistoryState {
 
     pub fn push(&mut self, job: &str) {
         let idx = self.count % self.entries.capacity();
+
+        // Prevent adjacent, duplicate entries from being added to the history.
+        let prev_idx = if idx == 0 { self.entries.capacity() - 1 } else { idx - 1 };
+        if self.entries.get(prev_idx).map(|e| e.line == job).unwrap_or(false) {
+            return;
+        }
+
+        self.count += 1;
         let entry = HistoryEntry {
             line: job.to_owned(),
-            timestamp: self.count + 1,
+            timestamp: self.count,
         };
         match self.entries.get(idx) {
-            Some(_) => self.entries[idx] = entry,
+            Some(_) => self.entries[idx] = entry,  // replace if exists
             None => self.entries.insert(idx, entry),
         }
-        self.count += 1;
     }
 
     pub fn clear(&mut self) {
@@ -131,14 +138,12 @@ impl fmt::Display for HistoryEntry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::super::parse::ParseJob;
 
     fn alloc_history_state(capacity: usize, full: usize) -> HistoryState {
         assert!(full <= capacity);
         let mut state = HistoryState::with_capacity(capacity);
-        let job = ParseJob::parse("cmd").unwrap().unwrap();
-        for _ in 0..full {
-            state.push(&job.clone());
+        for i in 0..full {
+            state.push(&format!("cmd{}", i));
         }
         state
     }
@@ -216,29 +221,59 @@ mod tests {
     }
 
     #[test]
+    fn push_duplicate() {
+        let mut state = HistoryState::with_capacity(2);
+        state.push("dup");
+        assert_eq!(1, state.entries.len());
+
+        state.push("dup");
+        assert_eq!(1, state.entries.len());
+    }
+
+    #[test]
     fn expand_empty_command() {
-        let cmd = "";
+        let mut buf = String::new();
         let state = alloc_history_state(1, 1);
-        assert!(expand(cmd).is_none());
+        assert!(state.expand(&mut buf).is_ok());
+        assert!(buf.is_empty());
     }
 
     #[test]
     fn expand_empty_history() {
         let state = alloc_history_state(0, 0);
+
+        let mut buf = String::new();
+        assert!(state.expand(&mut buf).is_ok());
+        assert!(buf.is_empty());
+
+        let mut buf = String::from("!1");
+        assert!(state.expand(&mut buf).is_err());
+        assert_eq!("!1", buf);
+
+        let mut buf = String::from("!-1");
+        assert!(state.expand(&mut buf).is_err());
+        assert_eq!("!-1", buf);
     }
 
     #[test]
     fn expand_positive_nth_command() {
-        let state = alloc_history_state(10, 10);
+        let (cap, full) = (10, 10);
+        let state = alloc_history_state(cap, full);
+        for i in 0..full {
+            let mut buf = format!("!{}", i + 1);
+            assert!(state.expand(&mut buf).is_ok());
+            assert_eq!(format!("cmd{}", i), buf);
+        }
     }
 
     #[test]
     fn expand_negative_nth_command() {
-        let state = alloc_history_state(10, 10);
-    }
-
-    #[test]
-    fn expand_search_string() {
-        let state = alloc_history_state(10, 10);
+        let (cap, full) = (10, 10);
+        let state = alloc_history_state(cap, full);
+        for i in 0..full {
+            let mut buf = format!("!-{}", i + 1);
+            assert!(state.expand(&mut buf).is_ok());
+            assert_eq!(format!("cmd{}", full - i - 1), buf);
+        }
     }
 }
