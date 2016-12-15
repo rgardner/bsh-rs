@@ -90,12 +90,17 @@ impl ParseJob {
     /// # Examples
     ///
     /// ```
-    /// # extern crate bsh_rs;
-    /// # fn main() {
-    ///     use bsh_rs::parse::ParseJob;
-    ///     assert!(ParseJob::parse("echo test").unwrap().is_some());
-    /// # }
+    /// use bsh_rs::parse::{ParseJob, ParseCommandBuilder};
     ///
+    /// let job = ParseJob::parse("echo test").unwrap().unwrap();
+    /// assert_eq!(job.command, "echo test");
+    /// assert!(job.infile.is_none());
+    /// assert!(job.outfile.is_none());
+    /// assert!(!job.background);
+    ///
+    /// let mut expected_command = ParseCommandBuilder::new("echo");
+    /// expected_command.arg("test");
+    /// assert_eq!(job.commands, vec![expected_command.build()]);
     /// ```
     pub fn parse(input: &str) -> Result<Option<ParseJob>, ParseError> {
         let input_trimmed = input.trim();
