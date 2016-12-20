@@ -1,5 +1,4 @@
 //! Bsh - Bob Shell
-#![cfg_attr(feature="unstable", feature(path_relative_from))]
 
 #![deny(missing_docs,
         missing_debug_implementations, missing_copy_implementations,
@@ -7,9 +6,8 @@
         unsafe_code,
         unused_import_braces, unused_qualifications)]
 
-#![cfg_attr(feature="dev", allow(unstable_features))]
-#![cfg_attr(feature="dev", feature(plugin))]
-#![cfg_attr(feature="dev", plugin(clippy))]
+#![cfg_attr(feature="clippy", feature(plugin))]
+#![cfg_attr(feature="clippy", plugin(clippy))]
 
 // necessary for `error-chain`
 #![recursion_limit = "1024"]
@@ -25,7 +23,7 @@ pub use self::shell::Shell;
 pub use self::parse::{ParseCommand, ParseJob};
 
 mod builtins;
-mod history;
 mod errors;
-pub mod shell;
+mod history;
 pub mod parse;
+pub mod shell;

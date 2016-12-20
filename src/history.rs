@@ -29,7 +29,11 @@ impl HistoryState {
         let idx = self.count % self.entries.capacity();
 
         // Prevent adjacent, duplicate entries from being added to the history.
-        let prev_idx = if idx == 0 { self.entries.capacity() - 1 } else { idx - 1 };
+        let prev_idx = if idx == 0 {
+            self.entries.capacity() - 1
+        } else {
+            idx - 1
+        };
         if self.entries.get(prev_idx).map(|e| e.line == job).unwrap_or(false) {
             return;
         }
@@ -65,7 +69,11 @@ impl HistoryState {
             Ordering::Greater => {
                 // Empty vectors: reserve_exact(size) = || capacity = size;
                 // Nonempty vectors: reserve_exact(size) = || capacity += size;
-                let reserve = if self.count > 0 { size - self.entries.capacity() } else { size };
+                let reserve = if self.count > 0 {
+                    size - self.entries.capacity()
+                } else {
+                    size
+                };
                 self.entries.reserve_exact(reserve);
             }
         }

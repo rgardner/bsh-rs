@@ -170,7 +170,11 @@ impl Shell {
             Some(n) => n,
             None => self.last_exit_status,
         };
-        let code_like_u8 = if code < 0 { 256 + code % 256 } else { code % 256 };
+        let code_like_u8 = if code < 0 {
+            256 + code % 256
+        } else {
+            code % 256
+        };
         process::exit(code_like_u8);
     }
 }
@@ -199,27 +203,17 @@ impl fmt::Debug for BackgroundJob {
     }
 }
 
-#[cfg(feature="unstable")]
 /// Print the current directory relative to $HOME and prompt the user for input.
 fn prompt(shell: &Shell, buf: &mut String) -> io::Result<usize> {
     use std::path::Path;
     let cwd = env::current_dir().unwrap();
     let home = env::home_dir().unwrap();
-    let rel = match cwd.relative_from(&home) {
-        Some(rel) => Path::new("~/").join(rel),
-        None => cwd.clone(),
+    let rel = match cwd.strip_prefix(&home) {
+        Ok(rel) => Path::new("~").join(rel),
+        Err(_) => cwd.clone(),
     };
 
     print!("{}|{} $ ", shell.last_exit_status, rel.display());
-    io::stdout().flush().unwrap();
-    io::stdin().read_line(buf)
-}
-
-#[cfg(not(feature="unstable"))]
-/// Print the full directory and prompt the user for input.
-fn prompt(shell: &Shell, buf: &mut String) -> io::Result<usize> {
-    let cwd = env::current_dir().unwrap();
-    print!("{}|{} $ ", shell.last_exit_status, cwd.display());
     io::stdout().flush().unwrap();
     io::stdin().read_line(buf)
 }
