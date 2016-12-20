@@ -1,5 +1,4 @@
-use error;
-use builtins::Error;
+use errors::*;
 use std::cmp::{self, Ordering};
 use std::fmt;
 use std::str;
@@ -78,16 +77,16 @@ impl HistoryState {
         let idx = self.count % self.entries.capacity();
         let (end, start) = self.entries.split_at(idx);
         start.iter()
-             .chain(end.iter())
-             .skip(skip)
-             .map(|e| format!("\t{}\t{}", e.timestamp.clone(), e.line.clone()))
-             .collect::<Vec<String>>()
-             .join("\n")
+            .chain(end.iter())
+            .skip(skip)
+            .map(|e| format!("\t{}\t{}", e.timestamp.clone(), e.line.clone()))
+            .collect::<Vec<String>>()
+            .join("\n")
     }
 
 
     /// Perform history expansion.
-    pub fn expand(&self, command: &mut String) -> error::Result<()> {
+    pub fn expand(&self, command: &mut String) -> Result<()> {
         named!(event<&str>, map_res!(preceded!(tag!("!"), is_not!(" ")), str::from_utf8));
         let input = command.clone();
         let arg = match event(input.as_bytes()) {
@@ -99,8 +98,7 @@ impl HistoryState {
             Ok(raw_n) => {
                 let n = match raw_n {
                     0 => {
-                        let msg = format!("{}: event not found", command);
-                        return Err(error::Error::BuiltinError(Error::InvalidArgs(msg, 1)));
+                        bail!(ErrorKind::BuiltinError(format!("{}: event not found", command), 1));
                     }
                     n if n < 0 => (n + (self.entries.len() as isize)) as usize,
                     n => (n - 1) as usize,
@@ -120,8 +118,7 @@ impl HistoryState {
                 command.push_str(&e.line);
             }
             None => {
-                let msg = format!("{}: event not found", command);
-                return Err(error::Error::BuiltinError(Error::InvalidArgs(msg, 1)));
+                bail!(ErrorKind::BuiltinError(format!("{}: event not found", command), 1));
             }
         }
         Ok(())

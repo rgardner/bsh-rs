@@ -11,18 +11,21 @@
 #![cfg_attr(feature="dev", feature(plugin))]
 #![cfg_attr(feature="dev", plugin(clippy))]
 
+// necessary for `error-chain`
+#![recursion_limit = "1024"]
+
 #[macro_use]
 extern crate nom;
 extern crate odds;
 #[macro_use]
-extern crate quick_error;
+extern crate error_chain;
 extern crate wait_timeout;
 
 pub use self::shell::Shell;
 pub use self::parse::{ParseCommand, ParseJob};
 
 mod builtins;
-pub mod error;
 mod history;
+mod errors;
 pub mod shell;
 pub mod parse;

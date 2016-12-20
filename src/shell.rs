@@ -3,8 +3,8 @@
 //! The Shell itself is responsible for managing background jobs and for
 //! maintaining a history of previous commands.
 
+use errors::*;
 use builtins;
-use error::{self, Error};
 use parse::ParseJob;
 use history::HistoryState;
 use odds::vec::VecExt;
@@ -46,7 +46,7 @@ impl Shell {
     /// !n -> repeat command numbered n in the list of commands (starting at 1)
     /// !-n -> repeat last nth command (starting at -1)
     /// !string -> searches through history for first item that matches the string (via contains)
-    pub fn expand_history(&self, job: &mut String) -> error::Result<()> {
+    pub fn expand_history(&self, job: &mut String) -> Result<()> {
         self.history.expand(job)
     }
 
@@ -71,14 +71,15 @@ impl Shell {
     }
 
     /// Run a job.
-    pub fn run(&mut self, job: &mut ParseJob) -> error::Result<()> {
+    pub fn run(&mut self, job: &mut ParseJob) -> Result<()> {
         let process = job.commands.get_mut(0).unwrap();
         if builtins::is_builtin(&process.program) {
             let res = builtins::run(self, &process);
             self.last_exit_status = if let Err(ref e) = res {
                 match *e {
-                    Error::Io(_) => 1,
-                    Error::BuiltinError(builtins::Error::InvalidArgs(_, code)) => code,
+                    Error(ErrorKind::Io(_), _) => 1,
+                    Error(ErrorKind::BuiltinError(_, code), _) => code,
+                    Error(ErrorKind::Msg(_), _) => 2,
                 }
             } else {
                 0
@@ -144,7 +145,7 @@ impl Shell {
     /// Kills a child with the corresponding jobid.
     ///
     /// Returns `true` if a corresponding job exists; `false`, otherwise.
-    pub fn kill_job(&mut self, jobid: u32) -> error::Result<Option<BackgroundJob>> {
+    pub fn kill_job(&mut self, jobid: u32) -> Result<Option<BackgroundJob>> {
         match self.jobs.iter().position(|j| j.idx == jobid) {
             Some(n) => {
                 let mut job = self.jobs.remove(n);
@@ -172,7 +173,6 @@ impl Shell {
         let code_like_u8 = if code < 0 { 256 + code % 256 } else { code % 256 };
         process::exit(code_like_u8);
     }
-
 }
 
 impl fmt::Debug for Shell {

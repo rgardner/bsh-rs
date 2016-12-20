@@ -1,5 +1,5 @@
-use error::{self, Result};
-use builtins::{BuiltinCommand, Error};
+use errors::*;
+use builtins::BuiltinCommand;
 use shell::Shell;
 use std::env;
 use std::path::Path;
@@ -22,21 +22,23 @@ cd: cd [dir]
     fn run(_shell: &mut Shell, args: Vec<String>) -> Result<()> {
         let dir = match args.get(0).map(|x| &x[..]) {
             Some("~") | None => {
-                let msg = String::from("cd: HOME not set");
-                try!(env::home_dir().ok_or(Error::InvalidArgs(msg, 1)))
+                try!(env::home_dir()
+                    .ok_or(ErrorKind::BuiltinError("cd: HOME not set".to_string(), 1)))
             }
-            Some("-") => match env::var_os("OLDPWD") {
-                Some(val) => {
-                    println!("{}", val.to_str().unwrap());
-                    Path::new(val.as_os_str()).to_path_buf()
+            Some("-") => {
+                match env::var_os("OLDPWD") {
+                    Some(val) => {
+                        println!("{}", val.to_str().unwrap());
+                        Path::new(val.as_os_str()).to_path_buf()
+                    }
+                    None => {
+                        bail!(ErrorKind::BuiltinError("cd: OLDPWD not set".to_string(), 1));
+                    }
                 }
-                None => {
-                    let msg = String::from("cd: OLDPWD not set");
-                    return Err(error::Error::BuiltinError(Error::InvalidArgs(msg, 1)));
-                }
-            },
+            }
             Some(val) => Path::new(val).to_path_buf(),
         };
+
         env::set_var("OLDPWD", try!(env::current_dir()));
         try!(env::set_current_dir(dir));
         Ok(())

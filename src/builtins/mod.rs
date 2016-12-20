@@ -5,7 +5,7 @@
 
 pub use self::dirs::*;
 
-use error::{self, Result};
+use errors::*;
 use parse::ParseCommand;
 use shell::Shell;
 use std::process::Command;
@@ -17,17 +17,6 @@ const EXIT: &'static str = "exit";
 const HELP: &'static str = "help";
 const HISTORY: &'static str = "history";
 const KILL: &'static str = "kill";
-
-quick_error! {
-    #[derive(Debug)]
-    /// Errors that can occur while parsing a bsh script
-    pub enum Error {
-        /// Generic builtin error.
-        InvalidArgs(message: String, code: i32) {
-            description(message)
-        }
-    }
-}
 
 /// Represents a Bsh builtin command such as cd or help.
 pub trait BuiltinCommand {
@@ -100,8 +89,7 @@ help: help [command ...]
             }
             if all_invalid {
                 let cmd = args.last().unwrap();
-                let msg = format!("help: no help topics match {}", cmd);
-                return Err(error::Error::BuiltinError(Error::InvalidArgs(msg, 1)));
+                bail!(ErrorKind::BuiltinError(format!("help: no help topics match {}", cmd), 1));
             }
         }
         Ok(())
@@ -169,13 +157,15 @@ history: history [-c] [-s size] [n]
                     }
                 }
             }
-            s => match s.parse::<usize>() {
-                Ok(n) => println!("{}", shell.history.display(n)),
-                Err(_) => {
-                    let msg = format!("history: {}: nonnegative numeric argument required", s);
-                    return Err(error::Error::BuiltinError(Error::InvalidArgs(msg, 1)));
+            s => {
+                match s.parse::<usize>() {
+                    Ok(n) => println!("{}", shell.history.display(n)),
+                    Err(_) => {
+                        let msg = format!("history: {}: nonnegative numeric argument required", s);
+                        bail!(ErrorKind::BuiltinError(msg, 1));
+                    }
                 }
-            },
+            }
         }
         Ok(())
     }
@@ -206,36 +196,35 @@ kill: kill pid | %jobspec
         if let None = args.first() {
             println!("{}", Kill::help());
             let msg = usage(&Kill::help());
-            return Err(error::Error::BuiltinError(Error::InvalidArgs(msg, 2)));
+            bail!(ErrorKind::BuiltinError(msg, 2));
         }
 
         let arg = args.first().unwrap();
         if arg.starts_with("%") {
             match arg[1..].parse::<u32>() {
-                Ok(n) => match shell.kill_job(n) {
-                    Ok(Some(job)) => {
-                        println!("[{}]+\tTerminated: 15\t{}", n, job.command);
-                        Ok(())
+                Ok(n) => {
+                    match shell.kill_job(n) {
+                        Ok(Some(job)) => {
+                            println!("[{}]+\tTerminated: 15\t{}", n, job.command);
+                            Ok(())
+                        }
+                        Ok(None) => {
+                            bail!(ErrorKind::BuiltinError(format!("kill: {}: no such job", arg),
+                                                          1));
+                        }
+                        Err(e) => Err(e),
                     }
-                    Ok(None) => {
-                        let msg = format!("kill: {}: no such job", arg);
-                        Err(error::Error::BuiltinError(Error::InvalidArgs(msg, 1)))
-                    }
-                    Err(e) => Err(e),
-                },
+                }
                 Err(_) => {
-                    let msg = format!("kill: {}: arguments must be job IDs", arg);
-                    Err(error::Error::BuiltinError(Error::InvalidArgs(msg, 1)))
+                    bail!(ErrorKind::BuiltinError(format!("kill: {}: arguments must be job IDs",
+                                                          arg),
+                                                  1));
                 }
             }
         } else {
-            match Command::new("kill").args(&args).output() {
-                Ok(output) => {
-                    print!("{}", String::from_utf8_lossy(&output.stdout));
-                    Ok(())
-                }
-                Err(e) => Err(error::Error::Io(e)),
-            }
+            let output = try!(Command::new("kill").args(&args).output());
+            print!("{}", String::from_utf8_lossy(&output.stdout));
+            Ok(())
         }
     }
 }
