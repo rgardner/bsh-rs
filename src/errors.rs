@@ -12,7 +12,7 @@ error_chain! {
     }
 
     errors {
-        BuiltinError(message: String, code: i32) {
+        BuiltinCommandError(message: String, code: i32) {
             description(message)
         }
     }

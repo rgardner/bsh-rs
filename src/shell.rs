@@ -86,7 +86,7 @@ impl Shell {
             let res = builtins::run(self, &process);
             self.last_exit_status = if let Err(ref e) = res {
                 match *e {
-                    Error(ErrorKind::BuiltinError(_, code), _) => code,
+                    Error(ErrorKind::BuiltinCommandError(_, code), _) => code,
                     Error(ErrorKind::Parse(_), _) => 2,
                     Error(ErrorKind::Io(_), _) => 1,
                     Error(ErrorKind::Msg(_), _) => 2,

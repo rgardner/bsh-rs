@@ -1,29 +1,29 @@
 use errors::*;
-use builtins::BuiltinCommand;
+use builtins;
 use shell::Shell;
 use std::env;
 use std::path::Path;
 
 pub struct Cd;
 
-impl BuiltinCommand for Cd {
-    fn name() -> String {
-        String::from("cd")
+impl builtins::BuiltinCommand for Cd {
+    fn name() -> &'static str {
+        builtins::CD_NAME
     }
 
-    fn help() -> String {
-        String::from("\
+    fn help() -> &'static str {
+        "\
 cd: cd [dir]
     Change the current directory to DIR. The variable $HOME is the default dir.
     If DIR is '-', then the current directory will be the variable $OLDPWD,
-    which is the last working directory.")
+    which is the last working directory."
     }
 
     fn run(_shell: &mut Shell, args: Vec<String>) -> Result<()> {
         let dir = match args.get(0).map(|x| &x[..]) {
             Some("~") | None => {
                 try!(env::home_dir()
-                    .ok_or(ErrorKind::BuiltinError("cd: HOME not set".to_string(), 1)))
+                    .ok_or(ErrorKind::BuiltinCommandError("cd: HOME not set".to_string(), 1)))
             }
             Some("-") => {
                 match env::var_os("OLDPWD") {
@@ -32,7 +32,7 @@ cd: cd [dir]
                         Path::new(val.as_os_str()).to_path_buf()
                     }
                     None => {
-                        bail!(ErrorKind::BuiltinError("cd: OLDPWD not set".to_string(), 1));
+                        bail!(ErrorKind::BuiltinCommandError("cd: OLDPWD not set".to_string(), 1));
                     }
                 }
             }

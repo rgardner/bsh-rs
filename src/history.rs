@@ -106,7 +106,7 @@ impl HistoryState {
             Ok(raw_n) => {
                 let n = match raw_n {
                     0 => {
-                        bail!(ErrorKind::BuiltinError(format!("{}: event not found", command), 1));
+                        bail!(ErrorKind::BuiltinCommandError(format!("{}: event not found", command), 1));
                     }
                     n if n < 0 => (n + (self.entries.len() as isize)) as usize,
                     n => (n - 1) as usize,
@@ -126,7 +126,7 @@ impl HistoryState {
                 command.push_str(&e.line);
             }
             None => {
-                bail!(ErrorKind::BuiltinError(format!("{}: event not found", command), 1));
+                bail!(ErrorKind::BuiltinCommandError(format!("{}: event not found", command), 1));
             }
         }
         Ok(())
