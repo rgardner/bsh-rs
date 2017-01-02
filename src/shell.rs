@@ -38,7 +38,16 @@ impl Shell {
 
     /// Custom prompt to output to the user.
     pub fn prompt(&self, buf: &mut String) -> io::Result<usize> {
-        prompt(&self, buf)
+        let cwd = env::current_dir().unwrap();
+        let home = env::home_dir().unwrap();
+        let rel = match cwd.strip_prefix(&home) {
+            Ok(rel) => ::std::path::Path::new("~").join(rel),
+            Err(_) => cwd.clone(),
+        };
+
+        print!("{}|{} $ ", self.last_exit_status, rel.display());
+        io::stdout().flush().unwrap();
+        io::stdin().read_line(buf)
     }
 
     /// Perform history expansions.
@@ -77,8 +86,9 @@ impl Shell {
             let res = builtins::run(self, &process);
             self.last_exit_status = if let Err(ref e) = res {
                 match *e {
-                    Error(ErrorKind::Io(_), _) => 1,
                     Error(ErrorKind::BuiltinError(_, code), _) => code,
+                    Error(ErrorKind::Parse(_), _) => 2,
+                    Error(ErrorKind::Io(_), _) => 1,
                     Error(ErrorKind::Msg(_), _) => 2,
                 }
             } else {
@@ -201,19 +211,4 @@ impl fmt::Debug for BackgroundJob {
                self.child.id(),
                self.idx)
     }
-}
-
-/// Print the current directory relative to $HOME and prompt the user for input.
-fn prompt(shell: &Shell, buf: &mut String) -> io::Result<usize> {
-    use std::path::Path;
-    let cwd = env::current_dir().unwrap();
-    let home = env::home_dir().unwrap();
-    let rel = match cwd.strip_prefix(&home) {
-        Ok(rel) => Path::new("~").join(rel),
-        Err(_) => cwd.clone(),
-    };
-
-    print!("{}|{} $ ", shell.last_exit_status, rel.display());
-    io::stdout().flush().unwrap();
-    io::stdin().read_line(buf)
 }

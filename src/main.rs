@@ -91,7 +91,7 @@ fn main() {
         let mut job = match ParseJob::parse(&input) {
             Ok(Some(job)) => job,
             Err(err) => {
-                println!("{:?}", err);
+                println!("bsh: {}", err);
                 continue;
             }
             _ => continue,

@@ -2,6 +2,16 @@
 
 use std::process::Command;
 
+error_chain! {
+    errors {
+        /// Generic syntax error containing offending line
+        SyntaxError(l: String) {
+            description("syntax error")
+            display("syntax error: '{}'", l)
+        }
+    }
+}
+
 /// The `ParseCommand` type acts a wrapper around `Commands`, facilitating testing.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ParseCommand {
@@ -57,18 +67,6 @@ impl ParseCommandBuilder {
     }
 }
 
-quick_error! {
-    #[derive(Debug)]
-    /// Errors that can occur while parsing a bsh script
-    pub enum ParseError {
-        /// Generic syntax error if a more specific one does not exist
-        SyntaxError(line: String) {
-            description("unknown syntax error")
-            display("-bsh: syntax error in line `{}`", line)
-        }
-    }
-}
-
 /// Represents all information associated with a user input
 #[derive(Clone, Debug, PartialEq)]
 pub struct ParseJob {
@@ -102,7 +100,7 @@ impl ParseJob {
     /// expected_command.arg("test");
     /// assert_eq!(job.commands, vec![expected_command.build()]);
     /// ```
-    pub fn parse(input: &str) -> Result<Option<ParseJob>, ParseError> {
+    pub fn parse(input: &str) -> Result<Option<ParseJob>> {
         let input_trimmed = input.trim();
         let argv: Vec<_> = input_trimmed.split_whitespace().collect();
         if argv.is_empty() {
@@ -139,8 +137,9 @@ impl ParseJob {
                 cmd.arg(arg);
             }
         }
+
         if infile || outfile {
-            return Err(ParseError::SyntaxError(input.into()));
+            bail!(ErrorKind::SyntaxError(input.to_string()));
         }
         info.command(cmd.build());
         Ok(Some(info.build()))
