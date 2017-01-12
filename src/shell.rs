@@ -11,7 +11,7 @@ use odds::vec::VecExt;
 use std::env;
 use std::fmt;
 use std::fs::{File, OpenOptions};
-use std::io::{self, Read, Write};
+use std::io::{Read, Write};
 use std::process::{self, Child, Stdio};
 use wait_timeout::ChildExt;
 
@@ -37,7 +37,7 @@ impl Shell {
     }
 
     /// Custom prompt to output to the user.
-    pub fn prompt(&self, buf: &mut String) -> io::Result<usize> {
+    pub fn prompt(&mut self) -> Result<String> {
         let cwd = env::current_dir().unwrap();
         let home = env::home_dir().unwrap();
         let rel = match cwd.strip_prefix(&home) {
@@ -45,23 +45,25 @@ impl Shell {
             Err(_) => cwd.clone(),
         };
 
-        print!("{}|{} $ ", self.last_exit_status, rel.display());
-        io::stdout().flush().unwrap();
-        io::stdin().read_line(buf)
+        let prompt = format!("{}|{}\n$ ", self.last_exit_status, rel.display());
+        // TODO: https://github.com/rgardner/bsh-rs/issues/8
+        println!("");
+        let line = try!(self.history.readline(&prompt));
+        Ok(line)
+    }
+
+    /// Add a job to the history.
+    pub fn add_history(&mut self, job: &str) {
+        self.editor.add_history_entry(&job);
     }
 
     /// Perform history expansions.
     ///
     /// !n -> repeat command numbered n in the list of commands (starting at 1)
     /// !-n -> repeat last nth command (starting at -1)
-    /// !string -> searches through history for first item that matches the string (via contains)
+    /// !string -> searches through history for first item that matches the string
     pub fn expand_history(&self, job: &mut String) -> Result<()> {
         self.history.expand(job)
-    }
-
-    /// Add a job to the history.
-    pub fn add_history(&mut self, job: &str) {
-        self.history.push(&job);
     }
 
     /// Add a job to the background.
@@ -89,6 +91,7 @@ impl Shell {
                     Error(ErrorKind::BuiltinCommandError(_, code), _) => code,
                     Error(ErrorKind::Parse(_), _) => 2,
                     Error(ErrorKind::Io(_), _) => 1,
+                    Error(ErrorKind::ReadlineError(_), _) => 1,
                     Error(ErrorKind::Msg(_), _) => 2,
                 }
             } else {
@@ -98,11 +101,11 @@ impl Shell {
         }
         let mut command = process.to_command();
 
-        if let Some(_) = job.infile {
+        if job.infile.is_some() {
             command.stdin(Stdio::piped());
         }
 
-        if let Some(_) = job.outfile {
+        if job.outfile.is_some() {
             command.stdout(Stdio::piped());
         }
 
@@ -174,7 +177,7 @@ impl Shell {
     ///
     /// Exit the shell with a status of n. If n is None, then the exit status is that of the last
     /// command executed.
-    pub fn exit(&mut self, n: Option<i32>) {
+    pub fn exit(&mut self, n: Option<i32>) -> ! {
         println!("exit");
         let code = match n {
             Some(n) => n,

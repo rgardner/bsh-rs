@@ -1,97 +1,66 @@
 use errors::*;
-use std::cmp::{self, Ordering};
+use rustyline::{Config, Editor, history};
 use std::fmt;
 use std::str;
 use nom::IResult;
 
-#[derive(Debug)]
-struct HistoryEntry {
-    line: String,
-    timestamp: usize,
-}
-
-#[derive(Debug)]
 pub struct HistoryState {
-    entries: Vec<HistoryEntry>,
-    /// The total number of history items ever saved.
+    internal: Editor<()>,
+    /// The total number of history items ever saved
     count: usize,
+    capacity: usize,
 }
 
 impl HistoryState {
     pub fn with_capacity(capacity: usize) -> HistoryState {
+        let config =
+            Config::builder().max_history_size(capacity).history_ignore_space(true).build();
+        let internal = Editor::with_config(config);
         HistoryState {
-            entries: Vec::with_capacity(capacity),
+            internal: internal,
             count: 0,
+            capacity: capacity,
         }
+    }
+
+    pub fn readline(&mut self, prompt: &str) -> Result<String> {
+        let line = try!(self.internal.readline(prompt));
+        Ok(line)
     }
 
     pub fn push(&mut self, job: &str) {
-        let idx = self.count % self.entries.capacity();
+        if self.internal.add_history_entry(job) {
+            self.count += 1;
+        }
+    }
 
-        // Prevent adjacent, duplicate entries from being added to the history.
-        let prev_idx = if idx == 0 {
-            self.entries.capacity() - 1
-        } else {
-            idx - 1
-        };
-        if self.entries.get(prev_idx).map(|e| e.line == job).unwrap_or(false) {
-            return;
+    /// Get the history entry at an absolute position
+    pub fn get(&self, abs_pos: usize) -> Option<&String> {
+        // map abs_pos to [0, self.capacity]
+        let begin = self.count.checked_sub(self.capacity).unwrap_or(0);
+        if (abs_pos < begin) || (abs_pos > self.count) {
+            return None;
         }
 
-        self.count += 1;
-        let entry = HistoryEntry {
-            line: job.to_owned(),
-            timestamp: self.count,
-        };
-        match self.entries.get(idx) {
-            Some(_) => self.entries[idx] = entry,  // replace if exists
-            None => self.entries.insert(idx, entry),
-        }
+        self.internal.get_history_const().get(abs_pos - begin)
+    }
+
+    /// Set maximum number of remembered history entries.
+    ///
+    /// If `size` > current max size, retain last `size` entries.
+    pub fn set_size(&mut self, size: usize) {
+        self.internal.get_history().set_max_len(size);
+        self.capacity = size;
+    }
+
+    pub fn count(&self) -> usize {
+        self.count
     }
 
     pub fn clear(&mut self) {
-        self.entries.clear();
+        self.internal.clear_history();
         self.count = 0;
     }
-
-    pub fn set_size(&mut self, size: usize) {
-        if size == 0 {
-            return;
-        }
-        let capacity = self.entries.capacity();
-        match size.cmp(&capacity) {
-            Ordering::Equal => return,
-            Ordering::Less => {
-                self.entries.clear();
-                self.entries.shrink_to_fit();
-                self.entries.reserve_exact(size);
-            }
-            Ordering::Greater => {
-                // Empty vectors: reserve_exact(size) = || capacity = size;
-                // Nonempty vectors: reserve_exact(size) = || capacity += size;
-                let reserve = if self.count > 0 {
-                    size - self.entries.capacity()
-                } else {
-                    size
-                };
-                self.entries.reserve_exact(reserve);
-            }
-        }
-    }
-
-    pub fn display(&self, last: usize) -> String {
-        let len = self.entries.len();
-        let skip = len - cmp::min(last, len);
-        let idx = self.count % self.entries.capacity();
-        let (end, start) = self.entries.split_at(idx);
-        start.iter()
-            .chain(end.iter())
-            .skip(skip)
-            .map(|e| format!("\t{}\t{}", e.timestamp.clone(), e.line.clone()))
-            .collect::<Vec<String>>()
-            .join("\n")
-    }
-
 
     /// Perform history expansion.
     pub fn expand(&self, command: &mut String) -> Result<()> {
@@ -103,48 +72,81 @@ impl HistoryState {
         };
 
         let entry = match arg.parse::<isize>() {
-            Ok(raw_n) => {
-                let n = match raw_n {
-                    0 => {
-                        bail!(ErrorKind::BuiltinCommandError(format!("{}: event not found", command), 1));
-                    }
-                    n if n < 0 => (n + (self.entries.len() as isize)) as usize,
-                    n => (n - 1) as usize,
-                };
-                self.entries.get(n)
-            }
+            Ok(0) => None,
+            Ok(n) if n > 0 => self.get((n - 1) as usize),
+            Ok(n) => self.count.checked_sub(n.wrapping_abs() as usize).and_then(|i| self.get(i)),
             Err(_) => {
-                let idx = self.count % self.entries.capacity();
-                let (end, start) = self.entries.split_at(idx);
-                start.iter().chain(end.iter()).rev().find(|&e| e.line.starts_with(arg))
+                self.internal
+                    .get_history_const()
+                    .search(arg, self.count - 1, history::Direction::Reverse)
+                    .and_then(|idx| self.internal.get_history_const().get(idx))
             }
         };
 
         match entry {
-            Some(e) => {
+            Some(line) => {
                 command.clear();
-                command.push_str(&e.line);
+                command.push_str(&line);
             }
             None => {
                 bail!(ErrorKind::BuiltinCommandError(format!("{}: event not found", command), 1));
             }
         }
+
         Ok(())
+    }
+
+    pub fn enumerate(&self) -> HistoryStateEnumerate {
+        let start = self.count.checked_sub(self.capacity).unwrap_or(0);
+        HistoryStateEnumerate {
+            history: self,
+            pos: start,
+        }
     }
 }
 
 impl fmt::Display for HistoryState {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.display(self.count))
+        for (i, e) in self.enumerate() {
+            try!(write!(f, "\t{}\t{}\n", i + 1, e));
+        }
+
+        Ok(())
     }
 }
 
-impl fmt::Display for HistoryEntry {
+impl fmt::Debug for HistoryState {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "\t{}\t{}", self.timestamp, self.line)
+        try!(write!(f, "count: {}\n", self.count));
+        try!(write!(f, "capacity: {}\n", self.capacity));
+        write!(f, "{}", self)
     }
 }
 
+pub struct HistoryStateEnumerate<'a> {
+    history: &'a HistoryState,
+    pos: usize,
+}
+
+impl<'a> Iterator for HistoryStateEnumerate<'a> {
+    type Item = (usize, &'a String);
+
+    fn next(&mut self) -> Option<(usize, &'a String)> {
+        if self.pos < self.history.count {
+            let v = self.history.get(self.pos).map(|e| (self.pos, e));
+            self.pos += 1;
+            v
+        } else {
+            None
+        }
+    }
+}
+
+impl<'a> fmt::Debug for HistoryStateEnumerate<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "pos: {}\n", self.pos)
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -163,9 +165,9 @@ mod tests {
     fn init_with_capacity() {
         let capacity = 10;
         let state = HistoryState::with_capacity(capacity);
-        assert_eq!(capacity, state.entries.capacity());
-        assert!(state.entries.is_empty());
-        assert_eq!(0, state.count);
+        assert!(state.internal.get_history_const().is_empty());
+        assert_eq!(state.count, 0);
+        assert_eq!(state.capacity, capacity);
     }
 
     #[test]
@@ -173,72 +175,28 @@ mod tests {
         let capacity = 10;
         let mut state = alloc_history_state(capacity, 5);
         state.clear();
-        assert!(state.entries.is_empty());
-        assert_eq!(capacity, state.entries.capacity());
-        assert_eq!(0, state.count);
-    }
-
-    #[test]
-    fn set_size_equal() {
-        let init_capacity = 10;
-
-        // empty history state
-        let mut state = HistoryState::with_capacity(init_capacity);
-        assert_eq!(init_capacity, state.entries.capacity());
-        state.set_size(init_capacity);
-        assert_eq!(init_capacity, state.entries.capacity());
-
-        // full history state
-        let mut state = alloc_history_state(init_capacity, init_capacity);
-        assert_eq!(init_capacity, state.entries.capacity());
-        state.set_size(init_capacity);
-        assert_eq!(init_capacity, state.entries.capacity());
-    }
-
-    #[test]
-    fn set_size_greater() {
-        let init_capacity = 10;
-        let new_capacity = 15;
-
-        // empty history state
-        let mut state = HistoryState::with_capacity(init_capacity);
-        assert_eq!(init_capacity, state.entries.capacity());
-        state.set_size(new_capacity);
-        assert_eq!(new_capacity, state.entries.capacity());
-
-        // full history state
-        let mut state = alloc_history_state(init_capacity, init_capacity);
-        assert_eq!(init_capacity, state.entries.capacity());
-        state.set_size(new_capacity);
-        assert_eq!(new_capacity, state.entries.capacity());
-    }
-
-    #[test]
-    fn set_size_less() {
-        let init_capacity = 10;
-        let new_capacity = 5;
-
-        // empty history state
-        let mut state = HistoryState::with_capacity(init_capacity);
-        assert_eq!(init_capacity, state.entries.capacity());
-        state.set_size(new_capacity);
-        assert_eq!(new_capacity, state.entries.capacity());
-
-        // full history state
-        let mut state = alloc_history_state(init_capacity, init_capacity);
-        assert_eq!(init_capacity, state.entries.capacity());
-        state.set_size(new_capacity);
-        assert_eq!(new_capacity, state.entries.capacity());
+        assert!(state.internal.get_history_const().is_empty());
+        assert_eq!(state.count, 0);
+        assert_eq!(state.capacity, capacity);
     }
 
     #[test]
     fn push_duplicate() {
         let mut state = HistoryState::with_capacity(2);
-        state.push("dup");
-        assert_eq!(1, state.entries.len());
 
-        state.push("dup");
-        assert_eq!(1, state.entries.len());
+        let item = "dup";
+        state.push(item);
+        assert_eq!(state.internal.get_history_const().len(), 1);
+
+        state.push(item);
+        assert_eq!(state.internal.get_history_const().len(), 1);
+    }
+
+    #[test]
+    fn push_rollover() {
+        let mut state = alloc_history_state(10, 10);
+        state.push("extra");
+        assert_eq!(state.count, 11);
     }
 
     #[test]
@@ -257,13 +215,15 @@ mod tests {
         assert!(state.expand(&mut buf).is_ok());
         assert!(buf.is_empty());
 
-        let mut buf = String::from("!1");
+        let first_cmd = "!1";
+        let mut buf = first_cmd.to_string();
         assert!(state.expand(&mut buf).is_err());
-        assert_eq!("!1", buf);
+        assert_eq!(buf.as_str(), first_cmd);
 
-        let mut buf = String::from("!-1");
+        let last_cmd = "!-1";
+        let mut buf = String::from(last_cmd);
         assert!(state.expand(&mut buf).is_err());
-        assert_eq!("!-1", buf);
+        assert_eq!(buf, last_cmd);
     }
 
     #[test]
@@ -273,7 +233,7 @@ mod tests {
         for i in 0..full {
             let mut buf = format!("!{}", i + 1);
             assert!(state.expand(&mut buf).is_ok());
-            assert_eq!(format!("cmd{}", i), buf);
+            assert_eq!(buf, format!("cmd{}", i));
         }
     }
 
@@ -284,7 +244,7 @@ mod tests {
         for i in 0..full {
             let mut buf = format!("!-{}", i + 1);
             assert!(state.expand(&mut buf).is_ok());
-            assert_eq!(format!("cmd{}", full - i - 1), buf);
+            assert_eq!(buf, format!("cmd{}", full - i - 1));
         }
     }
 
@@ -294,10 +254,10 @@ mod tests {
 
         let mut buf = String::from("!c");
         assert!(state.expand(&mut buf).is_ok());
-        assert_eq!("cmd9", buf);
+        assert_eq!(buf, "cmd9");
 
         buf = String::from("!cmd1");
         assert!(state.expand(&mut buf).is_ok());
-        assert_eq!("cmd1", buf);
+        assert_eq!(buf, "cmd1");
     }
 }

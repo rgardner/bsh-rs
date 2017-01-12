@@ -27,6 +27,5 @@ exit: exit [n]
                 2
             })
         }));
-        unreachable!()
     }
 }

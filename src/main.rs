@@ -5,9 +5,12 @@
 extern crate bsh_rs;
 extern crate docopt;
 extern crate rustc_serialize;
+extern crate rustyline;
 
+use bsh_rs::errors::*;
 use bsh_rs::{ParseJob, Shell};
 use docopt::Docopt;
+use rustyline::error::ReadlineError;
 use std::process;
 
 static HISTORY_CAPACITY: usize = 10;
@@ -71,14 +74,11 @@ fn main() {
         // Check the status of background jobs, removing exited ones.
         shell.check_jobs();
 
-        let mut input = String::new();
-        match shell.prompt(&mut input) {
-            Ok(0) => shell.exit(None),
-            Err(_) => panic!("failed to read line."),
-            _ => {}
-        }
-
-        input = input.trim().to_owned();
+        let mut input = match shell.prompt() {
+            Ok(line) => line.trim().to_owned(),
+            Err(Error(ErrorKind::ReadlineError(ReadlineError::Eof), _)) => shell.exit(None),
+            _ => continue,
+        };
 
         // Perform history substitutions and add user input to history.
         if let Err(e) = shell.expand_history(&mut input) {

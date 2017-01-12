@@ -20,5 +20,8 @@ wait-timeout = "0.1"
 optional = true
 version = "*"
 
+[dependencies.rustyline]
+path = "/Users/bobgardner/Developer/rust/rustyline-fork"
+
 [features]
 default = []

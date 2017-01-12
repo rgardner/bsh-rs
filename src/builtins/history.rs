@@ -1,5 +1,6 @@
 use errors::*;
 use builtins;
+use history::HistoryState;
 use shell::Shell;
 
 pub struct History;
@@ -20,11 +21,11 @@ history: history [-c] [-s size] [n]
 
     fn run(shell: &mut Shell, args: Vec<String>) -> Result<()> {
         if let None = args.first() {
-            println!("{}", shell.history);
+            print!("{}", shell.history);
             return Ok(());
         }
-        let arg = args.first().unwrap();
-        match &**arg {
+
+        match &**args.first().unwrap() {
             "-c" => shell.history.clear(),
             "-s" => {
                 if let Some(s) = args.get(2) {
@@ -35,7 +36,7 @@ history: history [-c] [-s size] [n]
             }
             s => {
                 match s.parse::<usize>() {
-                    Ok(n) => println!("{}", shell.history.display(n)),
+                    Ok(n) => println!("{}", history_display(&shell.history, n)),
                     Err(_) => {
                         let msg = format!("history: {}: nonnegative numeric argument required", s);
                         bail!(ErrorKind::BuiltinCommandError(msg, 1));
@@ -45,4 +46,13 @@ history: history [-c] [-s size] [n]
         }
         Ok(())
     }
+}
+
+pub fn history_display(state: &HistoryState, n_last_entries: usize) -> String {
+    let num_to_skip = state.count().checked_sub(n_last_entries).unwrap_or(0);
+    state.enumerate()
+        .skip(num_to_skip)
+        .map(|(i, e)| format!("\t{}\t{}", i + 1, e))
+        .collect::<Vec<String>>()
+        .join("\n")
 }

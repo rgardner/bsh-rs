@@ -13,17 +13,19 @@
 #![recursion_limit = "1024"]
 
 #[macro_use]
+extern crate error_chain;
+#[macro_use]
 extern crate nom;
 extern crate odds;
-#[macro_use]
-extern crate error_chain;
+extern crate rustyline;
 extern crate wait_timeout;
 
 pub use self::shell::Shell;
 pub use self::parse::{ParseCommand, ParseJob};
 
 mod builtins;
-mod errors;
+#[allow(missing_docs)]
+pub mod errors;
 mod history;
 pub mod parse;
 pub mod shell;
