@@ -46,8 +46,6 @@ impl Shell {
         };
 
         let prompt = format!("{}|{}\n$ ", self.last_exit_status, rel.display());
-        // TODO: https://github.com/rgardner/bsh-rs/issues/8
-        println!("");
         let line = try!(self.history.readline(&prompt));
         Ok(line)
     }
