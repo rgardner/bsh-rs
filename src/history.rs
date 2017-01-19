@@ -1,11 +1,12 @@
 use errors::*;
-use rustyline::{Config, Editor, history};
+use rustyline::{Config, CompletionType, Editor, history};
+use rustyline::completion::FilenameCompleter;
 use std::fmt;
 use std::str;
 use nom::IResult;
 
 pub struct HistoryState {
-    internal: Editor<()>,
+    internal: Editor<(FilenameCompleter)>,
     /// The total number of history items ever saved
     count: usize,
     capacity: usize,
@@ -13,9 +14,15 @@ pub struct HistoryState {
 
 impl HistoryState {
     pub fn with_capacity(capacity: usize) -> HistoryState {
-        let config =
-            Config::builder().max_history_size(capacity).history_ignore_space(true).build();
-        let internal = Editor::with_config(config);
+        let config = Config::builder()
+            .max_history_size(capacity)
+            .history_ignore_space(true)
+            .completion_type(CompletionType::Circular)
+            .build();
+
+        let mut internal = Editor::with_config(config);
+        internal.set_completer(Some(FilenameCompleter::new()));
+
         HistoryState {
             internal: internal,
             count: 0,
