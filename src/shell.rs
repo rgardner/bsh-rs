@@ -1,12 +1,12 @@
 //! Bsh - Shell Module
 //!
 //! The Shell itself is responsible for managing background jobs and for
-//! maintaining a history of previous commands.
+//! maintaining a editor of previous commands.
 
 use errors::*;
 use builtins;
 use parse::ParseJob;
-use history::HistoryState;
+use editor::Editor;
 use odds::vec::VecExt;
 use std::env;
 use std::fmt;
@@ -17,8 +17,8 @@ use wait_timeout::ChildExt;
 
 /// Bsh Shell
 pub struct Shell {
-    /// History of previously executed shell commands.
-    pub history: HistoryState,
+    /// Responsible for readline and history.
+    pub editor: Editor,
     jobs: Vec<BackgroundJob>,
     job_count: u32,
     /// Exit status of last command executed.
@@ -29,7 +29,7 @@ impl Shell {
     /// Constructs a new Shell to manage running jobs and command history.
     pub fn new(history_capacity: usize) -> Shell {
         Shell {
-            history: HistoryState::with_capacity(history_capacity),
+            editor: Editor::with_capacity(history_capacity),
             jobs: Vec::new(),
             job_count: 0,
             last_exit_status: 0,
@@ -46,7 +46,7 @@ impl Shell {
         };
 
         let prompt = format!("{}|{}\n$ ", self.last_exit_status, rel.display());
-        let line = try!(self.history.readline(&prompt));
+        let line = try!(self.editor.readline(&prompt));
         Ok(line)
     }
 
@@ -61,7 +61,7 @@ impl Shell {
     /// !-n -> repeat last nth command (starting at -1)
     /// !string -> searches through history for first item that matches the string
     pub fn expand_history(&self, job: &mut String) -> Result<()> {
-        self.history.expand(job)
+        self.editor.expand_history(job)
     }
 
     /// Add a job to the background.
@@ -192,7 +192,7 @@ impl Shell {
 
 impl fmt::Debug for Shell {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} jobs\n{}", self.jobs.len(), self.history)
+        write!(f, "{} jobs\n{}", self.jobs.len(), self.editor)
     }
 }
 

@@ -24,8 +24,8 @@ pub use self::shell::Shell;
 pub use self::parse::{ParseCommand, ParseJob};
 
 mod builtins;
+mod editor;
 #[allow(missing_docs)]
 pub mod errors;
-mod history;
 pub mod parse;
 pub mod shell;
