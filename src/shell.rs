@@ -8,17 +8,22 @@ use builtins;
 use parse::ParseJob;
 use editor::Editor;
 use odds::vec::VecExt;
+use rustyline;
 use std::env;
 use std::fmt;
 use std::fs::{File, OpenOptions};
-use std::io::{Read, Write};
+use std::io::{self, Read, Write};
+use std::path::{Path, PathBuf};
 use std::process::{self, Child, Stdio};
 use wait_timeout::ChildExt;
+
+const HISTORY_FILE_NAME: &'static str = ".bsh_history";
 
 /// Bsh Shell
 pub struct Shell {
     /// Responsible for readline and history.
     pub editor: Editor,
+    history_file: PathBuf,
     jobs: Vec<BackgroundJob>,
     job_count: u32,
     /// Exit status of last command executed.
@@ -27,13 +32,31 @@ pub struct Shell {
 
 impl Shell {
     /// Constructs a new Shell to manage running jobs and command history.
-    pub fn new(history_capacity: usize) -> Shell {
-        Shell {
+    pub fn new(history_capacity: usize) -> Result<Shell> {
+        let history_file = try!(env::home_dir()
+            .map(|p| p.join(HISTORY_FILE_NAME))
+            .ok_or("failed to get home directory"));
+
+        let mut shell = Shell {
             editor: Editor::with_capacity(history_capacity),
+            history_file: history_file,
             jobs: Vec::new(),
             job_count: 0,
             last_exit_status: 0,
-        }
+        };
+
+        try!(shell.editor.load_history(&shell.history_file).or_else(|e| {
+            if let &ErrorKind::ReadlineError(rustyline::error::ReadlineError::Io(ref inner)) =
+                   e.kind() {
+                if inner.kind() == io::ErrorKind::NotFound {
+                    return Ok(());
+                }
+            }
+
+            Err(e)
+        }));
+
+        Ok(shell)
     }
 
     /// Custom prompt to output to the user.
@@ -41,7 +64,7 @@ impl Shell {
         let cwd = env::current_dir().unwrap();
         let home = env::home_dir().unwrap();
         let rel = match cwd.strip_prefix(&home) {
-            Ok(rel) => ::std::path::Path::new("~").join(rel),
+            Ok(rel) => Path::new("~").join(rel),
             Err(_) => cwd.clone(),
         };
 
@@ -186,6 +209,9 @@ impl Shell {
         } else {
             code % 256
         };
+
+        // TODO(rogardn): log failures
+        let _ = self.editor.save_history(&self.history_file);
         process::exit(code_like_u8);
     }
 }

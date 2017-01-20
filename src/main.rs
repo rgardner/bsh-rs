@@ -64,7 +64,7 @@ fn main() {
         process::exit(0);
     }
 
-    let mut shell = Shell::new(HISTORY_CAPACITY);
+    let mut shell = Shell::new(HISTORY_CAPACITY).unwrap();
     if args.flag_c {
         execute_command(shell, &args.arg_command.unwrap());
         process::exit(0);
@@ -76,7 +76,7 @@ fn main() {
 
         let mut input = match shell.prompt() {
             Ok(line) => line.trim().to_owned(),
-            Err(Error(ErrorKind::ReadlineError(ReadlineError::Eof), _)) => shell.exit(None),
+            Err(Error(ErrorKind::ReadlineError(ReadlineError::Eof), _)) => break,
             _ => continue,
         };
 
@@ -101,4 +101,6 @@ fn main() {
             println!("bsh: {}", e);
         }
     }
+
+    shell.exit(None);
 }

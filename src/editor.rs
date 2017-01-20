@@ -1,9 +1,10 @@
 use errors::*;
+use nom::IResult;
 use rustyline::{self, Config, CompletionType, history};
 use rustyline::completion::FilenameCompleter;
 use std::fmt;
+use std::path::Path;
 use std::str;
-use nom::IResult;
 
 pub struct Editor {
     internal: rustyline::Editor<(FilenameCompleter)>,
@@ -33,6 +34,16 @@ impl Editor {
     pub fn readline(&mut self, prompt: &str) -> Result<String> {
         let line = try!(self.internal.readline(prompt));
         Ok(line)
+    }
+
+    pub fn load_history<P: AsRef<Path> + ?Sized>(&mut self, path: &P) -> Result<()> {
+        let result = try!(self.internal.load_history(path));
+        Ok(result)
+    }
+
+    pub fn save_history<P: AsRef<Path> + ?Sized>(&mut self, path: &P) -> Result<()> {
+        let result = try!(self.internal.save_history(path));
+        Ok(result)
     }
 
     pub fn add_history_entry(&mut self, job: &str) {
