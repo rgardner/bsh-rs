@@ -1,10 +1,10 @@
 //! Error module. See the [error-chain](https://crates.io/crates/error-chain) crate for details.
 
-use parse;
+use parser;
 
 error_chain! {
     links {
-        Parse(parse::Error, parse::ErrorKind);
+        Parser(parser::Error, parser::ErrorKind);
     }
 
     foreign_links {

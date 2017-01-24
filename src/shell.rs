@@ -5,7 +5,7 @@
 
 use errors::*;
 use builtins;
-use parse::ParseJob;
+use parser::Job;
 use editor::Editor;
 use odds::vec::VecExt;
 use rustyline;
@@ -103,53 +103,50 @@ impl Shell {
     }
 
     /// Run a job.
-    pub fn run(&mut self, job: &mut ParseJob) -> Result<()> {
-        let process = job.commands.get_mut(0).unwrap();
-        if builtins::is_builtin(&process.program) {
-            let res = builtins::run(self, &process);
-            self.last_exit_status = if let Err(ref e) = res {
-                match *e {
-                    Error(ErrorKind::BuiltinCommandError(_, code), _) => code,
-                    Error(ErrorKind::Parse(_), _) => 2,
-                    Error(ErrorKind::Io(_), _) => 1,
-                    Error(ErrorKind::ReadlineError(_), _) => 1,
-                    Error(ErrorKind::Msg(_), _) => 2,
-                }
+    pub fn run(&mut self, job: &mut Job) -> Result<()> {
+        for cmd in job.commands.iter() {
+            if builtins::is_builtin(&cmd.program()) {
+                let res = builtins::run(self, &cmd);
+                self.last_exit_status = get_builtin_error_code(res);
             } else {
-                0
-            };
-            return res;
-        }
-        let mut command = process.to_command();
+                let mut external_cmd = cmd.to_command();
 
-        if job.infile.is_some() {
-            command.stdin(Stdio::piped());
-        }
+                if cmd.infile.is_some() {
+                    external_cmd.stdin(Stdio::piped());
+                }
 
-        if job.outfile.is_some() {
-            command.stdout(Stdio::piped());
-        }
+                if cmd.outfile.is_some() {
+                    external_cmd.stdout(Stdio::piped());
+                }
 
-        let mut child = try!(command.spawn());
-        if let Some(ref mut stdin) = child.stdin {
-            let infile = job.infile.take().unwrap();
-            let mut f = try!(File::open(infile));
-            let mut buf: Vec<u8> = vec![];
-            try!(f.read_to_end(&mut buf));
-            try!(stdin.write_all(&buf));
-        }
-        if let Some(ref mut stdout) = child.stdout {
-            let outfile = job.outfile.take().unwrap();
-            let mut file = try!(OpenOptions::new().write(true).create(true).open(outfile));
-            let mut buf: Vec<u8> = vec![];
-            try!(stdout.read_to_end(&mut buf));
-            try!(file.write_all(&buf));
-        } else if job.background {
-            self.add_to_background(child);
-        } else if !job.background {
-            let output = child.wait_with_output().unwrap();
-            self.last_exit_status = output.status.code().unwrap_or(0);
-            print!("{}", String::from_utf8_lossy(&output.stdout));
+                let mut child = try!(external_cmd.spawn());
+                if let Some(ref mut stdin) = child.stdin {
+                    if let Some(ref infile) = cmd.infile {
+                        let mut f = try!(File::open(infile));
+                        let mut buf: Vec<u8> = vec![];
+                        try!(f.read_to_end(&mut buf));
+                        try!(stdin.write_all(&buf));
+                    }
+                }
+
+                if let Some(ref mut stdout) = child.stdout {
+                    if let Some(ref outfile) = cmd.outfile {
+                        let mut file =
+                            try!(OpenOptions::new().write(true).create(true).open(outfile));
+                        let mut buf: Vec<u8> = vec![];
+                        try!(stdout.read_to_end(&mut buf));
+                        try!(file.write_all(&buf));
+                    }
+                }
+
+                if job.background {
+                    self.add_to_background(child);
+                } else {
+                    let output = child.wait_with_output().unwrap();
+                    self.last_exit_status = output.status.code().unwrap_or(0);
+                    print!("{}", String::from_utf8_lossy(&output.stdout));
+                }
+            }
         }
 
         Ok(())
@@ -215,6 +212,21 @@ impl Shell {
         process::exit(code_like_u8);
     }
 }
+
+fn get_builtin_error_code(result: Result<()>) -> i32 {
+    if let Err(ref e) = result {
+        match *e {
+            Error(ErrorKind::BuiltinCommandError(_, code), _) => code,
+            Error(ErrorKind::Parser(_), _) => 2,
+            Error(ErrorKind::Io(_), _) => 1,
+            Error(ErrorKind::ReadlineError(_), _) => 1,
+            Error(ErrorKind::Msg(_), _) => 2,
+        }
+    } else {
+        0
+    }
+}
+
 
 impl fmt::Debug for Shell {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

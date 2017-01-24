@@ -14,6 +14,7 @@
 
 #[macro_use]
 extern crate error_chain;
+extern crate lalrpop_util;
 #[macro_use]
 extern crate nom;
 extern crate odds;
@@ -21,11 +22,12 @@ extern crate rustyline;
 extern crate wait_timeout;
 
 pub use self::shell::Shell;
-pub use self::parse::{ParseCommand, ParseJob};
+pub use self::parser::Job;
 
 mod builtins;
 mod editor;
 #[allow(missing_docs)]
 pub mod errors;
-pub mod parse;
+#[allow(missing_docs)]
+pub mod parser;
 pub mod shell;

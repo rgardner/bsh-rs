@@ -4,7 +4,7 @@
 //! Where possible the commands conform to their standard Bash counterparts.
 
 use errors::*;
-use parse::ParseCommand;
+use parser::Command;
 use shell::Shell;
 
 use self::dirs::Cd;
@@ -44,14 +44,14 @@ pub fn is_builtin(program: &str) -> bool {
 }
 
 /// precondition: process is a builtin.
-pub fn run(shell: &mut Shell, process: &ParseCommand) -> Result<()> {
-    assert!(is_builtin(&process.program));
-    match &*process.program {
-        CD_NAME => Cd::run(shell, process.args.clone()),
-        EXIT_NAME => Exit::run(shell, process.args.clone()),
-        HELP_NAME => Help::run(shell, process.args.clone()),
-        HISTORY_NAME => History::run(shell, process.args.clone()),
-        KILL_NAME => Kill::run(shell, process.args.clone()),
+pub fn run(shell: &mut Shell, process: &Command) -> Result<()> {
+    assert!(is_builtin(&process.program()));
+    match &*process.program() {
+        CD_NAME => Cd::run(shell, process.args().clone()),
+        EXIT_NAME => Exit::run(shell, process.args().clone()),
+        HELP_NAME => Help::run(shell, process.args().clone()),
+        HISTORY_NAME => History::run(shell, process.args().clone()),
+        KILL_NAME => Kill::run(shell, process.args().clone()),
         _ => unreachable!(),
     }
 }

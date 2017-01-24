@@ -1,0 +1,38 @@
+use parser::ast;
+use std::iter;
+
+grammar;
+
+pub Job: ast::Job = {
+    <cmd0:(<Command> "|")*> <cmd1:Command> <background:"&"?> => ast::Job {
+        commands: { cmd0.into_iter().chain(iter::once(cmd1)).collect() },
+        background: background.is_some(),
+
+    }
+};
+
+Command: ast::Command = {
+    <CommandPart+> => {
+        <>.iter().fold(ast::Command::new(), |acc, ref x| {
+            ast::Command {
+                argv: { acc.argv.into_iter().chain(x.argv.iter().cloned()).collect() },
+                infile: acc.infile.or(x.infile.clone()),
+                outfile: acc.outfile.or(x.outfile.clone()),
+            }
+        })
+    }
+};
+
+CommandPart: ast::Command = {
+    <Word> => ast::Command { argv: vec![<>], infile: None, outfile: None, },
+    <Infile> => ast::Command { argv: vec![], infile: Some(<>), outfile: None, },
+    <Outfile> => ast::Command { argv: vec![], infile: None, outfile: Some(<>) },
+};
+
+Infile = "<" <Word>;
+Outfile = ">" <Word>;
+Word: String = {
+    r"[a-zA-Z0-9]+" => <>.to_string(),
+    <s:r"'[a-zA-Z0-9\s]+'"> => s[1..s.len()-1].to_string(),
+    <s:r#""[a-zA-Z0-9\s]+""#> => s[1..s.len()-1].to_string(),
+};

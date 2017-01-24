@@ -8,7 +8,7 @@ extern crate rustc_serialize;
 extern crate rustyline;
 
 use bsh_rs::errors::*;
-use bsh_rs::{ParseJob, Shell};
+use bsh_rs::{Job, Shell};
 use docopt::Docopt;
 use rustyline::error::ReadlineError;
 use std::process;
@@ -41,7 +41,7 @@ struct Args {
 
 /// Execute a command string in the context of the shell.
 fn execute_command(mut shell: Shell, command: &str) {
-    let mut job = match ParseJob::parse(command) {
+    let mut job = match Job::parse(command) {
         Ok(Some(job)) => job,
         Err(err) => {
             println!("{:?}", err);
@@ -88,7 +88,7 @@ fn main() {
         shell.add_history(&input);
 
         // Parse user input.
-        let mut job = match ParseJob::parse(&input) {
+        let mut job = match Job::parse(&input) {
             Ok(Some(job)) => job,
             Err(err) => {
                 println!("bsh: {}", err);
