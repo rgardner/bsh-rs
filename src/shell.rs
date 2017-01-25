@@ -107,7 +107,7 @@ impl Shell {
         for cmd in job.commands.iter() {
             if builtins::is_builtin(&cmd.program()) {
                 let res = builtins::run(self, &cmd);
-                self.last_exit_status = get_builtin_error_code(res);
+                self.last_exit_status = get_builtin_exit_status(res);
             } else {
                 let mut external_cmd = cmd.to_command();
 
@@ -213,7 +213,7 @@ impl Shell {
     }
 }
 
-fn get_builtin_error_code(result: Result<()>) -> i32 {
+fn get_builtin_exit_status(result: Result<()>) -> i32 {
     if let Err(ref e) = result {
         match *e {
             Error(ErrorKind::BuiltinCommandError(_, code), _) => code,

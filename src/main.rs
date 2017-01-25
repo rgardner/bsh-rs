@@ -59,12 +59,11 @@ fn main() {
 
     let mut shell = Shell::new(HISTORY_CAPACITY).unwrap();
     if args.flag_c {
-        match execute_command(&mut shell, &args.arg_command.unwrap()) {
-            Err(e) => {
-                println!("bsh: {}", e);
-                process::exit(1);
-            }
-            _ => process::exit(0),
+        if let Err(e) = execute_command(&mut shell, &args.arg_command.unwrap()) {
+            println!("bsh: {}", e);
+            process::exit(1);
+        } else {
+            process::exit(0);
         }
     }
 

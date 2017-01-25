@@ -6,10 +6,7 @@ grammar;
 pub Jobs = Semicolon<Job>;
 
 Semicolon<T>: Vec<T> = {
-    <v:(<T> ";")*> <e:T?> => match e {
-        Some(e) => v.into_iter().chain(iter::once(e)).collect(),
-        None => v,
-    }
+    <v:(<T> ";")*> <e:T?> => v.into_iter().chain(e).collect()
 };
 
 pub Job: ast::Job = {
@@ -22,11 +19,11 @@ pub Job: ast::Job = {
 
 Command: ast::Command = {
     <CommandPart+> => {
-        <>.iter().fold(ast::Command::new(), |acc, ref x| {
+        <>.into_iter().fold(ast::Command::new(), |acc, x| {
             ast::Command {
-                argv: { acc.argv.into_iter().chain(x.argv.iter().cloned()).collect() },
-                infile: acc.infile.or(x.infile.clone()),
-                outfile: acc.outfile.or(x.outfile.clone()),
+                argv: { acc.argv.into_iter().chain(x.argv.into_iter()).collect() },
+                infile: acc.infile.or(x.infile),
+                outfile: acc.outfile.or(x.outfile),
             }
         })
     }
