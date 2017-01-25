@@ -56,22 +56,22 @@ mod tests {
         }
     }
 
+    fn command_just_argv(argv: Vec<&str>) -> Command {
+        Command {
+            argv: argv.iter().map(|s| s.to_string()).collect(),
+            infile: None,
+            outfile: None,
+        }
+    }
+
     #[test]
     fn test_simple_command() {
         assert!(grammar::parse_Job("").is_err());
         assert_eq!(grammar::parse_Job("echo bob").unwrap(),
-                   job_with_single_cmd(Command {
-                       argv: vec!["echo".into(), "bob".into()],
-                       infile: None,
-                       outfile: None,
-                   }));
+                   job_with_single_cmd(command_just_argv(vec!["echo", "bob"])));
 
         assert_eq!(grammar::parse_Job("ls ~/1code").unwrap(),
-                   job_with_single_cmd(Command {
-                       argv: vec!["ls".into(), "~/1code".into()],
-                       infile: None,
-                       outfile: None,
-                   }));
+                   job_with_single_cmd(command_just_argv(vec!["ls", "~/1code"])));
     }
 
     #[test]
@@ -141,11 +141,7 @@ mod tests {
     fn test_job() {
         assert_eq!(grammar::parse_Job("cmd1").unwrap(),
                    ast::Job {
-                       commands: vec![Command {
-                                          argv: vec!["cmd1".into()],
-                                          infile: None,
-                                          outfile: None,
-                                      }],
+                       commands: vec![command_just_argv(vec!["cmd1".into()])],
                        background: false,
                    });
 
@@ -163,11 +159,7 @@ mod tests {
     fn test_job_background() {
         assert_eq!(grammar::parse_Job("cmd1 &").unwrap(),
                    ast::Job {
-                       commands: vec![Command {
-                                          argv: vec!["cmd1".into()],
-                                          infile: None,
-                                          outfile: None,
-                                      }],
+                       commands: vec![command_just_argv(vec!["cmd1"])],
                        background: true,
                    });
 
@@ -205,74 +197,34 @@ mod tests {
     #[test]
     fn test_nested_quotes() {
         assert_eq!(grammar::parse_Job(r#"echo '"arg"'"#).unwrap(),
-                   job_with_single_cmd(Command {
-                       argv: vec!["echo".into(), r#""arg""#.into()],
-                       infile: None,
-                       outfile: None,
-                   }));
+                   job_with_single_cmd(command_just_argv(vec!["echo", r#""arg""#])));
 
         assert_eq!(grammar::parse_Job(r#"echo "'arg'""#).unwrap(),
-                   job_with_single_cmd(Command {
-                       argv: vec!["echo".into(), "'arg'".into()],
-                       infile: None,
-                       outfile: None,
-                   }));
+                   job_with_single_cmd(command_just_argv(vec!["echo", "'arg'"])));
 
         assert_eq!(grammar::parse_Job(r#"echo '"arg'"#).unwrap(),
-                   job_with_single_cmd(Command {
-                       argv: vec!["echo".into(), r#""arg"#.into()],
-                       infile: None,
-                       outfile: None,
-                   }));
+                   job_with_single_cmd(command_just_argv(vec!["echo", r#""arg"#])));
 
         assert_eq!(grammar::parse_Job(r#"echo "arg'""#).unwrap(),
-                   job_with_single_cmd(Command {
-                       argv: vec!["echo".into(), r#"arg'"#.into()],
-                       infile: None,
-                       outfile: None,
-                   }));
+                   job_with_single_cmd(command_just_argv(vec!["echo", r#"arg'"#])));
     }
 
     #[test]
     fn test_multiple_jobs() {
         assert!(grammar::parse_Jobs(";").is_err());
         assert_eq!(grammar::parse_Jobs("cmd1;").unwrap(),
-                   vec![job_with_single_cmd(Command {
-                            argv: vec!["cmd1".into()],
-                            infile: None,
-                            outfile: None,
-                        })]);
+                   vec![job_with_single_cmd(command_just_argv(vec!["cmd1"]))]);
 
         assert_eq!(grammar::parse_Jobs("cmd1; cmd2").unwrap(),
-                   vec![job_with_single_cmd(Command {
-                            argv: vec!["cmd1".into()],
-                            infile: None,
-                            outfile: None,
-                        }),
-                        job_with_single_cmd(Command {
-                            argv: vec!["cmd2".into()],
-                            infile: None,
-                            outfile: None,
-                        })]);
+                   vec![job_with_single_cmd(command_just_argv(vec!["cmd1"])),
+                        job_with_single_cmd(command_just_argv(vec!["cmd2"]))]);
 
         assert_eq!(grammar::parse_Jobs("cmd1 | cmd2; cmd3").unwrap(),
                    vec![ast::Job {
-                            commands: vec![Command {
-                                               argv: vec!["cmd1".into()],
-                                               infile: None,
-                                               outfile: None,
-                                           },
-                                           Command {
-                                               argv: vec!["cmd2".into()],
-                                               infile: None,
-                                               outfile: None,
-                                           }],
+                            commands: vec![command_just_argv(vec!["cmd1"]),
+                                           command_just_argv(vec!["cmd2"])],
                             background: false,
                         },
-                        job_with_single_cmd(Command {
-                            argv: vec!["cmd3".into()],
-                            infile: None,
-                            outfile: None,
-                        })]);
+                        job_with_single_cmd(command_just_argv(vec!["cmd3"]))]);
     }
 }
