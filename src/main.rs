@@ -40,20 +40,13 @@ struct Args {
 }
 
 /// Execute a command string in the context of the shell.
-fn execute_command(mut shell: Shell, command: &str) {
-    let mut job = match Job::parse(command) {
-        Ok(Some(job)) => job,
-        Err(err) => {
-            println!("{:?}", err);
-            process::exit(1);
-        }
-        _ => process::exit(1),
-    };
-
-    if let Err(e) = shell.run(&mut job) {
-        println!("bsh: {}", e);
-        process::exit(1);
+fn execute_command(shell: &mut Shell, command: &str) -> Result<()> {
+    let job = try!(Job::parse(command));
+    if let Some(mut job) = job {
+        try!(shell.run(&mut job));
     }
+
+    Ok(())
 }
 
 fn main() {
@@ -66,8 +59,13 @@ fn main() {
 
     let mut shell = Shell::new(HISTORY_CAPACITY).unwrap();
     if args.flag_c {
-        execute_command(shell, &args.arg_command.unwrap());
-        process::exit(0);
+        match execute_command(&mut shell, &args.arg_command.unwrap()) {
+            Err(e) => {
+                println!("bsh: {}", e);
+                process::exit(1);
+            }
+            _ => process::exit(0),
+        }
     }
 
     loop {
@@ -87,17 +85,7 @@ fn main() {
         }
         shell.add_history(&input);
 
-        // Parse user input.
-        let mut job = match Job::parse(&input) {
-            Ok(Some(job)) => job,
-            Err(err) => {
-                println!("bsh: {}", err);
-                continue;
-            }
-            _ => continue,
-        };
-
-        if let Err(e) = shell.run(&mut job) {
+        if let Err(e) = execute_command(&mut shell, &input) {
             println!("bsh: {}", e);
         }
     }
