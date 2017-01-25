@@ -32,7 +32,7 @@ CommandPart: ast::Command = {
 Infile = "<" <Word>;
 Outfile = ">" <Word>;
 Word: String = {
-    r"[a-zA-Z0-9]+" => <>.to_string(),
-    <s:r"'[a-zA-Z0-9\s]+'"> => s[1..s.len()-1].to_string(),
-    <s:r#""[a-zA-Z0-9\s]+""#> => s[1..s.len()-1].to_string(),
+    r#"[^|<>&\s'"]+"# => <>.to_string(),
+    r#"'[^|<>&']+'"# => <>[1..<>.len()-1].to_string(),
+    r#""[^|<>&"]+""# => <>[1..<>.len()-1].to_string(),
 };

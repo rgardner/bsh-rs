@@ -58,9 +58,17 @@ mod tests {
 
     #[test]
     fn test_simple_command() {
+        assert!(grammar::parse_Job("").is_err());
         assert_eq!(grammar::parse_Job("echo bob").unwrap(),
                    job_with_single_cmd(Command {
                        argv: vec!["echo".into(), "bob".into()],
+                       infile: None,
+                       outfile: None,
+                   }));
+
+        assert_eq!(grammar::parse_Job("ls ~/1code").unwrap(),
+                   job_with_single_cmd(Command {
+                       argv: vec!["ls".into(), "~/1code".into()],
                        infile: None,
                        outfile: None,
                    }));
@@ -168,18 +176,18 @@ mod tests {
 
     #[test]
     fn test_quotes() {
-        assert_eq!(grammar::parse_Job(">'out 1' echo 'arg arg arg'").unwrap(),
-                   job_with_single_cmd(Command {
-                       argv: vec!["echo".into(), "arg arg arg".into()],
-                       infile: None,
-                       outfile: Some("out 1".into()),
-                   }));
-
         assert_eq!(grammar::parse_Job(">'out' 'echo' <in 'arg'").unwrap(),
                    job_with_single_cmd(Command {
                        argv: vec!["echo".into(), "arg".into()],
                        infile: Some("in".into()),
                        outfile: Some("out".into()),
+                   }));
+
+        assert_eq!(grammar::parse_Job(">'out 1' echo 'arg arg arg'").unwrap(),
+                   job_with_single_cmd(Command {
+                       argv: vec!["echo".into(), "arg arg arg".into()],
+                       infile: None,
+                       outfile: Some("out 1".into()),
                    }));
 
         assert_eq!(grammar::parse_Job(r#">"out" "echo" <in "arg""#).unwrap(),
@@ -188,5 +196,39 @@ mod tests {
                        infile: Some("in".into()),
                        outfile: Some("out".into()),
                    }));
+
+        assert!(grammar::parse_Job("echo 'arg").is_err());
+        assert!(grammar::parse_Job(r#"echo "arg"#).is_err());
+    }
+
+    #[test]
+    fn test_nested_quotes() {
+        assert_eq!(grammar::parse_Job(r#"echo '"arg"'"#).unwrap(),
+                    job_with_single_cmd(Command {
+                        argv: vec!["echo".into(), r#""arg""#.into()],
+                        infile: None,
+                        outfile: None,
+                    }));
+
+        assert_eq!(grammar::parse_Job(r#"echo "'arg'""#).unwrap(),
+                    job_with_single_cmd(Command {
+                        argv: vec!["echo".into(), "'arg'".into()],
+                        infile: None,
+                        outfile: None,
+                    }));
+
+        assert_eq!(grammar::parse_Job(r#"echo '"arg'"#).unwrap(),
+                    job_with_single_cmd(Command {
+                        argv: vec!["echo".into(), r#""arg"#.into()],
+                        infile: None,
+                        outfile: None,
+                    }));
+
+        assert_eq!(grammar::parse_Job(r#"echo "arg'""#).unwrap(),
+                    job_with_single_cmd(Command {
+                        argv: vec!["echo".into(), r#"arg'"#.into()],
+                        infile: None,
+                        outfile: None,
+                    }));
     }
 }
