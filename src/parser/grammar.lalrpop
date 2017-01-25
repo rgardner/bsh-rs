@@ -3,6 +3,15 @@ use std::iter;
 
 grammar;
 
+pub Jobs = Semicolon<Job>;
+
+Semicolon<T>: Vec<T> = {
+    <v:(<T> ";")*> <e:T?> => match e {
+        Some(e) => v.into_iter().chain(iter::once(e)).collect(),
+        None => v,
+    }
+};
+
 pub Job: ast::Job = {
     <cmd0:(<Command> "|")*> <cmd1:Command> <background:"&"?> => ast::Job {
         commands: { cmd0.into_iter().chain(iter::once(cmd1)).collect() },
@@ -32,7 +41,7 @@ CommandPart: ast::Command = {
 Infile = "<" <Word>;
 Outfile = ">" <Word>;
 Word: String = {
-    r#"[^|<>&\s'"]+"# => <>.to_string(),
-    r#"'[^|<>&']+'"# => <>[1..<>.len()-1].to_string(),
-    r#""[^|<>&"]+""# => <>[1..<>.len()-1].to_string(),
+    r#"[^|;<>&\s'"]+"# => <>.to_string(),
+    r#"'[^|;<>&']+'"# => <>[1..<>.len()-1].to_string(),
+    r#""[^|;<>&"]+""# => <>[1..<>.len()-1].to_string(),
 };

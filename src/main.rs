@@ -41,8 +41,8 @@ struct Args {
 
 /// Execute a command string in the context of the shell.
 fn execute_command(shell: &mut Shell, command: &str) -> Result<()> {
-    let job = try!(Job::parse(command));
-    if let Some(mut job) = job {
+    let jobs = try!(Job::parse(command));
+    for mut job in jobs.into_iter() {
         try!(shell.run(&mut job));
     }
 
