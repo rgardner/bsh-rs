@@ -48,6 +48,8 @@ impl Job {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::grammar;
+    use super::ast;
 
     fn job_with_single_cmd(cmd: Command) -> ast::Job {
         ast::Job {

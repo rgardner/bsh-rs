@@ -1,5 +1,5 @@
 use errors::*;
-use builtins::{self, BuiltinCommand, Cd, Exit, History, Kill};
+use builtins::{self, BuiltinCommand, dirs, exit, history, kill};
 use shell::Shell;
 
 pub struct Help;
@@ -24,11 +24,11 @@ help: help [command ...]
             let mut all_invalid = true;
             for arg in &args {
                 let msg = match arg.as_str() {
-                    builtins::CD_NAME => Some(Cd::help()),
-                    builtins::EXIT_NAME => Some(Exit::help()),
+                    builtins::CD_NAME => Some(dirs::Cd::help()),
+                    builtins::EXIT_NAME => Some(exit::Exit::help()),
                     builtins::HELP_NAME => Some(Help::help()),
-                    builtins::HISTORY_NAME => Some(History::help()),
-                    builtins::KILL_NAME => Some(Kill::help()),
+                    builtins::HISTORY_NAME => Some(history::History::help()),
+                    builtins::KILL_NAME => Some(kill::Kill::help()),
                     _ => None,
                 };
                 if let Some(msg) = msg {
@@ -48,9 +48,9 @@ help: help [command ...]
 }
 
 fn print_all_usage_strings() {
-    println!("{}", Cd::usage());
-    println!("{}", Exit::usage());
+    println!("{}", dirs::Cd::usage());
+    println!("{}", exit::Exit::usage());
     println!("{}", Help::usage());
-    println!("{}", History::usage());
-    println!("{}", Kill::usage());
+    println!("{}", history::History::usage());
+    println!("{}", kill::Kill::usage());
 }
