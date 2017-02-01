@@ -34,7 +34,7 @@ kill: kill pid | %jobspec
         if arg.starts_with("%") {
             match arg[1..].parse::<u32>() {
                 Ok(n) => {
-                    match shell.kill_job(n) {
+                    match shell.kill_background_job(n) {
                         Ok(Some(job)) => {
                             println!("[{}]+\tTerminated: 15\t{}", n, job.command);
                             Ok(())

@@ -24,8 +24,7 @@ pub struct Shell {
     /// Responsible for readline and history.
     pub editor: Editor,
     history_file: PathBuf,
-    jobs: Vec<BackgroundJob>,
-    job_count: u32,
+    background_jobs: BackgroundJobManager,
     /// Exit status of last command executed.
     last_exit_status: i32,
 }
@@ -40,8 +39,7 @@ impl Shell {
         let mut shell = Shell {
             editor: Editor::with_capacity(history_capacity),
             history_file: history_file,
-            jobs: Vec::new(),
-            job_count: 0,
+            background_jobs: Default::default(),
             last_exit_status: 0,
         };
 
@@ -91,15 +89,8 @@ impl Shell {
     ///
     /// Job ids start at 1 and increment upwards as long as all the job list is non-empty. When
     /// all jobs have finished executing, the next background job id will be 1.
-    pub fn add_to_background(&mut self, child: Child) {
-        self.job_count += 1;
-        println!("[{}] {}", self.job_count, child.id());
-        let job = BackgroundJob {
-            command: String::new(),
-            child: child,
-            idx: self.job_count,
-        };
-        self.jobs.push(job);
+    pub fn add_background_job(&mut self, child: Child) {
+        self.background_jobs.add_job(child);
     }
 
     /// Run a job.
@@ -140,7 +131,7 @@ impl Shell {
                 }
 
                 if job.background {
-                    self.add_to_background(child);
+                    self.add_background_job(child);
                 } else {
                     let output = child.wait_with_output().unwrap();
                     self.last_exit_status = output.status.code().unwrap_or(0);
@@ -154,37 +145,19 @@ impl Shell {
 
     /// Returns `true` if the shell has background jobs.
     pub fn has_background_jobs(&self) -> bool {
-        !self.jobs.is_empty()
+        self.background_jobs.has_jobs()
+    }
+
+    /// Kills a child with the corresponding job id.
+    ///
+    /// Returns `true` if a corresponding job exists; `false`, otherwise.
+    pub fn kill_background_job(&mut self, job_id: u32) -> Result<Option<BackgroundJob>> {
+        self.background_jobs.kill_job(job_id)
     }
 
     /// Check on the status of background jobs, removing exited ones.
-    pub fn check_jobs(&mut self) {
-        self.jobs.retain_mut(|mut job| {
-            match job.child.wait_timeout_ms(0).unwrap() {
-                Some(status) => {
-                    println!("[{}]+\t{}\t{}", job.idx, status, job.command);
-                    false
-                }
-                None => true,
-            }
-        });
-        if self.jobs.is_empty() {
-            self.job_count = 0;
-        }
-    }
-
-    /// Kills a child with the corresponding jobid.
-    ///
-    /// Returns `true` if a corresponding job exists; `false`, otherwise.
-    pub fn kill_job(&mut self, jobid: u32) -> Result<Option<BackgroundJob>> {
-        match self.jobs.iter().position(|j| j.idx == jobid) {
-            Some(n) => {
-                let mut job = self.jobs.remove(n);
-                try!(job.child.kill());
-                Ok(Some(job))
-            }
-            None => Ok(None),
-        }
+    pub fn check_background_jobs(&mut self) {
+        self.background_jobs.check_jobs();
     }
 
     /// Exit the shell.
@@ -230,7 +203,73 @@ fn get_builtin_exit_status(result: Result<()>) -> i32 {
 
 impl fmt::Debug for Shell {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} jobs\n{}", self.jobs.len(), self.editor)
+        write!(f, "{:?} jobs\n{:?}", self.background_jobs, self.editor)
+    }
+}
+
+#[derive(Default)]
+struct BackgroundJobManager {
+    jobs: Vec<BackgroundJob>,
+    job_count: u32,
+}
+
+impl BackgroundJobManager {
+    fn has_jobs(&self) -> bool {
+        self.jobs.is_empty()
+    }
+
+    fn add_job(&mut self, child: Child) {
+        self.job_count += 1;
+        println!("[{}] {}", self.job_count, child.id());
+        let job = BackgroundJob {
+            command: String::new(),
+            child: child,
+            idx: self.job_count,
+        };
+        self.jobs.push(job);
+    }
+
+    fn kill_job(&mut self, job_id: u32) -> Result<Option<BackgroundJob>> {
+        match self.jobs.iter().position(|j| j.idx == job_id) {
+            Some(n) => {
+                let mut job = self.jobs.remove(n);
+                try!(job.child.kill());
+                if self.jobs.is_empty() {
+                    self.job_count = 0;
+                }
+                Ok(Some(job))
+            }
+            None => Ok(None),
+        }
+    }
+
+    fn check_jobs(&mut self) {
+        self.jobs.retain_mut(|mut job| {
+            match job.child.wait_timeout_ms(0).unwrap() {
+                Some(status) => {
+                    println!("[{}]+\t{}\t{}", job.idx, status, job.command);
+                    false
+                }
+                None => true,
+            }
+        });
+        if self.jobs.is_empty() {
+            self.job_count = 0;
+        }
+    }
+}
+
+impl fmt::Debug for BackgroundJobManager {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        try!(write!(f,
+                    "{} jobs\tjob_count: {}\n",
+                    self.jobs.len(),
+                    self.job_count));
+        for job in &self.jobs {
+            try!(write!(f, "{:?}", job));
+        }
+
+        Ok(())
     }
 }
 

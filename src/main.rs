@@ -69,7 +69,7 @@ fn main() {
 
     loop {
         // Check the status of background jobs, removing exited ones.
-        shell.check_jobs();
+        shell.check_background_jobs();
 
         let mut input = match shell.prompt() {
             Ok(line) => line.trim().to_owned(),
