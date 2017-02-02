@@ -15,9 +15,11 @@ use std::fs::{File, OpenOptions};
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{self, Child, Stdio};
+use std::time::Duration;
 use wait_timeout::ChildExt;
 
 const HISTORY_FILE_NAME: &'static str = ".bsh_history";
+const BACKGROUND_JOB_WAIT_TIMEOUT_MILLIS: u64 = 100;
 
 /// Bsh Shell
 pub struct Shell {
@@ -244,8 +246,9 @@ impl BackgroundJobManager {
     }
 
     fn check_jobs(&mut self) {
+        let timeout = Duration::from_millis(BACKGROUND_JOB_WAIT_TIMEOUT_MILLIS);
         self.jobs.retain_mut(|mut job| {
-            match job.child.wait_timeout_ms(0).unwrap() {
+            match job.child.wait_timeout(timeout).unwrap() {
                 Some(status) => {
                     println!("[{}]+\t{}\t{}", job.idx, status, job.command);
                     false
