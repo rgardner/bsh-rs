@@ -21,7 +21,7 @@ cd: cd [dir]
 
     fn run(_shell: &mut Shell, args: Vec<String>) -> Result<()> {
         let dir = match args.first().map(|x| &x[..]) {
-            Some("~") | None => {
+            None => {
                 try!(env::home_dir()
                     .ok_or(ErrorKind::BuiltinCommandError("cd: HOME not set".to_string(), 1)))
             }

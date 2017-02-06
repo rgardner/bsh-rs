@@ -5,7 +5,7 @@
 
 use errors::*;
 use builtins;
-use parser::Job;
+use parser::{Command, Job};
 use editor::Editor;
 use odds::vec::VecExt;
 use rustyline;
@@ -85,6 +85,27 @@ impl Shell {
     /// !string -> searches through history for first item that matches the string
     pub fn expand_history(&self, job: &mut String) -> Result<()> {
         self.editor.expand_history(job)
+    }
+
+    /// Expands shell and environment variables in command parts.
+    pub fn expand_variables(&mut self, job: &Job) -> Job {
+        Job {
+            input: job.input.clone(),
+            commands: job.commands
+                .iter()
+                .map(|cmd| {
+                    Command {
+                        argv: cmd.argv
+                            .iter()
+                            .map(|s| expand_variables_helper(&s))
+                            .collect(),
+                        infile: cmd.infile.clone().map(|s| expand_variables_helper(&s)),
+                        outfile: cmd.outfile.clone().map(|s| expand_variables_helper(&s)),
+                    }
+                })
+                .collect(),
+            background: job.background,
+        }
     }
 
     /// Add a job to the background.
@@ -185,6 +206,14 @@ impl Shell {
         // TODO(rogardn): log failures
         let _ = self.editor.save_history(&self.history_file);
         process::exit(code_like_u8);
+    }
+}
+
+fn expand_variables_helper(s: &str) -> String {
+    match s {
+        "~" => env::home_dir().map(|p| p.to_string_lossy().into_owned()).unwrap_or(s.to_string()),
+        s if s.starts_with("$") => env::var(s[1..].to_string()).unwrap_or("".to_string()),
+        _ => s.to_string(),
     }
 }
 

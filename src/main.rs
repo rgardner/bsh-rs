@@ -43,6 +43,7 @@ struct Args {
 fn execute_command(shell: &mut Shell, command: &str) -> Result<()> {
     let jobs = try!(Job::parse(command));
     for mut job in jobs.into_iter() {
+        job = shell.expand_variables(&job);
         try!(shell.run(&mut job));
     }
 
@@ -61,9 +62,9 @@ fn main() {
     if args.flag_c {
         if let Err(e) = execute_command(&mut shell, &args.arg_command.unwrap()) {
             println!("bsh: {}", e);
-            process::exit(1);
+            shell.exit(Some(1))
         } else {
-            process::exit(0);
+            shell.exit(Some(0))
         }
     }
 
