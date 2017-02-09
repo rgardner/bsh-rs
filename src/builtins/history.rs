@@ -20,7 +20,7 @@ history: history [-c] [-s size] [n]
     }
 
     fn run(shell: &mut Shell, args: Vec<String>) -> Result<()> {
-        if let None = args.first() {
+        if args.is_empty() {
             print!("{}", shell.editor);
             return Ok(());
         }

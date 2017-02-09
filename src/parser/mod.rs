@@ -3,7 +3,8 @@
 pub use self::ast::Command;
 
 mod ast;
-#[allow(unused_qualifications, dead_code)]
+#[allow(dead_code, unused_qualifications)]
+#[cfg_attr(feature = "cargo-clippy", allow(clippy))]
 mod grammar;
 
 error_chain! {
@@ -28,7 +29,7 @@ pub struct Job {
 
 impl Job {
     /// Parse `input` according to bsh grammar
-    pub fn parse<'input>(input: &'input str) -> Result<Vec<Job>> {
+    pub fn parse(input: &str) -> Result<Vec<Job>> {
         grammar::parse_Jobs(input)
             .map_err(|_| ErrorKind::SyntaxError(input.to_string()).into())
             .map(|jobs| {

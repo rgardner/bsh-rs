@@ -42,7 +42,7 @@ struct Args {
 /// Execute a command string in the context of the shell.
 fn execute_command(shell: &mut Shell, command: &str) -> Result<()> {
     let jobs = try!(Job::parse(command));
-    for mut job in jobs.into_iter() {
+    for mut job in jobs {
         job = shell.expand_variables(&job);
         try!(shell.run(&mut job));
     }

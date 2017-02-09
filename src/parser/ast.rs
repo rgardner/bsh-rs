@@ -1,6 +1,6 @@
 use std::process;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Default, PartialEq)]
 pub struct Command {
     pub argv: Vec<String>,
     pub infile: Option<String>,
@@ -8,14 +8,6 @@ pub struct Command {
 }
 
 impl Command {
-    pub fn new() -> Command {
-        Command {
-            argv: vec![],
-            infile: None,
-            outfile: None,
-        }
-    }
-
     pub fn program(&self) -> String {
         self.argv.first().unwrap().to_string()
     }

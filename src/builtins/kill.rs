@@ -25,13 +25,13 @@ kill: kill pid | %jobspec
     }
 
     fn run(shell: &mut Shell, args: Vec<String>) -> Result<()> {
-        if let None = args.first() {
+        if args.is_empty() {
             println!("{}", Kill::help());
             bail!(ErrorKind::BuiltinCommandError(Kill::usage(), 2));
         }
 
         let arg = args.first().unwrap();
-        if arg.starts_with("%") {
+        if arg.starts_with('%') {
             match arg[1..].parse::<u32>() {
                 Ok(n) => {
                     match shell.kill_background_job(n) {

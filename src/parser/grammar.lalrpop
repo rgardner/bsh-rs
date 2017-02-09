@@ -19,7 +19,7 @@ pub Job: ast::Job = {
 
 Command: ast::Command = {
     <CommandPart+> => {
-        <>.into_iter().fold(ast::Command::new(), |acc, x| {
+        <>.into_iter().fold(ast::Command::default(), |acc, x| {
             ast::Command {
                 argv: { acc.argv.into_iter().chain(x.argv.into_iter()).collect() },
                 infile: acc.infile.or(x.infile),

@@ -37,13 +37,13 @@ impl Editor {
     }
 
     pub fn load_history<P: AsRef<Path> + ?Sized>(&mut self, path: &P) -> Result<()> {
-        let result = try!(self.internal.load_history(path));
-        Ok(result)
+        try!(self.internal.load_history(path));
+        Ok(())
     }
 
     pub fn save_history<P: AsRef<Path> + ?Sized>(&mut self, path: &P) -> Result<()> {
-        let result = try!(self.internal.save_history(path));
-        Ok(result)
+        try!(self.internal.save_history(path));
+        Ok(())
     }
 
     pub fn add_history_entry(&mut self, job: &str) {
@@ -108,7 +108,7 @@ impl Editor {
         match entry {
             Some(line) => {
                 command.clear();
-                command.push_str(&line);
+                command.push_str(line);
             }
             None => {
                 bail!(ErrorKind::BuiltinCommandError(format!("{}: event not found", command), 1));

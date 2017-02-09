@@ -75,7 +75,7 @@ impl Shell {
 
     /// Add a job to the history.
     pub fn add_history(&mut self, job: &str) {
-        self.editor.add_history_entry(&job);
+        self.editor.add_history_entry(job);
     }
 
     /// Perform history expansions.
@@ -97,7 +97,7 @@ impl Shell {
                     Command {
                         argv: cmd.argv
                             .iter()
-                            .map(|s| expand_variables_helper(&s))
+                            .map(|s| expand_variables_helper(s))
                             .collect(),
                         infile: cmd.infile.clone().map(|s| expand_variables_helper(&s)),
                         outfile: cmd.outfile.clone().map(|s| expand_variables_helper(&s)),
@@ -118,9 +118,9 @@ impl Shell {
 
     /// Run a job.
     pub fn run(&mut self, job: &mut Job) -> Result<()> {
-        for cmd in job.commands.iter() {
+        for cmd in &job.commands {
             if builtins::is_builtin(&cmd.program()) {
-                let res = builtins::run(self, &cmd);
+                let res = builtins::run(self, cmd);
                 self.last_exit_status = get_builtin_exit_status(res);
             } else {
                 let mut external_cmd = cmd.to_command();
@@ -210,20 +210,22 @@ impl Shell {
 }
 
 fn expand_variables_helper(s: &str) -> String {
-    match s {
-        "~" => env::home_dir().map(|p| p.to_string_lossy().into_owned()).unwrap_or(s.to_string()),
-        s if s.starts_with("$") => env::var(s[1..].to_string()).unwrap_or("".to_string()),
-        _ => s.to_string(),
-    }
+    let expansion = match s {
+        "~" => env::home_dir().map(|p| p.to_string_lossy().into_owned()),
+        s if s.starts_with('$') => env::var(s[1..].to_string()).ok(),
+        _ => Some(s.to_string()),
+    };
+
+    expansion.unwrap_or_else(|| "".to_string())
 }
 
 fn get_builtin_exit_status(result: Result<()>) -> i32 {
     if let Err(ref e) = result {
         match *e {
             Error(ErrorKind::BuiltinCommandError(_, code), _) => code,
-            Error(ErrorKind::Parser(_), _) => 2,
-            Error(ErrorKind::Io(_), _) => 1,
+            Error(ErrorKind::Io(_), _) |
             Error(ErrorKind::ReadlineError(_), _) => 1,
+            Error(ErrorKind::Parser(_), _) |
             Error(ErrorKind::Msg(_), _) => 2,
         }
     } else {
