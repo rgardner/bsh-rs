@@ -121,7 +121,10 @@ impl Shell {
         for cmd in &job.commands {
             if builtins::is_builtin(&cmd.program()) {
                 let res = builtins::run(self, cmd);
-                self.last_exit_status = get_builtin_exit_status(res);
+                self.last_exit_status = get_builtin_exit_status(&res);
+                if let Err(e) = res {
+                    eprintln!("{}", e);
+                }
             } else {
                 let mut external_cmd = cmd.to_command();
 
@@ -219,8 +222,8 @@ fn expand_variables_helper(s: &str) -> String {
     expansion.unwrap_or_else(|| "".to_string())
 }
 
-fn get_builtin_exit_status(result: Result<()>) -> i32 {
-    if let Err(ref e) = result {
+fn get_builtin_exit_status(result: &Result<()>) -> i32 {
+    if let Err(ref e) = *result {
         match *e {
             Error(ErrorKind::BuiltinCommandError(_, code), _) => code,
             Error(ErrorKind::Io(_), _) |

@@ -27,6 +27,13 @@ extern crate rand;
 pub use self::shell::Shell;
 pub use self::parser::Job;
 
+macro_rules! eprintln {
+    ($($tt:tt)*) => {{
+        use std::io::Write;
+        let _ = writeln!(&mut ::std::io::stderr(), $($tt)*);
+    }}
+}
+
 mod builtins;
 mod editor;
 #[allow(missing_docs)]
