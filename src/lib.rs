@@ -15,8 +15,6 @@
 #[macro_use]
 extern crate error_chain;
 extern crate lalrpop_util;
-#[macro_use]
-extern crate nom;
 extern crate odds;
 extern crate rustyline;
 extern crate wait_timeout;

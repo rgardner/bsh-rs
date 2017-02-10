@@ -1,5 +1,4 @@
 use errors::*;
-use nom::IResult;
 use rustyline::{self, Config, CompletionType, history};
 use rustyline::completion::FilenameCompleter;
 use std::fmt;
@@ -82,13 +81,11 @@ impl Editor {
 
     /// Perform history expansion.
     pub fn expand_history(&self, command: &mut String) -> Result<()> {
-        named!(event<&str>, map_res!(preceded!(tag!("!"), is_not!(" ")), str::from_utf8));
-        let input = command.clone();
-        let arg = match event(input.as_bytes()) {
-            IResult::Done(_, a) => a,
-            _ => return Ok(()),
-        };
+        if !command.starts_with('!') {
+            return Ok(());
+        }
 
+        let arg = command[1..].to_string();
         let entry = match arg.parse::<isize>() {
             Ok(0) => None,
             Ok(n) if n > 0 => self.get_history_entry((n - 1) as usize),
@@ -100,7 +97,7 @@ impl Editor {
             Err(_) => {
                 self.internal
                     .get_history_const()
-                    .search(arg, self.history_count - 1, history::Direction::Reverse)
+                    .search(&arg, self.history_count - 1, history::Direction::Reverse)
                     .and_then(|idx| self.internal.get_history_const().get(idx))
             }
         };
