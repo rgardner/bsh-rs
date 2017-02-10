@@ -1,5 +1,5 @@
 use errors::*;
-use builtins::{self, BuiltinCommand, dirs, exit, history, kill};
+use builtins::{self, BuiltinCommand, dirs, env, exit, history, kill};
 use shell::Shell;
 
 pub struct Help;
@@ -25,10 +25,12 @@ help: help [command ...]
             for arg in &args {
                 let msg = match arg.as_str() {
                     builtins::CD_NAME => Some(dirs::Cd::help()),
+                    builtins::DECLARE_NAME => Some(env::Declare::help()),
                     builtins::EXIT_NAME => Some(exit::Exit::help()),
                     builtins::HELP_NAME => Some(Help::help()),
                     builtins::HISTORY_NAME => Some(history::History::help()),
                     builtins::KILL_NAME => Some(kill::Kill::help()),
+                    builtins::UNSET_NAME => Some(env::Unset::help()),
                     _ => None,
                 };
                 if let Some(msg) = msg {
@@ -49,8 +51,10 @@ help: help [command ...]
 
 fn print_all_usage_strings() {
     println!("{}", dirs::Cd::usage());
+    println!("{}", env::Declare::usage());
     println!("{}", exit::Exit::usage());
     println!("{}", Help::usage());
     println!("{}", history::History::usage());
     println!("{}", kill::Kill::usage());
+    println!("{}", env::Unset::usage());
 }

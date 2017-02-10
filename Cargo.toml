@@ -1,10 +1,10 @@
 [package]
 authors = ["Robert Gardner <rhg259@nyu.edu>"]
+build = "build.rs"
 description = "Command line shell"
 name = "bsh-rs"
 readme = "README.md"
 version = "0.1.0"
-build = "build.rs"
 
 [[bin]]
 name = "bsh"
@@ -27,6 +27,9 @@ version = "*"
 
 [dependencies.rustyline]
 git = "https://github.com/rgardner/rustyline"
+
+[dev-dependencies]
+rand = "0.3.15"
 
 [features]
 default = []

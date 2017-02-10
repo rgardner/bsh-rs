@@ -21,6 +21,9 @@ extern crate odds;
 extern crate rustyline;
 extern crate wait_timeout;
 
+#[cfg(test)]
+extern crate rand;
+
 pub use self::shell::Shell;
 pub use self::parser::Job;
 
