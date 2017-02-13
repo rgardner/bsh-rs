@@ -13,6 +13,8 @@ use rustyline::error::ReadlineError;
 use std::process;
 
 static HISTORY_CAPACITY: usize = 10;
+static EXIT_SUCCESS: i32 = 0;
+static EXIT_FAILURE: i32 = 1;
 
 const USAGE: &'static str = "
 bsh.
@@ -54,19 +56,27 @@ fn main() {
 
     if args.flag_version {
         println!("bsh version {}", env!("CARGO_PKG_VERSION"));
-        process::exit(0);
+        process::exit(EXIT_SUCCESS);
     }
 
-    let mut shell = Shell::new(HISTORY_CAPACITY).unwrap();
+    let shell = Shell::new(HISTORY_CAPACITY).unwrap();
     if args.flag_c {
-        if let Err(e) = execute_command(&mut shell, &args.arg_command.unwrap()) {
-            println!("bsh: {}", e);
-            shell.exit(Some(1))
-        } else {
-            shell.exit(Some(0))
-        }
+        execute_from_arg(shell, &args.arg_command.unwrap());
+    } else {
+        execute_from_stdin(shell);
     }
+}
 
+fn execute_from_arg(mut shell: Shell, command: &str) -> ! {
+    if let Err(e) = execute_command(&mut shell, command) {
+        println!("bsh: {}", e);
+        shell.exit(Some(EXIT_FAILURE))
+    } else {
+        shell.exit(Some(EXIT_SUCCESS))
+    }
+}
+
+fn execute_from_stdin(mut shell: Shell) -> ! {
     loop {
         // Check the status of background jobs, removing exited ones.
         shell.check_background_jobs();
