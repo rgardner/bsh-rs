@@ -32,6 +32,13 @@ Options:
                      argument command_string.
 ";
 
+macro_rules! eprintln {
+    ($($tt:tt)*) => {{
+        use std::io::Write;
+        let _ = writeln!(&mut ::std::io::stderr(), $($tt)*);
+    }}
+}
+
 /// Docopts input arguments.
 #[derive(Debug, RustcDecodable)]
 struct Args {
@@ -69,7 +76,7 @@ fn main() {
 
 fn execute_from_arg(mut shell: Shell, command: &str) -> ! {
     if let Err(e) = execute_command(&mut shell, command) {
-        println!("bsh: {}", e);
+        eprintln!("bsh: {}", e);
         shell.exit(Some(EXIT_FAILURE))
     } else {
         shell.exit(Some(EXIT_SUCCESS))
@@ -89,13 +96,13 @@ fn execute_from_stdin(mut shell: Shell) -> ! {
 
         // Perform history substitutions and add user input to history.
         if let Err(e) = shell.expand_history(&mut input) {
-            println!("bsh: {}", e);
+            eprintln!("bsh: {}", e);
             continue;
         }
         shell.add_history(&input);
 
         if let Err(e) = execute_command(&mut shell, &input) {
-            println!("bsh: {}", e);
+            eprintln!("bsh: {}", e);
         }
     }
 
