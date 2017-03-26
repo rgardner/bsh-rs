@@ -251,7 +251,7 @@ struct BackgroundJobManager {
 
 impl BackgroundJobManager {
     fn has_jobs(&self) -> bool {
-        self.jobs.is_empty()
+        !self.jobs.is_empty()
     }
 
     fn add_job(&mut self, child: Child) {
