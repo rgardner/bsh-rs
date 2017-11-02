@@ -15,7 +15,7 @@ lalrpop = "0.13.1"
 
 [dependencies]
 docopt = "0.6.75"
-error-chain = "0.7.1"
+error-chain = "0.11.0"
 lalrpop-util = "0.13.1"
 odds = "0.2.8"
 rustc-serialize = "0.3.16"

@@ -226,10 +226,8 @@ fn get_builtin_exit_status(result: &Result<()>) -> i32 {
     if let Err(ref e) = *result {
         match *e {
             Error(ErrorKind::BuiltinCommandError(_, code), _) => code,
-            Error(ErrorKind::Io(_), _) |
-            Error(ErrorKind::ReadlineError(_), _) => 1,
-            Error(ErrorKind::Parser(_), _) |
             Error(ErrorKind::Msg(_), _) => 2,
+            Error(_, _) => 1,
         }
     } else {
         0
