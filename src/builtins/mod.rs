@@ -45,8 +45,15 @@ pub trait BuiltinCommand {
 }
 
 pub fn is_builtin(program: &str) -> bool {
-    [CD_NAME, DECLARE_NAME, EXIT_NAME, HELP_NAME, HISTORY_NAME, KILL_NAME, UNSET_NAME]
-        .contains(&program)
+    [
+        CD_NAME,
+        DECLARE_NAME,
+        EXIT_NAME,
+        HELP_NAME,
+        HISTORY_NAME,
+        KILL_NAME,
+        UNSET_NAME,
+    ].contains(&program)
 }
 
 /// precondition: process is a builtin.

@@ -33,25 +33,28 @@ kill: kill pid | %jobspec
         let arg = args.first().unwrap();
         if arg.starts_with('%') {
             match arg[1..].parse::<u32>() {
-                Ok(n) => {
-                    match shell.kill_background_job(n) {
-                        Ok(Some(job)) => {
-                            println!("[{}]+\tTerminated: 15\t{}", n, job.command);
-                            Ok(())
-                        }
-                        Ok(None) => {
-                            bail!(ErrorKind::BuiltinCommandError(format!("kill: {}: no such job",
-                                                                         arg),
-                                                                 1));
-                        }
-                        Err(e) => Err(e),
+                Ok(n) => match shell.kill_background_job(n) {
+                    Ok(Some(job)) => {
+                        println!("[{}]+\tTerminated: 15\t{}", n, job.command);
+                        Ok(())
                     }
-                }
+                    Ok(None) => {
+                        bail!(ErrorKind::BuiltinCommandError(
+                            format!("kill: {}: no such job", arg),
+                            1
+                        ));
+                    }
+                    Err(e) => Err(e),
+                },
                 Err(_) => {
-                    bail!(ErrorKind::BuiltinCommandError(format!("kill: {}: arguments must be \
-                                                                  job IDs",
-                                                                 arg),
-                                                         1));
+                    bail!(ErrorKind::BuiltinCommandError(
+                        format!(
+                            "kill: {}: arguments must be \
+                             job IDs",
+                            arg
+                        ),
+                        1
+                    ));
                 }
             }
         } else {

@@ -1,5 +1,5 @@
 use errors::*;
-use builtins::{self, BuiltinCommand, dirs, env, exit, history, kill};
+use builtins::{self, dirs, env, exit, history, kill, BuiltinCommand};
 use shell::Shell;
 
 pub struct Help;
@@ -40,9 +40,10 @@ help: help [command ...]
             }
             if all_invalid {
                 let cmd = args.last().unwrap();
-                bail!(ErrorKind::BuiltinCommandError(format!("help: no help topics match {}",
-                                                             cmd),
-                                                     1));
+                bail!(ErrorKind::BuiltinCommandError(
+                    format!("help: no help topics match {}", cmd),
+                    1
+                ));
             }
         }
         Ok(())

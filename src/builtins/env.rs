@@ -27,7 +27,8 @@ declare: declare [name[=value] ...]
         }
 
         if !bad_args.is_empty() {
-            let msg = bad_args.iter()
+            let msg = bad_args
+                .iter()
                 .map(|arg| format!("declare: {} is not a valid identifier", arg))
                 .collect::<Vec<String>>()
                 .join("\n");
@@ -62,7 +63,8 @@ unset: unset [name ...]
         }
 
         if !bad_args.is_empty() {
-            let msg = bad_args.iter()
+            let msg = bad_args
+                .iter()
                 .map(|arg| format!("unset: {} is not a valid identifier", arg))
                 .collect::<Vec<String>>()
                 .join("\n");
@@ -99,9 +101,12 @@ mod tests {
 
         let key = generate_unique_env_key();
         let value = "bar";
-        assert!(Declare::run(&mut shell,
-                             vec!["=baz".into(), format!("{}={}", key, value), "=baz".into()])
-            .is_err());
+        assert!(
+            Declare::run(
+                &mut shell,
+                vec!["=baz".into(), format!("{}={}", key, value), "=baz".into()]
+            ).is_err()
+        );
         assert_eq!(env::var(key).unwrap(), value);
     }
 
@@ -129,9 +134,12 @@ mod tests {
         let key1 = generate_unique_env_key();
         let key2 = generate_unique_env_key();
         let value = "baz";
-        assert!(Declare::run(&mut shell,
-                             vec![format!("{}={}", key1, value), format!("{}={}", key2, value)])
-            .is_ok());
+        assert!(
+            Declare::run(
+                &mut shell,
+                vec![format!("{}={}", key1, value), format!("{}={}", key2, value)]
+            ).is_ok()
+        );
         assert_eq!(env::var(&key1).unwrap(), value);
         assert_eq!(env::var(&key2).unwrap(), value);
     }
