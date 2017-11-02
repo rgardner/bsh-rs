@@ -29,32 +29,39 @@ pub struct Shell {
     background_jobs: BackgroundJobManager,
     /// Exit status of last command executed.
     last_exit_status: i32,
+    config: ShellConfig,
 }
 
 impl Shell {
     /// Constructs a new Shell to manage running jobs and command history.
-    pub fn new(history_capacity: usize) -> Result<Shell> {
-        let history_file = try!(env::home_dir()
-            .map(|p| p.join(HISTORY_FILE_NAME))
-            .ok_or("failed to get home directory"));
+    pub fn new(config: ShellConfig) -> Result<Shell> {
+        let history_file = try!(
+            env::home_dir()
+                .map(|p| p.join(HISTORY_FILE_NAME))
+                .ok_or("failed to get home directory")
+        );
 
         let mut shell = Shell {
-            editor: Editor::with_capacity(history_capacity),
+            editor: Editor::with_capacity(config.command_history_capacity),
             history_file: history_file,
             background_jobs: Default::default(),
             last_exit_status: 0,
+            config,
         };
 
-        try!(shell.editor.load_history(&shell.history_file).or_else(|e| {
-            if let &ErrorKind::ReadlineError(rustyline::error::ReadlineError::Io(ref inner)) =
-                   e.kind() {
-                if inner.kind() == io::ErrorKind::NotFound {
-                    return Ok(());
+        try!(shell.editor.load_history(&shell.history_file).or_else(
+            |e| {
+                if let &ErrorKind::ReadlineError(rustyline::error::ReadlineError::Io(ref inner)) =
+                    e.kind()
+                {
+                    if inner.kind() == io::ErrorKind::NotFound {
+                        return Ok(());
+                    }
                 }
-            }
 
-            Err(e)
-        }));
+                Err(e)
+            }
+        ));
 
         Ok(shell)
     }
@@ -116,54 +123,97 @@ impl Shell {
         self.background_jobs.add_job(child);
     }
 
-    /// Run a job.
-    pub fn run(&mut self, job: &mut Job) -> Result<()> {
-        for cmd in &job.commands {
-            if builtins::is_builtin(&cmd.program()) {
-                let res = builtins::run(self, cmd);
-                self.last_exit_status = get_builtin_exit_status(&res);
-                if let Err(e) = res {
+    /// Runs a job from a command string.
+    pub fn execute_command_string(&mut self, input: &str) -> Result<()> {
+        let mut command = input.to_owned();
+        if self.config.enable_command_history {
+            try!(self.expand_history(&mut command));
+            self.add_history(&input);
+        }
+
+        let jobs = try!(Job::parse(input));
+        for mut job in jobs {
+            job = self.expand_variables(&job);
+            try!(self.execute_job(&mut job));
+        }
+
+        Ok(())
+    }
+
+    /// Runs a bsh script from a file.
+    pub fn execute_commands_from_file<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
+        use std::io::Read;
+        let mut f = File::open(path)?;
+        let mut buffer = String::new();
+        f.read_to_string(&mut buffer)?;
+
+        for line in buffer.split('\n') {
+            self.execute_command_string(line)?
+        }
+
+        Ok(())
+    }
+
+    /// Runs a job.
+    fn execute_job(&mut self, job: &mut Job) -> Result<()> {
+        for command in &job.commands {
+            if builtins::is_builtin(&command.program()) {
+                let result = self.execute_builtin_command(command);
+                if let Err(e) = result {
                     eprintln!("{}", e);
                 }
             } else {
-                let mut external_cmd = cmd.to_command();
-
-                if cmd.infile.is_some() {
-                    external_cmd.stdin(Stdio::piped());
-                }
-
-                if cmd.outfile.is_some() {
-                    external_cmd.stdout(Stdio::piped());
-                }
-
-                let mut child = try!(external_cmd.spawn());
-                if let Some(ref mut stdin) = child.stdin {
-                    if let Some(ref infile) = cmd.infile {
-                        let mut f = try!(File::open(infile));
-                        let mut buf: Vec<u8> = vec![];
-                        try!(f.read_to_end(&mut buf));
-                        try!(stdin.write_all(&buf));
-                    }
-                }
-
-                if let Some(ref mut stdout) = child.stdout {
-                    if let Some(ref outfile) = cmd.outfile {
-                        let mut file =
-                            try!(OpenOptions::new().write(true).create(true).open(outfile));
-                        let mut buf: Vec<u8> = vec![];
-                        try!(stdout.read_to_end(&mut buf));
-                        try!(file.write_all(&buf));
-                    }
-                }
-
-                if job.background {
-                    self.add_background_job(child);
-                } else {
-                    let output = child.wait_with_output().unwrap();
-                    self.last_exit_status = output.status.code().unwrap_or(0);
-                    print!("{}", String::from_utf8_lossy(&output.stdout));
-                }
+                try!(self.execute_external_command(command, job.background));
             }
+        }
+
+        Ok(())
+    }
+
+    /// Executes a builtin command
+    fn execute_builtin_command(&mut self, command: &Command) -> Result<()> {
+        let result = builtins::run(self, command);
+        self.last_exit_status = get_builtin_exit_status(&result);
+        result
+    }
+
+    fn execute_external_command(&mut self, command: &Command, run_in_background: bool) -> Result<()> {
+        let mut external_command = command.to_command();
+
+        if command.infile.is_some() {
+            external_command.stdin(Stdio::piped());
+        }
+
+        if command.outfile.is_some() {
+            external_command.stdout(Stdio::piped());
+        }
+
+        let mut child = try!(external_command.spawn());
+        if let Some(ref mut stdin) = child.stdin {
+            if let Some(ref infile) = command.infile {
+                let mut f = try!(File::open(infile));
+                let mut buf: Vec<u8> = vec![];
+                try!(f.read_to_end(&mut buf));
+                try!(stdin.write_all(&buf));
+            }
+        }
+
+        if let Some(ref mut stdout) = child.stdout {
+            if let Some(ref outfile) = command.outfile {
+                let mut file =
+                    try!(OpenOptions::new().write(true).create(true).open(outfile));
+                let mut buf: Vec<u8> = vec![];
+                try!(stdout.read_to_end(&mut buf));
+                try!(file.write_all(&buf));
+            }
+        }
+
+        if run_in_background {
+            self.add_background_job(child);
+        } else {
+            let output = child.wait_with_output().unwrap();
+            self.last_exit_status = output.status.code().unwrap_or(0);
+            print!("{}", String::from_utf8_lossy(&output.stdout));
         }
 
         Ok(())
@@ -195,7 +245,10 @@ impl Shell {
     /// Exit the shell with a status of n. If n is None, then the exit status is that of the last
     /// command executed.
     pub fn exit(&mut self, n: Option<i32>) -> ! {
-        println!("exit");
+        if self.config.display_messages {
+            println!("exit");
+        }
+
         let code = match n {
             Some(n) => n,
             None => self.last_exit_status,
@@ -234,10 +287,62 @@ fn get_builtin_exit_status(result: &Result<()>) -> i32 {
     }
 }
 
-
 impl fmt::Debug for Shell {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:?} jobs\n{:?}", self.background_jobs, self.editor)
+    }
+}
+
+/// Policy object to control a Shell's behavior
+#[derive(Debug, Copy, Clone)]
+pub struct ShellConfig {
+    /// Determines if new command entries will be added to the shell's command history.
+    ///
+    /// Note: This is checked before the other command history config fields.
+    pub enable_command_history: bool,
+
+    /// Number of entries to store in the shell's command history
+    pub command_history_capacity: usize,
+
+    /// Determines if some messages (e.g. "exit") should be displayed.
+    pub display_messages: bool,
+}
+
+impl ShellConfig {
+    /// Creates an interactive shell, e.g. command history, job control
+    /// 
+    /// # Complete List
+    /// - Command History is enabled
+    /// - Job Control is enabled
+    /// - Some additional messages are displayed
+    pub fn interactive(command_history_capacity: usize) -> ShellConfig {
+        ShellConfig {
+            display_messages: true,
+            enable_command_history: true,
+            command_history_capacity,
+            ..Default::default()
+        }
+    }
+
+    /// Creates a noninteractive shell, e.g. no command history, no job control
+    ///
+    /// # Complete List
+    /// - Command History is disabled. Commands are not saved and history expansions are not performed.
+    ///   The history builtin command is not affected by this option.
+    /// - Job Control is disabled.
+    /// - Fewer messages are displayed
+    pub fn noninteractive() -> ShellConfig {
+        Default::default()
+    }
+}
+
+impl Default for ShellConfig {
+    fn default() -> ShellConfig {
+        ShellConfig {
+            display_messages: false,
+            enable_command_history: false,
+            command_history_capacity: 0,
+        }
     }
 }
 
@@ -279,15 +384,14 @@ impl BackgroundJobManager {
 
     fn check_jobs(&mut self) {
         let timeout = Duration::from_millis(BACKGROUND_JOB_WAIT_TIMEOUT_MILLIS);
-        self.jobs.retain_mut(|mut job| {
-            match job.child.wait_timeout(timeout).unwrap() {
+        self.jobs
+            .retain_mut(|job| match job.child.wait_timeout(timeout).unwrap() {
                 Some(status) => {
                     println!("[{}]+\t{}\t{}", job.idx, status, job.command);
                     false
                 }
                 None => true,
-            }
-        });
+            });
         if self.jobs.is_empty() {
             self.job_count = 0;
         }
@@ -296,10 +400,12 @@ impl BackgroundJobManager {
 
 impl fmt::Debug for BackgroundJobManager {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        try!(write!(f,
-                    "{} jobs\tjob_count: {}\n",
-                    self.jobs.len(),
-                    self.job_count));
+        try!(write!(
+            f,
+            "{} jobs\tjob_count: {}\n",
+            self.jobs.len(),
+            self.job_count
+        ));
         for job in &self.jobs {
             try!(write!(f, "{:?}", job));
         }
@@ -318,10 +424,12 @@ pub struct BackgroundJob {
 
 impl fmt::Debug for BackgroundJob {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f,
-               "command: {}\tpid: {}\tidx: {}",
-               self.command,
-               self.child.id(),
-               self.idx)
+        write!(
+            f,
+            "command: {}\tpid: {}\tidx: {}",
+            self.command,
+            self.child.id(),
+            self.idx
+        )
     }
 }

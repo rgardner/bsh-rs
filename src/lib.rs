@@ -17,8 +17,7 @@ extern crate wait_timeout;
 #[cfg(test)]
 extern crate rand;
 
-pub use self::shell::Shell;
-pub use self::parser::Job;
+pub use self::shell::{Shell, ShellConfig};
 
 macro_rules! eprintln {
     ($($tt:tt)*) => {{
@@ -31,6 +30,5 @@ mod builtins;
 mod editor;
 #[allow(missing_docs)]
 pub mod errors;
-#[allow(missing_docs)]
-pub mod parser;
+mod parser;
 pub mod shell;

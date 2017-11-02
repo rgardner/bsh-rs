@@ -7,15 +7,13 @@ extern crate rustc_serialize;
 extern crate rustyline;
 
 use bsh_rs::errors::*;
-use bsh_rs::{Job, Shell};
+use bsh_rs::{Shell, ShellConfig};
 use docopt::Docopt;
 use rustyline::error::ReadlineError;
 use std::process;
-use std::fs::File;
 
-static HISTORY_CAPACITY: usize = 10;
-static EXIT_SUCCESS: i32 = 0;
-static EXIT_FAILURE: i32 = 1;
+const COMMAND_HISTORY_CAPACITY: usize = 10;
+const EXIT_FAILURE: i32 = 1;
 
 const USAGE: &'static str = "
 bsh.
@@ -57,71 +55,60 @@ fn main() {
 
     if args.flag_version {
         println!("bsh version {}", env!("CARGO_PKG_VERSION"));
-        process::exit(EXIT_SUCCESS);
+    } else if args.flag_c || args.arg_file.is_some() {
+        execute_from_command_string_or_file(&args);
+    } else {
+        execute_from_stdin();
+    }
+}
+
+fn execute_from_command_string_or_file(args: &Args) -> ! {
+    let shell_config = ShellConfig::noninteractive();
+    let result = Shell::new(shell_config);
+    if let Err(e) = result {
+        eprintln!("bsh: {}", e);
+        process::exit(EXIT_FAILURE);
     }
 
-    let mut shell = Shell::new(HISTORY_CAPACITY).unwrap();
-    let res = if args.flag_c {
-        execute_command(&mut shell, &args.arg_command.unwrap())
-    } else if args.arg_file.is_some() {
-        execute_from_file(&mut shell, &args.arg_file.unwrap())
+    let mut shell = result.unwrap();
+    let result = if let Some(ref command_string) = args.arg_command {
+        shell.execute_command_string(&command_string)
+    } else if let Some(ref file_path) = args.arg_file {
+        shell.execute_commands_from_file(&file_path)
     } else {
-        execute_from_stdin(shell);
+        Ok(())
     };
 
-    if let Err(e) = res {
-        eprintln!("bsh: {}", e);
-        shell.exit(Some(EXIT_FAILURE));
-    } else {
-        shell.exit(None);
-    }
+    display_error_and_exit(result, &mut shell);
 }
 
-fn execute_command(shell: &mut Shell, command: &str) -> Result<()> {
-    let jobs = try!(Job::parse(command));
-    for mut job in jobs {
-        job = shell.expand_variables(&job);
-        try!(shell.run(&mut job));
-    }
+fn execute_from_stdin() -> ! {
+    let shell_config = ShellConfig::interactive(COMMAND_HISTORY_CAPACITY);
+    let mut shell = Shell::new(shell_config).unwrap();
 
-    Ok(())
-}
-
-fn execute_from_file(shell: &mut Shell, filename: &str) -> Result<()> {
-    use std::io::Read;
-    let mut f = try!(File::open(filename));
-    let mut buffer = String::new();
-    try!(f.read_to_string(&mut buffer));
-
-    for line in buffer.split('\n') {
-        try!(execute_command(shell, &line));
-    }
-
-    Ok(())
-}
-
-fn execute_from_stdin(mut shell: Shell) -> ! {
     loop {
         // Check the status of background jobs, removing exited ones.
         shell.check_background_jobs();
 
-        let mut input = match shell.prompt() {
+        let input = match shell.prompt() {
             Ok(line) => line.trim().to_owned(),
             Err(Error(ErrorKind::ReadlineError(ReadlineError::Eof), _)) => break,
             _ => continue,
         };
 
-        // Perform history substitutions and add user input to history.
-        if let Err(e) = shell.expand_history(&mut input) {
-            eprintln!("bsh: {}", e);
-            continue;
-        }
-        shell.add_history(&input);
-
-        if let Err(e) = execute_command(&mut shell, &input) {
+        if let Err(e) = shell.execute_command_string(&input) {
             eprintln!("bsh: {}", e);
         }
     }
 
     shell.exit(None)
+}
+
+fn display_error_and_exit(result: Result<()>, shell: &mut Shell) -> ! {
+    if let Err(e) = result {
+        eprintln!("bsh: {}", e);
+        shell.exit(Some(EXIT_FAILURE));
+    } else {
+        shell.exit(None);
+    }
 }
