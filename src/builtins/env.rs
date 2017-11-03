@@ -6,15 +6,11 @@ use std::env;
 pub struct Declare;
 
 impl builtins::BuiltinCommand for Declare {
-    fn name() -> &'static str {
-        builtins::DECLARE_NAME
-    }
+    const NAME: &'static str = builtins::DECLARE_NAME;
 
-    fn help() -> &'static str {
-        "\
+    const HELP: &'static str = "\
 declare: declare [name[=value] ...]
-    Declare a variable and assign it a value."
-    }
+    Declare a variable and assign it a value.";
 
     fn run(_shell: &mut Shell, args: Vec<String>) -> Result<()> {
         let mut bad_args = Vec::new();
@@ -42,15 +38,11 @@ declare: declare [name[=value] ...]
 pub struct Unset;
 
 impl builtins::BuiltinCommand for Unset {
-    fn name() -> &'static str {
-        builtins::UNSET_NAME
-    }
+    const NAME: &'static str = builtins::UNSET_NAME;
 
-    fn help() -> &'static str {
-        "\
+    const HELP: &'static str = "\
 unset: unset [name ...]
-    For each name, remove the corresponding variable."
-    }
+    For each name, remove the corresponding variable.";
 
     fn run(_shell: &mut Shell, args: Vec<String>) -> Result<()> {
         let mut bad_args = Vec::new();
@@ -94,7 +86,7 @@ mod tests {
 
     #[test]
     fn declare_invalid_identifier() {
-        let mut shell = Shell::new(10).unwrap();
+        let mut shell = Shell::new(Default::default()).unwrap();
 
         assert!(Declare::run(&mut shell, vec!["".into()]).is_err());
         assert!(Declare::run(&mut shell, vec!["=FOO".into()]).is_err());
@@ -112,7 +104,7 @@ mod tests {
 
     #[test]
     fn declare_assignment() {
-        let mut shell = Shell::new(10).unwrap();
+        let mut shell = Shell::new(Default::default()).unwrap();
 
         let key = generate_unique_env_key();
         assert!(Declare::run(&mut shell, vec![key.clone()]).is_ok());
@@ -129,7 +121,7 @@ mod tests {
 
     #[test]
     fn declare_multiple_assignments() {
-        let mut shell = Shell::new(10).unwrap();
+        let mut shell = Shell::new(Default::default()).unwrap();
 
         let key1 = generate_unique_env_key();
         let key2 = generate_unique_env_key();
@@ -146,7 +138,7 @@ mod tests {
 
     #[test]
     fn unset_invalid_identifier() {
-        let mut shell = Shell::new(1).unwrap();
+        let mut shell = Shell::new(Default::default()).unwrap();
         let key = generate_unique_env_key();
         assert!(Declare::run(&mut shell, vec![key.clone()]).is_ok());
         assert!(Unset::run(&mut shell, vec!["".into(), key.clone(), "=FOO".into()]).is_err());
@@ -155,7 +147,7 @@ mod tests {
 
     #[test]
     fn unset_multiple_assignments() {
-        let mut shell = Shell::new(1).unwrap();
+        let mut shell = Shell::new(Default::default()).unwrap();
         let key1 = generate_unique_env_key();
         let key2 = generate_unique_env_key();
         assert!(Declare::run(&mut shell, vec![key1.clone(), key2.clone()]).is_ok());

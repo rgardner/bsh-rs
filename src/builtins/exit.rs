@@ -5,16 +5,12 @@ use shell::Shell;
 pub struct Exit;
 
 impl builtins::BuiltinCommand for Exit {
-    fn name() -> &'static str {
-        builtins::EXIT_NAME
-    }
+    const NAME: &'static str = builtins::EXIT_NAME;
 
-    fn help() -> &'static str {
-        "\
+    const HELP: &'static str = "\
 exit: exit [n]
     Exit the shell with a status of N. If N is omitted, the exit status
-    is 0."
-    }
+    is 0.";
 
     fn run(shell: &mut Shell, args: Vec<String>) -> Result<()> {
         if shell.has_background_jobs() {

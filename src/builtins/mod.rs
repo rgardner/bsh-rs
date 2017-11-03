@@ -32,13 +32,13 @@ const UNSET_NAME: &'static str = "unset";
 
 /// Represents a Bsh builtin command such as cd or help.
 pub trait BuiltinCommand {
-    /// The name of the command.
-    fn name() -> &'static str;
+    /// The NAME of the command.
+    const NAME: &'static str;
     /// The help string to display to the user.
-    fn help() -> &'static str;
+    const HELP: &'static str;
     /// The usage string to display to the user.
     fn usage() -> String {
-        Self::help().lines().nth(0).unwrap().to_owned()
+        Self::HELP.lines().nth(0).unwrap().to_owned()
     }
     /// Runs the command with the given arguments in the `shell` environment.
     fn run(shell: &mut Shell, args: Vec<String>) -> Result<()>;

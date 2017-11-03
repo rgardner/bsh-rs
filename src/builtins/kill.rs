@@ -6,12 +6,9 @@ use shell::Shell;
 pub struct Kill;
 
 impl builtins::BuiltinCommand for Kill {
-    fn name() -> &'static str {
-        builtins::KILL_NAME
-    }
+    const NAME: &'static str = builtins::KILL_NAME;
 
-    fn help() -> &'static str {
-        "\
+    const HELP: &'static str = "\
 kill: kill pid | %jobspec
     Send a signal to a job.
 
@@ -21,13 +18,12 @@ kill: kill pid | %jobspec
     to be used instead of process IDs.
 
     Exit Status:
-    Returns success unless an invalid option is given or an error occurs."
-    }
+    Returns success unless an invalid option is given or an error occurs.";
 
     fn run(shell: &mut Shell, args: Vec<String>) -> Result<()> {
         if args.is_empty() {
-            println!("{}", Kill::help());
-            bail!(ErrorKind::BuiltinCommandError(Kill::usage(), 2));
+            println!("{}", Self::usage());
+            bail!(ErrorKind::BuiltinCommandError(Self::usage(), 2));
         }
 
         let arg = args.first().unwrap();

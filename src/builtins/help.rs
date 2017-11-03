@@ -5,17 +5,13 @@ use shell::Shell;
 pub struct Help;
 
 impl BuiltinCommand for Help {
-    fn name() -> &'static str {
-        "help"
-    }
+    const NAME: &'static str = builtins::HELP_NAME;
 
-    fn help() -> &'static str {
-        "\
-help: help [command ...]
-    Display helpful information about builtin commands. If COMMAND is specified,
-    gives detailed help on all commands matching COMMAND, otherwise a list of the
-    builtins is printed."
-    }
+    const HELP: &'static str = "\
+HELP: HELP [command ...]
+    Display HELPful information about builtin commands. If COMMAND is specified,
+    gives detailed HELP on all commands matching COMMAND, otherwise a list of the
+    builtins is printed.";
 
     fn run(_shell: &mut Shell, args: Vec<String>) -> Result<()> {
         if args.is_empty() {
@@ -24,13 +20,13 @@ help: help [command ...]
             let mut all_invalid = true;
             for arg in &args {
                 let msg = match arg.as_str() {
-                    builtins::CD_NAME => Some(dirs::Cd::help()),
-                    builtins::DECLARE_NAME => Some(env::Declare::help()),
-                    builtins::EXIT_NAME => Some(exit::Exit::help()),
-                    builtins::HELP_NAME => Some(Help::help()),
-                    builtins::HISTORY_NAME => Some(history::History::help()),
-                    builtins::KILL_NAME => Some(kill::Kill::help()),
-                    builtins::UNSET_NAME => Some(env::Unset::help()),
+                    builtins::CD_NAME => Some(dirs::Cd::HELP),
+                    builtins::DECLARE_NAME => Some(env::Declare::HELP),
+                    builtins::EXIT_NAME => Some(exit::Exit::HELP),
+                    builtins::HELP_NAME => Some(Self::HELP),
+                    builtins::HISTORY_NAME => Some(history::History::HELP),
+                    builtins::KILL_NAME => Some(kill::Kill::HELP),
+                    builtins::UNSET_NAME => Some(env::Unset::HELP),
                     _ => None,
                 };
                 if let Some(msg) = msg {
