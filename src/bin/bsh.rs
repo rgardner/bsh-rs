@@ -63,6 +63,8 @@ fn main() {
 }
 
 fn execute_from_command_string_or_file(args: &Args) -> ! {
+    assert!(args.flag_c || args.arg_file.is_some());
+
     let shell_config = ShellConfig::noninteractive();
     let result = Shell::new(shell_config);
     if let Err(e) = result {
