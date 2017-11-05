@@ -35,11 +35,11 @@ pub struct Shell {
 impl Shell {
     /// Constructs a new Shell to manage running jobs and command history.
     pub fn new(config: ShellConfig) -> Result<Shell> {
-        let history_file = try!(
+        let history_file = 
             env::home_dir()
                 .map(|p| p.join(HISTORY_FILE_NAME))
                 .ok_or("failed to get home directory")
-        );
+        ?;
 
         let mut shell = Shell {
             editor: Editor::with_capacity(config.command_history_capacity),
@@ -49,7 +49,7 @@ impl Shell {
             config,
         };
 
-        try!(shell.editor.load_history(&shell.history_file).or_else(
+        shell.editor.load_history(&shell.history_file).or_else(
             |e| {
                 if let &ErrorKind::ReadlineError(rustyline::error::ReadlineError::Io(ref inner)) =
                     e.kind()
@@ -61,7 +61,7 @@ impl Shell {
 
                 Err(e)
             }
-        ));
+        )?;
 
         Ok(shell)
     }
@@ -76,7 +76,7 @@ impl Shell {
         };
 
         let prompt = format!("{}|{}\n$ ", self.last_exit_status, rel.display());
-        let line = try!(self.editor.readline(&prompt));
+        let line = self.editor.readline(&prompt)?;
         Ok(line)
     }
 
@@ -127,14 +127,14 @@ impl Shell {
     pub fn execute_command_string(&mut self, input: &str) -> Result<()> {
         let mut command = input.to_owned();
         if self.config.enable_command_history {
-            try!(self.expand_history(&mut command));
+            self.expand_history(&mut command)?;
             self.add_history(&input);
         }
 
-        let jobs = try!(Job::parse(input));
+        let jobs = Job::parse(input)?;
         for mut job in jobs {
             job = self.expand_variables(&job);
-            try!(self.execute_job(&mut job));
+            self.execute_job(&mut job)?;
         }
 
         Ok(())
@@ -163,7 +163,7 @@ impl Shell {
                     eprintln!("{}", e);
                 }
             } else {
-                try!(self.execute_external_command(command, job.background));
+                self.execute_external_command(command, job.background)?;
             }
         }
 
@@ -188,23 +188,23 @@ impl Shell {
             external_command.stdout(Stdio::piped());
         }
 
-        let mut child = try!(external_command.spawn());
+        let mut child = external_command.spawn()?;
         if let Some(ref mut stdin) = child.stdin {
             if let Some(ref infile) = command.infile {
-                let mut f = try!(File::open(infile));
+                let mut f = File::open(infile)?;
                 let mut buf: Vec<u8> = vec![];
-                try!(f.read_to_end(&mut buf));
-                try!(stdin.write_all(&buf));
+                f.read_to_end(&mut buf)?;
+                stdin.write_all(&buf)?;
             }
         }
 
         if let Some(ref mut stdout) = child.stdout {
             if let Some(ref outfile) = command.outfile {
                 let mut file =
-                    try!(OpenOptions::new().write(true).create(true).open(outfile));
+                    OpenOptions::new().write(true).create(true).open(outfile)?;
                 let mut buf: Vec<u8> = vec![];
-                try!(stdout.read_to_end(&mut buf));
-                try!(file.write_all(&buf));
+                stdout.read_to_end(&mut buf)?;
+                file.write_all(&buf)?;
             }
         }
 
@@ -372,7 +372,7 @@ impl BackgroundJobManager {
         match self.jobs.iter().position(|j| j.idx == job_id) {
             Some(n) => {
                 let mut job = self.jobs.remove(n);
-                try!(job.child.kill());
+                job.child.kill()?;
                 if self.jobs.is_empty() {
                     self.job_count = 0;
                 }
@@ -400,14 +400,14 @@ impl BackgroundJobManager {
 
 impl fmt::Debug for BackgroundJobManager {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        try!(write!(
+        write!(
             f,
             "{} jobs\tjob_count: {}\n",
             self.jobs.len(),
             self.job_count
-        ));
+        )?;
         for job in &self.jobs {
-            try!(write!(f, "{:?}", job));
+            write!(f, "{:?}", job)?;
         }
 
         Ok(())

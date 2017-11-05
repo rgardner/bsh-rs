@@ -17,10 +17,10 @@ cd: cd [dir]
 
     fn run(_shell: &mut Shell, args: Vec<String>) -> Result<()> {
         let dir = match args.first().map(|x| &x[..]) {
-            None => try!(env::home_dir().ok_or(ErrorKind::BuiltinCommandError(
+            None => env::home_dir().ok_or(ErrorKind::BuiltinCommandError(
                 "cd: HOME not set".to_string(),
-                1
-            ))),
+                1,
+            ))?,
             Some("-") => match env::var_os("OLDPWD") {
                 Some(val) => {
                     println!("{}", val.to_str().unwrap());
@@ -36,8 +36,8 @@ cd: cd [dir]
             Some(val) => Path::new(val).to_path_buf(),
         };
 
-        env::set_var("OLDPWD", try!(env::current_dir()));
-        try!(env::set_current_dir(dir));
+        env::set_var("OLDPWD", env::current_dir()?);
+        env::set_current_dir(dir)?;
         Ok(())
     }
 }

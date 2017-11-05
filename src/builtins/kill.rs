@@ -54,7 +54,7 @@ kill: kill pid | %jobspec
                 }
             }
         } else {
-            let output = try!(Command::new("kill").args(&args).output());
+            let output = Command::new("kill").args(&args).output()?;
             print!("{}", String::from_utf8_lossy(&output.stdout));
             Ok(())
         }

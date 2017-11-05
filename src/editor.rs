@@ -31,17 +31,17 @@ impl Editor {
     }
 
     pub fn readline(&mut self, prompt: &str) -> Result<String> {
-        let line = try!(self.internal.readline(prompt));
+        let line = self.internal.readline(prompt)?;
         Ok(line)
     }
 
     pub fn load_history<P: AsRef<Path> + ?Sized>(&mut self, path: &P) -> Result<()> {
-        try!(self.internal.load_history(path));
+        self.internal.load_history(path)?;
         Ok(())
     }
 
     pub fn save_history<P: AsRef<Path> + ?Sized>(&mut self, path: &P) -> Result<()> {
-        try!(self.internal.save_history(path));
+        self.internal.save_history(path)?;
         Ok(())
     }
 
@@ -130,7 +130,7 @@ impl Editor {
 impl fmt::Display for Editor {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for (i, e) in self.enumerate_history_entries() {
-            try!(write!(f, "\t{}\t{}\n", i + 1, e));
+            write!(f, "\t{}\t{}\n", i + 1, e)?;
         }
 
         Ok(())
@@ -139,8 +139,8 @@ impl fmt::Display for Editor {
 
 impl fmt::Debug for Editor {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        try!(write!(f, "count: {}\n", self.history_count));
-        try!(write!(f, "capacity: {}\n", self.history_capacity));
+        write!(f, "count: {}\n", self.history_count)?;
+        write!(f, "capacity: {}\n", self.history_capacity)?;
         write!(f, "{}", self)
     }
 }
