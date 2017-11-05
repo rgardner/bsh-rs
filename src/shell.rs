@@ -15,11 +15,8 @@ use std::fs::{File, OpenOptions};
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{self, Child, Stdio};
-use std::time::Duration;
-use wait_timeout::ChildExt;
 
 const HISTORY_FILE_NAME: &'static str = ".bsh_history";
-const BACKGROUND_JOB_WAIT_TIMEOUT_MILLIS: u64 = 100;
 
 /// Bsh Shell
 pub struct Shell {
@@ -119,10 +116,6 @@ impl Shell {
     ///
     /// Job ids start at 1 and increment upwards as long as all the job list is non-empty. When
     /// all jobs have finished executing, the next background job id will be 1.
-    pub fn add_background_job(&mut self, child: Child) {
-        self.background_jobs.add_job(child);
-    }
-
     /// Runs a job from a command string.
     pub fn execute_command_string(&mut self, input: &str) -> Result<()> {
         let mut command = input.to_owned();
@@ -170,7 +163,6 @@ impl Shell {
         Ok(())
     }
 
-    /// Executes a builtin command
     fn execute_builtin_command(&mut self, command: &Command) -> Result<()> {
         let result = builtins::run(self, command);
         self.last_exit_status = get_builtin_exit_status(&result);
@@ -209,7 +201,7 @@ impl Shell {
         }
 
         if run_in_background {
-            self.add_background_job(child);
+            self.background_jobs.add_job(child);
         } else {
             let output = child.wait_with_output().unwrap();
             self.last_exit_status = output.status.code().unwrap_or(0);
@@ -383,9 +375,8 @@ impl BackgroundJobManager {
     }
 
     fn check_jobs(&mut self) {
-        let timeout = Duration::from_millis(BACKGROUND_JOB_WAIT_TIMEOUT_MILLIS);
         self.jobs
-            .retain_mut(|job| match job.child.wait_timeout(timeout).unwrap() {
+            .retain_mut(|job| match job.child.try_wait().expect("error in try_wait") {
                 Some(status) => {
                     println!("[{}]+\t{}\t{}", job.idx, status, job.command);
                     false

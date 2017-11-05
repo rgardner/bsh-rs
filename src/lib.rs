@@ -12,7 +12,6 @@ extern crate error_chain;
 extern crate lalrpop_util;
 extern crate odds;
 extern crate rustyline;
-extern crate wait_timeout;
 
 #[cfg(test)]
 extern crate rand;
