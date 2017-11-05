@@ -29,6 +29,7 @@ version = "*"
 git = "https://github.com/rgardner/rustyline"
 
 [dev-dependencies]
+lazy_static = "0.2.9"
 rand = "0.3.15"
 
 [features]
