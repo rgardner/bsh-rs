@@ -1,10 +1,10 @@
 use std::env;
+use std::ffi::OsStr;
 use std::fmt;
 use std::path::PathBuf;
-use std::process::Command;
 use std::process;
+use std::process::Command;
 use std::str::FromStr;
-use std::ffi::OsStr;
 
 /// WorkDir represents a directory in which tests are run.
 #[derive(Debug)]

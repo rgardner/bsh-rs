@@ -39,10 +39,9 @@ fn test_all_bsh_scripts() {
             .expect("bar");
 
         let actual_stdout: String = wd.stdout(&mut cmd);
-        let actual_status = cmd.output()
-            .ok()
-            .and_then(|o| o.status.code())
-            .expect("failed to get exit status");
+        let actual_status = cmd.output().ok().and_then(|o| o.status.code()).expect(
+            "failed to get exit status",
+        );
         assert_eq!(actual_stdout, expected_data.stdout);
         assert_eq!(actual_status, expected_data.exit_status);
     }

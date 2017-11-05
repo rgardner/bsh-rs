@@ -1,7 +1,7 @@
-use errors::*;
 use builtins;
-use std::process::Command;
+use errors::*;
 use shell::Shell;
+use std::process::Command;
 
 pub struct Kill;
 
@@ -29,19 +29,21 @@ kill: kill pid | %jobspec
         let arg = args.first().unwrap();
         if arg.starts_with('%') {
             match arg[1..].parse::<u32>() {
-                Ok(n) => match shell.kill_background_job(n) {
-                    Ok(Some(job)) => {
-                        println!("[{}]+\tTerminated: 15\t{}", n, job.command);
-                        Ok(())
+                Ok(n) => {
+                    match shell.kill_background_job(n) {
+                        Ok(Some(job)) => {
+                            println!("[{}]+\tTerminated: 15\t{}", n, job.command);
+                            Ok(())
+                        }
+                        Ok(None) => {
+                            bail!(ErrorKind::BuiltinCommandError(
+                                format!("kill: {}: no such job", arg),
+                                1,
+                            ));
+                        }
+                        Err(e) => Err(e),
                     }
-                    Ok(None) => {
-                        bail!(ErrorKind::BuiltinCommandError(
-                            format!("kill: {}: no such job", arg),
-                            1
-                        ));
-                    }
-                    Err(e) => Err(e),
-                },
+                }
                 Err(_) => {
                     bail!(ErrorKind::BuiltinCommandError(
                         format!(
@@ -49,7 +51,7 @@ kill: kill pid | %jobspec
                              job IDs",
                             arg
                         ),
-                        1
+                        1,
                     ));
                 }
             }

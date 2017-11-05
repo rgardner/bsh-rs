@@ -1,5 +1,5 @@
-use errors::*;
 use builtins;
+use errors::*;
 use shell::Shell;
 use std::env;
 
@@ -71,7 +71,7 @@ unset: unset [name ...]
 mod tests {
     use super::*;
     use builtins::BuiltinCommand;
-    use rand::{thread_rng, Rng};
+    use rand::{Rng, thread_rng};
     use shell::Shell;
     use std::env;
 
@@ -96,7 +96,7 @@ mod tests {
         assert!(
             Declare::run(
                 &mut shell,
-                vec!["=baz".into(), format!("{}={}", key, value), "=baz".into()]
+                vec!["=baz".into(), format!("{}={}", key, value), "=baz".into()],
             ).is_err()
         );
         assert_eq!(env::var(key).unwrap(), value);
@@ -129,7 +129,7 @@ mod tests {
         assert!(
             Declare::run(
                 &mut shell,
-                vec![format!("{}={}", key1, value), format!("{}={}", key2, value)]
+                vec![format!("{}={}", key1, value), format!("{}={}", key2, value)],
             ).is_ok()
         );
         assert_eq!(env::var(&key1).unwrap(), value);

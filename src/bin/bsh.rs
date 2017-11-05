@@ -6,8 +6,8 @@ extern crate docopt;
 extern crate rustc_serialize;
 extern crate rustyline;
 
-use bsh_rs::errors::*;
 use bsh_rs::{Shell, ShellConfig};
+use bsh_rs::errors::*;
 use docopt::Docopt;
 use rustyline::error::ReadlineError;
 use std::process;
@@ -49,9 +49,9 @@ struct Args {
 }
 
 fn main() {
-    let args: Args = Docopt::new(USAGE)
-        .and_then(|d| d.decode())
-        .unwrap_or_else(|e| e.exit());
+    let args: Args = Docopt::new(USAGE).and_then(|d| d.decode()).unwrap_or_else(
+        |e| e.exit(),
+    );
 
     if args.flag_version {
         println!("bsh version {}", env!("CARGO_PKG_VERSION"));

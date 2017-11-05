@@ -3,11 +3,11 @@
 //! The Shell itself is responsible for managing background jobs and for
 //! maintaining a editor of previous commands.
 
-use errors::*;
 use builtins;
-use parser::{Command, Job};
 use editor::Editor;
+use errors::*;
 use odds::vec::VecExt;
+use parser::{Command, Job};
 use rustyline;
 use std::env;
 use std::fmt;
@@ -32,11 +32,9 @@ pub struct Shell {
 impl Shell {
     /// Constructs a new Shell to manage running jobs and command history.
     pub fn new(config: ShellConfig) -> Result<Shell> {
-        let history_file = 
-            env::home_dir()
-                .map(|p| p.join(HISTORY_FILE_NAME))
-                .ok_or("failed to get home directory")
-        ?;
+        let history_file = env::home_dir().map(|p| p.join(HISTORY_FILE_NAME)).ok_or(
+            "failed to get home directory",
+        )?;
 
         let mut shell = Shell {
             editor: Editor::with_capacity(config.command_history_capacity),
@@ -57,7 +55,7 @@ impl Shell {
                 }
 
                 Err(e)
-            }
+            },
         )?;
 
         Ok(shell)
@@ -169,7 +167,11 @@ impl Shell {
         result
     }
 
-    fn execute_external_command(&mut self, command: &Command, run_in_background: bool) -> Result<()> {
+    fn execute_external_command(
+        &mut self,
+        command: &Command,
+        run_in_background: bool,
+    ) -> Result<()> {
         let mut external_command = command.to_command();
 
         if command.infile.is_some() {
@@ -192,8 +194,7 @@ impl Shell {
 
         if let Some(ref mut stdout) = child.stdout {
             if let Some(ref outfile) = command.outfile {
-                let mut file =
-                    OpenOptions::new().write(true).create(true).open(outfile)?;
+                let mut file = OpenOptions::new().write(true).create(true).open(outfile)?;
                 let mut buf: Vec<u8> = vec![];
                 stdout.read_to_end(&mut buf)?;
                 file.write_all(&buf)?;
@@ -302,7 +303,7 @@ pub struct ShellConfig {
 
 impl ShellConfig {
     /// Creates an interactive shell, e.g. command history, job control
-    /// 
+    ///
     /// # Complete List
     /// - Command History is enabled
     /// - Job Control is enabled
@@ -319,8 +320,8 @@ impl ShellConfig {
     /// Creates a noninteractive shell, e.g. no command history, no job control
     ///
     /// # Complete List
-    /// - Command History is disabled. Commands are not saved and history expansions are not performed.
-    ///   The history builtin command is not affected by this option.
+    /// - Command History is disabled. Commands are not saved and history expansions are not
+    ///   performed. The history builtin command is not affected by this option.
     /// - Job Control is disabled.
     /// - Fewer messages are displayed
     pub fn noninteractive() -> ShellConfig {
@@ -375,14 +376,17 @@ impl BackgroundJobManager {
     }
 
     fn check_jobs(&mut self) {
-        self.jobs
-            .retain_mut(|job| match job.child.try_wait().expect("error in try_wait") {
+        self.jobs.retain_mut(
+            |job| match job.child.try_wait().expect(
+                "error in try_wait",
+            ) {
                 Some(status) => {
                     println!("[{}]+\t{}\t{}", job.idx, status, job.command);
                     false
                 }
                 None => true,
-            });
+            },
+        );
         if self.jobs.is_empty() {
             self.job_count = 0;
         }

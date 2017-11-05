@@ -1,5 +1,5 @@
-use errors::*;
 use builtins;
+use errors::*;
 use shell::Shell;
 
 pub struct Exit;

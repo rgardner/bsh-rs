@@ -5,6 +5,7 @@ pub use self::ast::Command;
 mod ast;
 #[allow(dead_code, unused_qualifications)]
 #[cfg_attr(feature = "cargo-clippy", allow(clippy))]
+#[cfg_attr(rustfmt, rustfmt_skip)]
 mod grammar;
 
 error_chain! {
@@ -49,8 +50,8 @@ impl Job {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::grammar;
     use super::ast;
+    use super::grammar;
 
     fn job_with_single_cmd(cmd: Command) -> ast::Job {
         ast::Job {
@@ -70,101 +71,133 @@ mod tests {
     #[test]
     fn test_simple_command() {
         assert!(grammar::parse_Job("").is_err());
-        assert_eq!(grammar::parse_Job("echo bob").unwrap(),
-                   job_with_single_cmd(command_just_argv(vec!["echo", "bob"])));
+        assert_eq!(
+            grammar::parse_Job("echo bob").unwrap(),
+            job_with_single_cmd(command_just_argv(vec!["echo", "bob"]))
+        );
 
-        assert_eq!(grammar::parse_Job("ls ~/1code").unwrap(),
-                   job_with_single_cmd(command_just_argv(vec!["ls", "~/1code"])));
+        assert_eq!(
+            grammar::parse_Job("ls ~/1code").unwrap(),
+            job_with_single_cmd(command_just_argv(vec!["ls", "~/1code"]))
+        );
     }
 
     #[test]
     fn test_infile() {
-        assert_eq!(grammar::parse_Job("echo bob <in").unwrap(),
-                   job_with_single_cmd(Command {
-                       argv: vec!["echo".into(), "bob".into()],
-                       infile: Some("in".into()),
-                       outfile: None,
-                   }));
-        assert_eq!(grammar::parse_Job("echo bob < in").unwrap(),
-                   job_with_single_cmd(Command {
-                       argv: vec!["echo".into(), "bob".into()],
-                       infile: Some("in".into()),
-                       outfile: None,
-                   }));
+        assert_eq!(
+            grammar::parse_Job("echo bob <in").unwrap(),
+            job_with_single_cmd(Command {
+                argv: vec!["echo".into(), "bob".into()],
+                infile: Some("in".into()),
+                outfile: None,
+            })
+        );
+        assert_eq!(
+            grammar::parse_Job("echo bob < in").unwrap(),
+            job_with_single_cmd(Command {
+                argv: vec!["echo".into(), "bob".into()],
+                infile: Some("in".into()),
+                outfile: None,
+            })
+        );
         assert!(grammar::parse_Job("<").is_err());
         assert!(grammar::parse_Job("echo <").is_err());
     }
 
     #[test]
     fn test_outfile() {
-        assert_eq!(grammar::parse_Job("echo bob >out").unwrap(),
-                   job_with_single_cmd(Command {
-                       argv: vec!["echo".into(), "bob".into()],
-                       infile: None,
-                       outfile: Some("out".into()),
-                   }));
-        assert_eq!(grammar::parse_Job("echo bob > out").unwrap(),
-                   job_with_single_cmd(Command {
-                       argv: vec!["echo".into(), "bob".into()],
-                       infile: None,
-                       outfile: Some("out".into()),
-                   }));
+        assert_eq!(
+            grammar::parse_Job("echo bob >out").unwrap(),
+            job_with_single_cmd(Command {
+                argv: vec!["echo".into(), "bob".into()],
+                infile: None,
+                outfile: Some("out".into()),
+            })
+        );
+        assert_eq!(
+            grammar::parse_Job("echo bob > out").unwrap(),
+            job_with_single_cmd(Command {
+                argv: vec!["echo".into(), "bob".into()],
+                infile: None,
+                outfile: Some("out".into()),
+            })
+        );
         assert!(grammar::parse_Job(">").is_err());
         assert!(grammar::parse_Job("echo >").is_err());
     }
 
     #[test]
     fn test_redirect() {
-        assert_eq!(grammar::parse_Job(">out echo <in bob").unwrap(),
-                   job_with_single_cmd(Command {
-                       argv: vec!["echo".into(), "bob".into()],
-                       infile: Some("in".into()),
-                       outfile: Some("out".into()),
-                   }));
+        assert_eq!(
+            grammar::parse_Job(">out echo <in bob").unwrap(),
+            job_with_single_cmd(Command {
+                argv: vec!["echo".into(), "bob".into()],
+                infile: Some("in".into()),
+                outfile: Some("out".into()),
+            })
+        );
     }
 
     #[test]
     fn test_multiple_redirects() {
-        assert_eq!(grammar::parse_Job("<in1 <in2").unwrap(),
-                   job_with_single_cmd(Command {
-                       argv: vec![],
-                       infile: Some("in1".into()),
-                       outfile: None,
-                   }));
+        assert_eq!(
+            grammar::parse_Job("<in1 <in2").unwrap(),
+            job_with_single_cmd(Command {
+                argv: vec![],
+                infile: Some("in1".into()),
+                outfile: None,
+            })
+        );
 
-        assert_eq!(grammar::parse_Job(">out1 >out2").unwrap(),
-                   job_with_single_cmd(Command {
-                       argv: vec![],
-                       infile: None,
-                       outfile: Some("out1".into()),
-                   }));
+        assert_eq!(
+            grammar::parse_Job(">out1 >out2").unwrap(),
+            job_with_single_cmd(Command {
+                argv: vec![],
+                infile: None,
+                outfile: Some("out1".into()),
+            })
+        );
     }
 
     #[test]
     fn test_job() {
-        assert_eq!(grammar::parse_Job("cmd1").unwrap(),
-                   ast::Job {
-                       commands: vec![command_just_argv(vec!["cmd1".into()])],
-                       background: false,
-                   });
+        assert_eq!(
+            grammar::parse_Job("cmd1").unwrap(),
+            ast::Job {
+                commands: vec![command_just_argv(vec!["cmd1".into()])],
+                background: false,
+            }
+        );
 
-        assert_eq!(grammar::parse_Job("<in cmd1 | cmd2 >out &").unwrap(),
-                   ast::Job {
-                       commands: vec![
-                Command { argv: vec!["cmd1".into()], infile: Some("in".into()), outfile: None },
-                Command { argv: vec!["cmd2".into()], infile: None, outfile: Some("out".into()) },
-            ],
-                       background: true,
-                   });
+        assert_eq!(
+            grammar::parse_Job("<in cmd1 | cmd2 >out &").unwrap(),
+            ast::Job {
+                commands: vec![
+                    Command {
+                        argv: vec!["cmd1".into()],
+                        infile: Some("in".into()),
+                        outfile: None,
+                    },
+                    Command {
+                        argv: vec!["cmd2".into()],
+                        infile: None,
+                        outfile: Some("out".into()),
+                    },
+                ],
+                background: true,
+            }
+        );
     }
 
     #[test]
     fn test_job_background() {
-        assert_eq!(grammar::parse_Job("cmd1 &").unwrap(),
-                   ast::Job {
-                       commands: vec![command_just_argv(vec!["cmd1"])],
-                       background: true,
-                   });
+        assert_eq!(
+            grammar::parse_Job("cmd1 &").unwrap(),
+            ast::Job {
+                commands: vec![command_just_argv(vec!["cmd1"])],
+                background: true,
+            }
+        );
 
         assert!(grammar::parse_Job("&").is_err());
         assert!(grammar::parse_Job("echo & | echo").is_err());
@@ -172,26 +205,32 @@ mod tests {
 
     #[test]
     fn test_quotes() {
-        assert_eq!(grammar::parse_Job(">'out' 'echo' <in 'arg'").unwrap(),
-                   job_with_single_cmd(Command {
-                       argv: vec!["echo".into(), "arg".into()],
-                       infile: Some("in".into()),
-                       outfile: Some("out".into()),
-                   }));
+        assert_eq!(
+            grammar::parse_Job(">'out' 'echo' <in 'arg'").unwrap(),
+            job_with_single_cmd(Command {
+                argv: vec!["echo".into(), "arg".into()],
+                infile: Some("in".into()),
+                outfile: Some("out".into()),
+            })
+        );
 
-        assert_eq!(grammar::parse_Job(">'out 1' echo 'arg arg arg'").unwrap(),
-                   job_with_single_cmd(Command {
-                       argv: vec!["echo".into(), "arg arg arg".into()],
-                       infile: None,
-                       outfile: Some("out 1".into()),
-                   }));
+        assert_eq!(
+            grammar::parse_Job(">'out 1' echo 'arg arg arg'").unwrap(),
+            job_with_single_cmd(Command {
+                argv: vec!["echo".into(), "arg arg arg".into()],
+                infile: None,
+                outfile: Some("out 1".into()),
+            })
+        );
 
-        assert_eq!(grammar::parse_Job(r#">"out" "echo" <in "arg""#).unwrap(),
-                   job_with_single_cmd(Command {
-                       argv: vec!["echo".into(), "arg".into()],
-                       infile: Some("in".into()),
-                       outfile: Some("out".into()),
-                   }));
+        assert_eq!(
+            grammar::parse_Job(r#">"out" "echo" <in "arg""#).unwrap(),
+            job_with_single_cmd(Command {
+                argv: vec!["echo".into(), "arg".into()],
+                infile: Some("in".into()),
+                outfile: Some("out".into()),
+            })
+        );
 
         assert!(grammar::parse_Job("echo 'arg").is_err());
         assert!(grammar::parse_Job(r#"echo "arg"#).is_err());
@@ -199,35 +238,55 @@ mod tests {
 
     #[test]
     fn test_nested_quotes() {
-        assert_eq!(grammar::parse_Job(r#"echo '"arg"'"#).unwrap(),
-                   job_with_single_cmd(command_just_argv(vec!["echo", r#""arg""#])));
+        assert_eq!(
+            grammar::parse_Job(r#"echo '"arg"'"#).unwrap(),
+            job_with_single_cmd(command_just_argv(vec!["echo", r#""arg""#]))
+        );
 
-        assert_eq!(grammar::parse_Job(r#"echo "'arg'""#).unwrap(),
-                   job_with_single_cmd(command_just_argv(vec!["echo", "'arg'"])));
+        assert_eq!(
+            grammar::parse_Job(r#"echo "'arg'""#).unwrap(),
+            job_with_single_cmd(command_just_argv(vec!["echo", "'arg'"]))
+        );
 
-        assert_eq!(grammar::parse_Job(r#"echo '"arg'"#).unwrap(),
-                   job_with_single_cmd(command_just_argv(vec!["echo", r#""arg"#])));
+        assert_eq!(
+            grammar::parse_Job(r#"echo '"arg'"#).unwrap(),
+            job_with_single_cmd(command_just_argv(vec!["echo", r#""arg"#]))
+        );
 
-        assert_eq!(grammar::parse_Job(r#"echo "arg'""#).unwrap(),
-                   job_with_single_cmd(command_just_argv(vec!["echo", r#"arg'"#])));
+        assert_eq!(
+            grammar::parse_Job(r#"echo "arg'""#).unwrap(),
+            job_with_single_cmd(command_just_argv(vec!["echo", r#"arg'"#]))
+        );
     }
 
     #[test]
     fn test_multiple_jobs() {
         assert!(grammar::parse_Jobs(";").is_err());
-        assert_eq!(grammar::parse_Jobs("cmd1;").unwrap(),
-                   vec![job_with_single_cmd(command_just_argv(vec!["cmd1"]))]);
+        assert_eq!(
+            grammar::parse_Jobs("cmd1;").unwrap(),
+            vec![job_with_single_cmd(command_just_argv(vec!["cmd1"]))]
+        );
 
-        assert_eq!(grammar::parse_Jobs("cmd1; cmd2").unwrap(),
-                   vec![job_with_single_cmd(command_just_argv(vec!["cmd1"])),
-                        job_with_single_cmd(command_just_argv(vec!["cmd2"]))]);
+        assert_eq!(
+            grammar::parse_Jobs("cmd1; cmd2").unwrap(),
+            vec![
+                job_with_single_cmd(command_just_argv(vec!["cmd1"])),
+                job_with_single_cmd(command_just_argv(vec!["cmd2"])),
+            ]
+        );
 
-        assert_eq!(grammar::parse_Jobs("cmd1 | cmd2; cmd3").unwrap(),
-                   vec![ast::Job {
-                            commands: vec![command_just_argv(vec!["cmd1"]),
-                                           command_just_argv(vec!["cmd2"])],
-                            background: false,
-                        },
-                        job_with_single_cmd(command_just_argv(vec!["cmd3"]))]);
+        assert_eq!(
+            grammar::parse_Jobs("cmd1 | cmd2; cmd3").unwrap(),
+            vec![
+                ast::Job {
+                    commands: vec![
+                        command_just_argv(vec!["cmd1"]),
+                        command_just_argv(vec!["cmd2"]),
+                    ],
+                    background: false,
+                },
+                job_with_single_cmd(command_just_argv(vec!["cmd3"])),
+            ]
+        );
     }
 }
