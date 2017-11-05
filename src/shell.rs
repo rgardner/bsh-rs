@@ -43,7 +43,7 @@ impl Shell {
 
         let mut shell = Shell {
             editor: Editor::with_capacity(config.command_history_capacity),
-            history_file: history_file,
+            history_file,
             background_jobs: Default::default(),
             last_exit_status: 0,
             config,
@@ -317,9 +317,9 @@ impl ShellConfig {
     /// - Some additional messages are displayed
     pub fn interactive(command_history_capacity: usize) -> ShellConfig {
         ShellConfig {
-            display_messages: true,
             enable_command_history: true,
             command_history_capacity,
+            display_messages: true,
             ..Default::default()
         }
     }
@@ -339,9 +339,9 @@ impl ShellConfig {
 impl Default for ShellConfig {
     fn default() -> ShellConfig {
         ShellConfig {
-            display_messages: false,
             enable_command_history: false,
             command_history_capacity: 0,
+            display_messages: false,
         }
     }
 }

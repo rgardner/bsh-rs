@@ -13,9 +13,9 @@ pub struct Editor {
 }
 
 impl Editor {
-    pub fn with_capacity(capacity: usize) -> Editor {
+    pub fn with_capacity(history_capacity: usize) -> Editor {
         let config = Config::builder()
-            .max_history_size(capacity)
+            .max_history_size(history_capacity)
             .history_ignore_space(true)
             .completion_type(CompletionType::Circular)
             .build();
@@ -24,9 +24,9 @@ impl Editor {
         internal.set_completer(Some(FilenameCompleter::new()));
 
         Editor {
-            internal: internal,
+            internal,
             history_count: 0,
-            history_capacity: capacity,
+            history_capacity,
         }
     }
 
