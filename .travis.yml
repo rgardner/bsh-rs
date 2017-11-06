@@ -11,8 +11,12 @@ matrix:
 before_script:
   - export PATH="$PATH:$HOME/.cargo/bin"
   - which rustfmt || cargo install rustfmt
+  - which cargo-clippy || cargo +"$(cat rustnightly.txt)" install clippy
 script:
+  - set -e
   - cargo build --verbose
   - cargo fmt -- --write-mode=diff
+  - cargo +"$(cat rustnightly.txt)" clippy
   - cargo test --verbose
   - cargo test --release --verbose
+  - set +e

@@ -6,8 +6,8 @@ use std::process;
 use std::process::Command;
 use std::str::FromStr;
 
-/// WorkDir represents a directory in which tests are run.
-#[derive(Debug)]
+/// `WorkDir` represents a directory in which tests are run.
+#[derive(Debug, Default)]
 pub struct WorkDir {
     /// The directory in which this text executable is running.
     root: PathBuf,

@@ -15,7 +15,7 @@ use std::process;
 const COMMAND_HISTORY_CAPACITY: usize = 10;
 const EXIT_FAILURE: i32 = 1;
 
-const USAGE: &'static str = "
+const USAGE: &str = "
 bsh.
 
 Usage:
@@ -74,7 +74,7 @@ fn execute_from_command_string_or_file(args: &Args) -> ! {
 
     let mut shell = result.unwrap();
     let result = if let Some(ref command_string) = args.arg_command {
-        shell.execute_command_string(&command_string)
+        shell.execute_command_string(command_string)
     } else if let Some(ref file_path) = args.arg_file {
         shell.execute_commands_from_file(&file_path)
     } else {

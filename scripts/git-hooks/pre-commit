@@ -1,0 +1,14 @@
+#!/bin/sh
+
+repo_root="$(git rev-parse --show-toplevel)"
+
+cargo +"$(cat "$repo_root"/rustnightly.txt)" clippy || exit 1
+
+cargo fmt -- --write-mode=diff
+exit_status="$?"
+if [ "$exit_status" -ne 0 ]; then
+    >&2 echo "Review rustfmt changes"
+    cargo fmt
+fi
+
+exit "$exit_status"

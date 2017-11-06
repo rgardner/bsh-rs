@@ -10,10 +10,30 @@ shell program](https://github.com/rgardner/bsh).
 ```bash
 $ git clone https://github.com/rgardner/bsh-rs
 $ cd bsh-rs
-$ # run stable
+$ # run bsh via cargo
 $ cargo run
-$ # run clippy lints, requires the nightly compiler
-$ cargo run --features clippy
+$ # run bsh directly
+$ ./target/debug/bsh
+$ # display bsh help
+$ ./target/debug/bsh --help
+```
+
+
+## Development
+
+```bash
+$ # setup dev environment (e.g. git hooks)
+$ ./scripts/dev_setup.sh
+$ # build
+$ cargo build
+$ # run tests
+$ cargo test
+$ # generate documentation
+$ cargo doc
+$ # run clippy lints via features
+$ rustup run +"$(cat rustnightly.txt)" cargo build --features "clippy"
+$ # run clippy lints via cargo subcommand
+$ rustup run +"$(cat rustnightly.txt)" cargo clippy
 ```
 
 
@@ -22,4 +42,4 @@ $ cargo run --features clippy
 * learn idiomatic Rust
 * make the C version of `bsh` more memory safe by using Rust's memory safety
   principles
-* contribute back to the Rust compiler
+* contribute back to the Rust ecosystem
