@@ -2,8 +2,10 @@
 
 repo_root="$(git rev-parse --show-toplevel)"
 
-cargo +"$(cat "$repo_root"/rustnightly.txt)" clippy || exit 1
+# warn, but do not block commit for clippy warnings
+cargo +"$(cat "$repo_root"/rustnightly.txt)" clippy
 
+# warn and block commit for rustfmt formatting changes
 cargo fmt -- --write-mode=diff
 exit_status="$?"
 if [ "$exit_status" -ne 0 ]; then
