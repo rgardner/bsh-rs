@@ -22,13 +22,13 @@ mod help;
 mod history;
 mod kill;
 
-const CD_NAME: &'static str = "cd";
-const DECLARE_NAME: &'static str = "declare";
-const EXIT_NAME: &'static str = "exit";
-const HELP_NAME: &'static str = "help";
-const HISTORY_NAME: &'static str = "history";
-const KILL_NAME: &'static str = "kill";
-const UNSET_NAME: &'static str = "unset";
+const CD_NAME: &str = "cd";
+const DECLARE_NAME: &str = "declare";
+const EXIT_NAME: &str = "exit";
+const HELP_NAME: &str = "help";
+const HISTORY_NAME: &str = "history";
+const KILL_NAME: &str = "kill";
+const UNSET_NAME: &str = "unset";
 
 /// Represents a Bsh builtin command such as cd or help.
 pub trait BuiltinCommand {

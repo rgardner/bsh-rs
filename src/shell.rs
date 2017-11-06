@@ -16,7 +16,7 @@ use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{self, Child, Stdio};
 
-const HISTORY_FILE_NAME: &'static str = ".bsh_history";
+const HISTORY_FILE_NAME: &str = ".bsh_history";
 
 /// Bsh Shell
 pub struct Shell {
@@ -46,8 +46,8 @@ impl Shell {
 
         shell.editor.load_history(&shell.history_file).or_else(
             |e| {
-                if let &ErrorKind::ReadlineError(rustyline::error::ReadlineError::Io(ref inner)) =
-                    e.kind()
+                if let ErrorKind::ReadlineError(rustyline::error::ReadlineError::Io(ref inner)) =
+                    *e.kind()
                 {
                     if inner.kind() == io::ErrorKind::NotFound {
                         return Ok(());
@@ -119,7 +119,7 @@ impl Shell {
         let mut command = input.to_owned();
         if self.config.enable_command_history {
             self.expand_history(&mut command)?;
-            self.add_history(&input);
+            self.add_history(input);
         }
 
         let jobs = Job::parse(input)?;
@@ -313,7 +313,6 @@ impl ShellConfig {
             enable_command_history: true,
             command_history_capacity,
             display_messages: true,
-            ..Default::default()
         }
     }
 

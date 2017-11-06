@@ -11,8 +11,15 @@ matrix:
 before_script:
   - export PATH="$PATH:$HOME/.cargo/bin"
   - which rustfmt || cargo install rustfmt
+  - |
+      if [[ "$TRAVIS_RUST_VERSION" == "nightly" ]]; then
+        cargo install clippy || true
+      fi
 script:
+  - set -e
   - cargo build --verbose
   - cargo fmt -- --write-mode=diff
+  - (which cargo-clippy && cargo clippy) || exit 0
   - cargo test --verbose
   - cargo test --release --verbose
+  - set +e
