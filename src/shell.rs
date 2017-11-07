@@ -57,6 +57,7 @@ impl Shell {
             }
         }
 
+        info!("bsh started up");
         Ok(shell)
     }
 
@@ -72,20 +73,6 @@ impl Shell {
         let prompt = format!("{}|{}\n$ ", self.last_exit_status, rel.display());
         let line = self.editor.readline(&prompt)?;
         Ok(line)
-    }
-
-    /// Add a job to the history.
-    pub fn add_history(&mut self, job: &str) {
-        self.editor.add_history_entry(job);
-    }
-
-    /// Perform history expansions.
-    ///
-    /// !n -> repeat command numbered n in the list of commands (starting at 1)
-    /// !-n -> repeat last nth command (starting at -1)
-    /// !string -> searches through history for first item that matches the string
-    pub fn expand_history(&self, job: &mut String) -> Result<()> {
-        self.editor.expand_history(job)
     }
 
     /// Expands shell and environment variables in command parts.
@@ -113,8 +100,8 @@ impl Shell {
     pub fn execute_command_string(&mut self, input: &str) -> Result<()> {
         let mut command = input.to_owned();
         if self.config.enable_command_history {
-            self.expand_history(&mut command)?;
-            self.add_history(input);
+            self.editor.expand_history(&mut command)?;
+            self.editor.add_history_entry(input);
         }
 
         let jobs = Job::parse(input)?;
@@ -278,6 +265,7 @@ impl Shell {
             }
         }
 
+        info!("bsh has shut down");
         process::exit(code_like_u8);
     }
 }

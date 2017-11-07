@@ -54,8 +54,7 @@ fn main() {
         |e| e.exit(),
     );
 
-    env_logger::init().unwrap();
-    info!("starting up");
+    env_logger::init().expect("failed to initialize logger");
 
     if args.flag_version {
         println!("bsh version {}", env!("CARGO_PKG_VERSION"));
@@ -70,13 +69,8 @@ fn execute_from_command_string_or_file(args: &Args) -> ! {
     assert!(args.flag_c || args.arg_file.is_some());
 
     let shell_config = ShellConfig::noninteractive();
-    let result = Shell::new(shell_config);
-    if let Err(e) = result {
-        eprintln!("bsh: {}", e);
-        process::exit(EXIT_FAILURE);
-    }
+    let mut shell = Shell::new(shell_config).unwrap_or_else(|e| display_error_and_exit(&e));
 
-    let mut shell = result.unwrap();
     let result = if let Some(ref command_string) = args.arg_command {
         shell.execute_command_string(command_string)
     } else if let Some(ref file_path) = args.arg_file {
@@ -85,17 +79,23 @@ fn execute_from_command_string_or_file(args: &Args) -> ! {
         Ok(())
     };
 
-    display_error_and_exit(result, &mut shell);
+    exit(result, &mut shell);
 }
 
 fn execute_from_stdin() -> ! {
     let shell_config = ShellConfig::interactive(COMMAND_HISTORY_CAPACITY);
-    let mut shell = Shell::new(shell_config).unwrap();
+    let mut shell = Shell::new(shell_config).unwrap_or_else(|e| display_error_and_exit(&e));
     shell.execute_from_stdin();
     shell.exit(None)
 }
 
-fn display_error_and_exit(result: Result<()>, shell: &mut Shell) -> ! {
+fn display_error_and_exit(error: &Error) -> ! {
+    error!("failed to create shell: {}", error);
+    eprintln!("bsh: {}", error);
+    process::exit(EXIT_FAILURE);
+}
+
+fn exit(result: Result<()>, shell: &mut Shell) -> ! {
     if let Err(e) = result {
         eprintln!("bsh: {}", e);
         shell.exit(Some(EXIT_FAILURE));

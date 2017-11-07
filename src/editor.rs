@@ -81,7 +81,11 @@ impl Editor {
         self.history_count = 0;
     }
 
-    /// Perform history expansion.
+    /// Performs history expansions.
+    ///
+    /// !n -> repeat command numbered n in the list of commands (starting at 1)
+    /// !-n -> repeat last nth command (starting at -1)
+    /// !string -> searches through history for first item that matches the string
     pub fn expand_history(&self, command: &mut String) -> Result<()> {
         if !command.starts_with('!') {
             return Ok(());
