@@ -3,13 +3,14 @@
 
 extern crate bsh_rs;
 extern crate docopt;
+extern crate env_logger;
+#[macro_use]
+extern crate log;
 extern crate rustc_serialize;
-extern crate rustyline;
 
 use bsh_rs::{Shell, ShellConfig};
 use bsh_rs::errors::*;
 use docopt::Docopt;
-use rustyline::error::ReadlineError;
 use std::process;
 
 const COMMAND_HISTORY_CAPACITY: usize = 10;
@@ -53,6 +54,9 @@ fn main() {
         |e| e.exit(),
     );
 
+    env_logger::init().unwrap();
+    info!("starting up");
+
     if args.flag_version {
         println!("bsh version {}", env!("CARGO_PKG_VERSION"));
     } else if args.flag_c || args.arg_file.is_some() {
@@ -87,22 +91,7 @@ fn execute_from_command_string_or_file(args: &Args) -> ! {
 fn execute_from_stdin() -> ! {
     let shell_config = ShellConfig::interactive(COMMAND_HISTORY_CAPACITY);
     let mut shell = Shell::new(shell_config).unwrap();
-
-    loop {
-        // Check the status of background jobs, removing exited ones.
-        shell.check_background_jobs();
-
-        let input = match shell.prompt() {
-            Ok(line) => line.trim().to_owned(),
-            Err(Error(ErrorKind::ReadlineError(ReadlineError::Eof), _)) => break,
-            _ => continue,
-        };
-
-        if let Err(e) = shell.execute_command_string(&input) {
-            eprintln!("bsh: {}", e);
-        }
-    }
-
+    shell.execute_from_stdin();
     shell.exit(None)
 }
 

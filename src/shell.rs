@@ -140,6 +140,26 @@ impl Shell {
         Ok(())
     }
 
+    /// Runs jobs from stdin until EOF is received.
+    pub fn execute_from_stdin(&mut self) {
+        loop {
+            if self.config.enable_job_control {
+                // Check the status of background jobs, removing exited ones.
+                self.check_background_jobs();
+            }
+
+            let input = match self.prompt() {
+                Ok(line) => line.trim().to_owned(),
+                Err(Error(ErrorKind::ReadlineError(ReadlineError::Eof), _)) => break,
+                _ => continue,
+            };
+
+            if let Err(e) = self.execute_command_string(&input) {
+                eprintln!("bsh: {}", e);
+            }
+        }
+    }
+
     /// Runs a job.
     fn execute_job(&mut self, job: &mut Job) -> Result<()> {
         for command in &job.commands {
@@ -301,6 +321,9 @@ pub struct ShellConfig {
     /// Number of entries to store in the shell's command history
     pub command_history_capacity: usize,
 
+    /// Determines if job control (fg and bg) is supported.
+    pub enable_job_control: bool,
+
     /// Determines if some messages (e.g. "exit") should be displayed.
     pub display_messages: bool,
 }
@@ -316,6 +339,7 @@ impl ShellConfig {
         ShellConfig {
             enable_command_history: true,
             command_history_capacity,
+            enable_job_control: true,
             display_messages: true,
         }
     }
@@ -337,6 +361,7 @@ impl Default for ShellConfig {
         ShellConfig {
             enable_command_history: false,
             command_history_capacity: 0,
+            enable_job_control: false,
             display_messages: false,
         }
     }
