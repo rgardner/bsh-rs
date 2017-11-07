@@ -8,7 +8,7 @@ use editor::Editor;
 use errors::*;
 use odds::vec::VecExt;
 use parser::{Command, Job};
-use rustyline;
+use rustyline::error::ReadlineError;
 use std::env;
 use std::fmt;
 use std::fs::{File, OpenOptions};
@@ -22,7 +22,7 @@ const HISTORY_FILE_NAME: &str = ".bsh_history";
 pub struct Shell {
     /// Responsible for readline and history.
     pub editor: Editor,
-    history_file: PathBuf,
+    history_file: Option<PathBuf>,
     background_jobs: BackgroundJobManager,
     /// Exit status of last command executed.
     last_exit_status: i32,
@@ -32,31 +32,30 @@ pub struct Shell {
 impl Shell {
     /// Constructs a new Shell to manage running jobs and command history.
     pub fn new(config: ShellConfig) -> Result<Shell> {
-        let history_file = env::home_dir().map(|p| p.join(HISTORY_FILE_NAME)).ok_or(
-            "failed to get home directory",
-        )?;
-
         let mut shell = Shell {
             editor: Editor::with_capacity(config.command_history_capacity),
-            history_file,
+            history_file: None,
             background_jobs: Default::default(),
             last_exit_status: 0,
             config,
         };
 
-        shell.editor.load_history(&shell.history_file).or_else(
-            |e| {
-                if let ErrorKind::ReadlineError(rustyline::error::ReadlineError::Io(ref inner)) =
-                    *e.kind()
-                {
-                    if inner.kind() == io::ErrorKind::NotFound {
-                        return Ok(());
+        if config.enable_command_history {
+            shell.history_file = env::home_dir().map(|p| p.join(HISTORY_FILE_NAME));
+            if let Some(ref history_file) = shell.history_file {
+                shell.editor.load_history(&history_file).or_else(|e| {
+                    if let ErrorKind::ReadlineError(ReadlineError::Io(ref inner)) = *e.kind() {
+                        if inner.kind() == io::ErrorKind::NotFound {
+                            return Ok(());
+                        }
                     }
-                }
 
-                Err(e)
-            },
-        )?;
+                    Err(e)
+                })?;
+            } else {
+                eprintln!("failed to get bsh history file path");
+            }
+        }
 
         Ok(shell)
     }
@@ -110,10 +109,6 @@ impl Shell {
         }
     }
 
-    /// Add a job to the background.
-    ///
-    /// Job ids start at 1 and increment upwards as long as all the job list is non-empty. When
-    /// all jobs have finished executing, the next background job id will be 1.
     /// Runs a job from a command string.
     pub fn execute_command_string(&mut self, input: &str) -> Result<()> {
         let mut command = input.to_owned();
@@ -233,7 +228,7 @@ impl Shell {
     ///
     /// Valid exit codes are between 0 and 255. Like bash and its descendents, it automatically
     /// converts exit codes to a u8 such that positive n becomes n & 256 and negative n becomes
-    /// 256 + n % 256.
+    /// 256 + (n % 256).
     ///
     /// Exit the shell with a status of n. If n is None, then the exit status is that of the last
     /// command executed.
@@ -247,13 +242,22 @@ impl Shell {
             None => self.last_exit_status,
         };
         let code_like_u8 = if code < 0 {
-            256 + code % 256
+            256 + (code % 256)
         } else {
             code % 256
         };
 
-        // TODO(rogardn): log failures
-        let _ = self.editor.save_history(&self.history_file);
+        if self.config.enable_command_history {
+            if let Some(ref history_file) = self.history_file {
+                if let Err(e) = self.editor.save_history(&history_file) {
+                    error!(
+                        "error: failed to save history to file during shutdown: {}",
+                        e
+                    );
+                }
+            }
+        }
+
         process::exit(code_like_u8);
     }
 }
@@ -349,6 +353,10 @@ impl BackgroundJobManager {
         !self.jobs.is_empty()
     }
 
+    /// Add a job to the background.
+    ///
+    /// Job ids start at 1 and increment upwards as long as all the job list is non-empty. When
+    /// all jobs have finished executing, the next background job id will be 1.
     fn add_job(&mut self, child: Child) {
         self.job_count += 1;
         println!("[{}] {}", self.job_count, child.id());
