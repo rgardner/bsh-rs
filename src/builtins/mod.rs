@@ -56,17 +56,32 @@ pub fn is_builtin(program: &str) -> bool {
     ].contains(&program)
 }
 
-/// precondition: process is a builtin.
-pub fn run(shell: &mut Shell, process: &Command) -> Result<()> {
-    assert!(is_builtin(&process.program()));
-    match &*process.program() {
-        CD_NAME => Cd::run(shell, process.args().clone()),
-        DECLARE_NAME => Declare::run(shell, process.args().clone()),
-        EXIT_NAME => Exit::run(shell, process.args().clone()),
-        HELP_NAME => Help::run(shell, process.args().clone()),
-        HISTORY_NAME => History::run(shell, process.args().clone()),
-        KILL_NAME => Kill::run(shell, process.args().clone()),
-        UNSET_NAME => Unset::run(shell, process.args().clone()),
+/// precondition: command is a builtin.
+pub fn run(shell: &mut Shell, command: &mut Command) -> Result<()> {
+    assert!(is_builtin(&command.program()));
+    let result = match &*command.program() {
+        CD_NAME => Cd::run(shell, command.args().clone()),
+        DECLARE_NAME => Declare::run(shell, command.args().clone()),
+        EXIT_NAME => Exit::run(shell, command.args().clone()),
+        HELP_NAME => Help::run(shell, command.args().clone()),
+        HISTORY_NAME => History::run(shell, command.args().clone()),
+        KILL_NAME => Kill::run(shell, command.args().clone()),
+        UNSET_NAME => Unset::run(shell, command.args().clone()),
         _ => unreachable!(),
+    };
+
+    command.status = get_builtin_exit_status(&result);
+    result
+}
+
+fn get_builtin_exit_status(result: &Result<()>) -> i32 {
+    if let Err(ref e) = *result {
+        match *e {
+            Error(ErrorKind::BuiltinCommandError(_, code), _) => code,
+            Error(ErrorKind::Msg(_), _) => 2,
+            Error(_, _) => 1,
+        }
+    } else {
+        0
     }
 }

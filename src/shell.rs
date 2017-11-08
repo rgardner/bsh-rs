@@ -89,6 +89,7 @@ impl Shell {
                             .collect(),
                         infile: cmd.infile.clone().map(|s| expand_variables_helper(&s)),
                         outfile: cmd.outfile.clone().map(|s| expand_variables_helper(&s)),
+                        ..*cmd
                     }
                 })
                 .collect(),
@@ -132,7 +133,7 @@ impl Shell {
         loop {
             if self.config.enable_job_control {
                 // Check the status of background jobs, removing exited ones.
-                self.check_background_jobs();
+                self.background_jobs.check_jobs();
             }
 
             let input = match self.prompt() {
@@ -149,29 +150,25 @@ impl Shell {
 
     /// Runs a job.
     fn execute_job(&mut self, job: &mut Job) -> Result<()> {
-        for command in &job.commands {
+        for command in &mut job.commands {
             if builtins::is_builtin(&command.program()) {
-                let result = self.execute_builtin_command(command);
+                let result = builtins::run(self, command);
                 if let Err(e) = result {
                     eprintln!("{}", e);
                 }
             } else {
                 self.execute_external_command(command, job.background)?;
             }
+
+            self.last_exit_status = command.status;
         }
 
         Ok(())
     }
 
-    fn execute_builtin_command(&mut self, command: &Command) -> Result<()> {
-        let result = builtins::run(self, command);
-        self.last_exit_status = get_builtin_exit_status(&result);
-        result
-    }
-
     fn execute_external_command(
         &mut self,
-        command: &Command,
+        command: &mut Command,
         run_in_background: bool,
     ) -> Result<()> {
         let mut external_command = command.to_command();
@@ -207,7 +204,7 @@ impl Shell {
             self.background_jobs.add_job(child);
         } else {
             let output = child.wait_with_output().unwrap();
-            self.last_exit_status = output.status.code().unwrap_or(0);
+            command.status = output.status.code().unwrap_or(0);
             print!("{}", String::from_utf8_lossy(&output.stdout));
         }
 
@@ -224,11 +221,6 @@ impl Shell {
     /// Returns `true` if a corresponding job exists; `false`, otherwise.
     pub fn kill_background_job(&mut self, job_id: u32) -> Result<Option<BackgroundJob>> {
         self.background_jobs.kill_job(job_id)
-    }
-
-    /// Check on the status of background jobs, removing exited ones.
-    pub fn check_background_jobs(&mut self) {
-        self.background_jobs.check_jobs();
     }
 
     /// Exit the shell.
@@ -278,18 +270,6 @@ fn expand_variables_helper(s: &str) -> String {
     };
 
     expansion.unwrap_or_else(|| "".to_string())
-}
-
-fn get_builtin_exit_status(result: &Result<()>) -> i32 {
-    if let Err(ref e) = *result {
-        match *e {
-            Error(ErrorKind::BuiltinCommandError(_, code), _) => code,
-            Error(ErrorKind::Msg(_), _) => 2,
-            Error(_, _) => 1,
-        }
-    } else {
-        0
-    }
 }
 
 impl fmt::Debug for Shell {
@@ -395,6 +375,7 @@ impl BackgroundJobManager {
         }
     }
 
+    /// Check on the status of background jobs, removing exited ones.
     fn check_jobs(&mut self) {
         self.jobs.retain_mut(
             |job| match job.child.try_wait().expect(

@@ -1,6 +1,6 @@
 //! BSH Parser
 
-pub use self::ast::Command;
+use std::process;
 
 mod ast;
 #[allow(dead_code, unused_qualifications)]
@@ -39,12 +39,48 @@ impl Job {
                     .map(|j| {
                         Job {
                             input: input.into(),
-                            commands: j.commands,
+                            commands: j.commands.into_iter().map(Command::from).collect(),
                             background: j.background,
                         }
                     })
                     .collect()
             })
+    }
+}
+
+#[derive(Debug, Default, PartialEq)]
+pub struct Command {
+    pub argv: Vec<String>,
+    pub infile: Option<String>,
+    pub outfile: Option<String>,
+    pub status: i32,
+}
+
+impl Command {
+    pub fn program(&self) -> String {
+        self.argv.first().unwrap().to_string()
+    }
+
+    pub fn args(&self) -> Vec<String> {
+        self.argv.iter().skip(1).cloned().collect()
+    }
+
+    /// Copies `command` and `args` into a `std::Command`.
+    pub fn to_command(&self) -> process::Command {
+        let mut cmd = process::Command::new(self.program());
+        cmd.args(&self.args());
+        cmd
+    }
+}
+
+impl From<ast::Command> for Command {
+    fn from(command: ast::Command) -> Command {
+        Command {
+            argv: command.argv,
+            infile: command.infile,
+            outfile: command.outfile,
+            status: 0,
+        }
     }
 }
 
