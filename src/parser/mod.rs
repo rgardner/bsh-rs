@@ -190,7 +190,10 @@ mod tests {
         );
     }
 
+    // TODO: un-ignore this test when lalrpop fix has been published to crates.io
+    // https://github.com/nikomatsakis/lalrpop/issues/253
     #[test]
+    #[ignore]
     fn test_job_background() {
         assert_eq!(
             grammar::parse_Job("cmd1 &").unwrap(),
