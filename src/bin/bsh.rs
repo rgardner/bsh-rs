@@ -33,13 +33,6 @@ Options:
                      argument command_string.
 ";
 
-macro_rules! eprintln {
-    ($($tt:tt)*) => {{
-        use std::io::Write;
-        let _ = writeln!(&mut ::std::io::stderr(), $($tt)*);
-    }}
-}
-
 /// Docopts input arguments.
 #[derive(Debug, RustcDecodable)]
 struct Args {
