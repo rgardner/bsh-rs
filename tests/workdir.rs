@@ -28,7 +28,6 @@ impl WorkDir {
         }
     }
 
-    /// Builds a new command to run in this working directory with its unique cache file.
     pub fn command<I, S>(&self, args: I) -> process::Command
     where
         I: IntoIterator<Item = S>,

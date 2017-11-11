@@ -1,42 +1,66 @@
 use parser::ast;
-use std::iter;
+use std::str::FromStr;
 
 grammar;
 
-pub Jobs = Semicolon<Job>;
-
-Semicolon<T>: Vec<T> = {
-    <v:(<T> ";")*> <e:T?> => v.into_iter().chain(e).collect()
+pub Command: ast::Command = {
+    <first:SimpleCommand> "|" <second:Command> => ast::Command::Connection {
+        first: Box::new(first),
+        second: Box::new(second),
+        connector: ast::Connector::Pipe,
+    },
+    <first:SimpleCommand> ";" <second:Command> => ast::Command::Connection {
+        first: Box::new(first),
+        second: Box::new(second),
+        connector: ast::Connector::Semicolon,
+    },
+    SimpleCommand
 };
 
-pub Job: ast::Job = {
-    <cmd0:(<Command> "|")*> <cmd1:Command> <background:"&"?> => ast::Job {
-        commands: { cmd0.into_iter().chain(iter::once(cmd1)).collect() },
-        background: background.is_some(),
-
-    }
-};
-
-Command: ast::Command = {
-    <CommandPart+> => {
-        <>.into_iter().fold(ast::Command::default(), |acc, x| {
-            ast::Command {
-                argv: { acc.argv.into_iter().chain(x.argv.into_iter()).collect() },
-                infile: acc.infile.or(x.infile),
-                outfile: acc.outfile.or(x.outfile),
-            }
+SimpleCommand: ast::Command = {
+    <cmdparts:SimpleCommandPart+> <background:"&"?> => {
+        cmdparts.into_iter().fold(ast::SimpleCommandBuilder::new(background.is_some()), |acc, x| {
+            acc.update(x)
         })
-    }
+        .build()
+    },
 };
 
-CommandPart: ast::Command = {
-    <Word> => ast::Command { argv: vec![<>], infile: None, outfile: None, },
-    <Infile> => ast::Command { argv: vec![], infile: Some(<>), outfile: None, },
-    <Outfile> => ast::Command { argv: vec![], infile: None, outfile: Some(<>) },
+SimpleCommandPart: ast::SimpleCommandPart = {
+    <Word> => ast::SimpleCommandPart::Word(<>),
+    <Redirect> => ast::SimpleCommandPart::Redirect(<>),
 };
 
-Infile = "<" <Word>;
-Outfile = ">" <Word>;
+Redirect: ast::Redirect = {
+    "<" <Redirectee> => ast::Redirect {
+        redirector: None, instruction: ast::RedirectInstruction::Input, redirectee: <>
+    },
+    <num:Num?> ">" <redirectee:Redirectee> => ast::Redirect {
+        redirector: num.map(|n| ast::Redirectee::Dest(n)),
+        instruction: ast::RedirectInstruction::Output,
+        redirectee: redirectee,
+    },
+};
+
+Redirectee: ast::Redirectee = {
+    <Num> => ast::Redirectee::Dest(<>),
+    <Word> => ast::Redirectee::Filename(<>),
+};
+
+match {
+    r"\d+" => AllDigits,
+} else {
+    // Add in all other strings and regexes as lower priority
+    _
+}
+
+Num: i32 = {
+    r">" <AllDigits> => i32::from_str(<>).unwrap(),
+    r"<" <AllDigits> => i32::from_str(<>).unwrap(),
+    <AllDigits> r">"  => i32::from_str(<>).unwrap(),
+    <AllDigits> r"<"  => i32::from_str(<>).unwrap(),
+};
+
 Word: String = {
     r#"[^|;<>&\s'"]+"# => <>.to_string(),
     r#"'[^|;<>&']+'"# => <>[1..<>.len()-1].to_string(),

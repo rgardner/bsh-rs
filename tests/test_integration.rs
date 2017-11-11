@@ -24,6 +24,7 @@ lazy_static! {
 }
 
 #[test]
+#[ignore]
 fn test_all_bsh_scripts() {
     for entry in get_path_to_test_fixtures()
         .join("scripts")

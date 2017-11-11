@@ -3,11 +3,10 @@
 //! The Shell itself is responsible for managing background jobs and for
 //! maintaining a editor of previous commands.
 
-use builtins;
 use editor::Editor;
 use errors::*;
 use jobs::{BackgroundJob, BackgroundJobManager};
-use parser::{Command, Job};
+use parser::{Command, ast};
 use rustyline::error::ReadlineError;
 use std::env;
 use std::fmt;
@@ -41,24 +40,28 @@ impl Shell {
         };
 
         if config.enable_command_history {
-            shell.history_file = env::home_dir().map(|p| p.join(HISTORY_FILE_NAME));
-            if let Some(ref history_file) = shell.history_file {
-                shell.editor.load_history(&history_file).or_else(|e| {
-                    if let ErrorKind::ReadlineError(ReadlineError::Io(ref inner)) = *e.kind() {
-                        if inner.kind() == io::ErrorKind::NotFound {
-                            return Ok(());
-                        }
-                    }
-
-                    Err(e)
-                })?;
-            } else {
-                eprintln!("failed to get bsh history file path");
-            }
+            shell.load_history()?
         }
 
         info!("bsh started up");
         Ok(shell)
+    }
+
+    fn load_history(&mut self) -> Result<()> {
+        self.history_file = env::home_dir().map(|p| p.join(HISTORY_FILE_NAME));
+        if let Some(ref history_file) = self.history_file {
+            self.editor.load_history(&history_file).or_else(|e| {
+                if let ErrorKind::ReadlineError(ReadlineError::Io(ref inner)) = *e.kind() {
+                    if inner.kind() == io::ErrorKind::NotFound {
+                        return Ok(());
+                    }
+                }
+
+                Err(e)
+            })?;
+        }
+
+        Ok(())
     }
 
     /// Custom prompt to output to the user.
@@ -76,40 +79,27 @@ impl Shell {
     }
 
     /// Expands shell and environment variables in command parts.
-    pub fn expand_variables(&mut self, job: &Job) -> Job {
-        Job {
-            input: job.input.clone(),
-            commands: job.commands
-                .iter()
-                .map(|cmd| {
-                    Command {
-                        argv: cmd.argv
-                            .iter()
-                            .map(|s| expand_variables_helper(s))
-                            .collect(),
-                        infile: cmd.infile.clone().map(|s| expand_variables_helper(&s)),
-                        outfile: cmd.outfile.clone().map(|s| expand_variables_helper(&s)),
-                        ..*cmd
-                    }
-                })
-                .collect(),
-            background: job.background,
-        }
+    fn expand_variables(&mut self, command: &mut Command) {
+        // TODO: re-enable variable expansion, Rust doesn't support tail-call optimization
+        warn!("variable expansion temporarily unimplemented");
     }
 
     /// Runs a job from a command string.
     pub fn execute_command_string(&mut self, input: &str) -> Result<()> {
+        // skip if empty
+        if input.is_empty() {
+            return Ok(());
+        }
+
         let mut command = input.to_owned();
         if self.config.enable_command_history {
             self.editor.expand_history(&mut command)?;
             self.editor.add_history_entry(input);
         }
 
-        let jobs = Job::parse(input)?;
-        for mut job in jobs {
-            job = self.expand_variables(&job);
-            self.execute_job(&mut job)?;
-        }
+        let mut command = Command::parse(input)?;
+        self.expand_variables(&mut command);
+        self.execute_command(&mut command)?;
 
         Ok(())
     }
@@ -149,67 +139,94 @@ impl Shell {
     }
 
     /// Runs a job.
-    fn execute_job(&mut self, job: &mut Job) -> Result<()> {
-        for command in &mut job.commands {
-            if builtins::is_builtin(&command.program()) {
-                let result = builtins::run(self, command);
-                if let Err(e) = result {
-                    eprintln!("{}", e);
+    fn execute_command(&mut self, command: &mut Command) -> Result<()> {
+        let mut current = command;
+        loop {
+            let next = match current.inner {
+                ast::Command::Simple {
+                    ref words,
+                    ref redirects,
+                    background,
+                } => {
+                    let (status_code, result) =
+                        BackgroundJobManager::execute_simple_command(self, words.as_slice());
+                    self.last_exit_status = status_code;
+                    if let Err(ref e) = result {
+                        eprintln!("{}", e);
+                    };
+                    result?;
+                    None
                 }
+                _ => unreachable!(),
+            };
+
+            if let Some(c) = next {
+                current = c;
             } else {
-                self.execute_external_command(command, job.background)?;
+                break;
             }
-
-            self.last_exit_status = command.status;
         }
+        // for command in &mut job.commands {
+        //     if builtins::is_builtin(&command.program()) {
+        //         let result = builtins::run(self, command);
+        //         if let Err(e) = result {
+        //             eprintln!("{}", e);
+        //         }
+        //     } else {
+        //         // TODO(rogardn): Add back support for executing jobs in background
+        //         self.execute_external_command(command, false)?;
+        //     }
+
+        //     self.last_exit_status = command.status;
+        // }
 
         Ok(())
     }
 
-    fn execute_external_command(
-        &mut self,
-        command: &mut Command,
-        run_in_background: bool,
-    ) -> Result<()> {
-        let mut external_command = command.to_command();
+    // fn execute_external_command(
+    //     &mut self,
+    //     command: &mut Command,
+    //     run_in_background: bool,
+    // ) -> Result<()> {
+    //     let mut external_command = command.to_command();
 
-        if command.infile.is_some() {
-            external_command.stdin(Stdio::piped());
-        }
+    //     if command.infile.is_some() {
+    //         external_command.stdin(Stdio::piped());
+    //     }
 
-        if command.outfile.is_some() {
-            external_command.stdout(Stdio::piped());
-        }
+    //     if command.outfile.is_some() {
+    //         external_command.stdout(Stdio::piped());
+    //     }
 
-        let mut child = external_command.spawn()?;
-        if let Some(ref mut stdin) = child.stdin {
-            if let Some(ref infile) = command.infile {
-                let mut f = File::open(infile)?;
-                let mut buf: Vec<u8> = vec![];
-                f.read_to_end(&mut buf)?;
-                stdin.write_all(&buf)?;
-            }
-        }
+    //     let mut child = external_command.spawn()?;
+    //     if let Some(ref mut stdin) = child.stdin {
+    //         if let Some(ref infile) = command.infile {
+    //             let mut f = File::open(infile)?;
+    //             let mut buf: Vec<u8> = vec![];
+    //             f.read_to_end(&mut buf)?;
+    //             stdin.write_all(&buf)?;
+    //         }
+    //     }
 
-        if let Some(ref mut stdout) = child.stdout {
-            if let Some(ref outfile) = command.outfile {
-                let mut file = OpenOptions::new().write(true).create(true).open(outfile)?;
-                let mut buf: Vec<u8> = vec![];
-                stdout.read_to_end(&mut buf)?;
-                file.write_all(&buf)?;
-            }
-        }
+    //     if let Some(ref mut stdout) = child.stdout {
+    //         if let Some(ref outfile) = command.outfile {
+    //             let mut file = OpenOptions::new().write(true).create(true).open(outfile)?;
+    //             let mut buf: Vec<u8> = vec![];
+    //             stdout.read_to_end(&mut buf)?;
+    //             file.write_all(&buf)?;
+    //         }
+    //     }
 
-        if run_in_background {
-            self.background_jobs.add_job(child);
-        } else {
-            let output = child.wait_with_output().unwrap();
-            command.status = output.status.code().unwrap_or(0);
-            print!("{}", String::from_utf8_lossy(&output.stdout));
-        }
+    //     if run_in_background {
+    //         self.background_jobs.add_job(child);
+    //     } else {
+    //         let output = child.wait_with_output().unwrap();
+    //         command.status = output.status.code().unwrap_or(0);
+    //         print!("{}", String::from_utf8_lossy(&output.stdout));
+    //     }
 
-        Ok(())
-    }
+    //     Ok(())
+    // }
 
     /// Returns `true` if the shell has background jobs.
     pub fn has_background_jobs(&self) -> bool {

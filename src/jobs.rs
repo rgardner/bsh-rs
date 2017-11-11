@@ -1,5 +1,7 @@
+use builtins;
 use errors::*;
 use odds::vec::VecExt;
+use shell::Shell;
 use std::fmt;
 use std::process::Child;
 
@@ -12,6 +14,22 @@ pub struct BackgroundJobManager {
 impl BackgroundJobManager {
     pub fn has_jobs(&self) -> bool {
         !self.jobs.is_empty()
+    }
+
+    // pub fn launch_job(&mut self, shell: &mut Shell, job: &Job) -> Result<()> {
+    // }
+
+    pub fn execute_simple_command<S>(shell: &mut Shell, words: &[S]) -> (i32, Result<()>)
+    where
+        S: AsRef<str>,
+    {
+        if builtins::is_builtin(words) {
+            builtins::run(shell, words)
+        } else {
+            // TODO: add back support for executing external commands
+            warn!("external commands temporarily unimplemented");
+            (1, Ok(()))
+        }
     }
 
     /// Add a job to the background.

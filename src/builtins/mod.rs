@@ -4,7 +4,6 @@
 //! Where possible the commands conform to their standard Bash counterparts.
 
 use errors::*;
-use parser::Command;
 use shell::Shell;
 
 use self::dirs::Cd;
@@ -44,7 +43,7 @@ pub trait BuiltinCommand {
     fn run(shell: &mut Shell, args: Vec<String>) -> Result<()>;
 }
 
-pub fn is_builtin(program: &str) -> bool {
+pub fn is_builtin<T: AsRef<str>>(argv: &[T]) -> bool {
     [
         CD_NAME,
         DECLARE_NAME,
@@ -53,25 +52,26 @@ pub fn is_builtin(program: &str) -> bool {
         HISTORY_NAME,
         KILL_NAME,
         UNSET_NAME,
-    ].contains(&program)
+    ].contains(&(program(argv).as_str()))
 }
 
 /// precondition: command is a builtin.
-pub fn run(shell: &mut Shell, command: &mut Command) -> Result<()> {
-    assert!(is_builtin(&command.program()));
-    let result = match &*command.program() {
-        CD_NAME => Cd::run(shell, command.args().clone()),
-        DECLARE_NAME => Declare::run(shell, command.args().clone()),
-        EXIT_NAME => Exit::run(shell, command.args().clone()),
-        HELP_NAME => Help::run(shell, command.args().clone()),
-        HISTORY_NAME => History::run(shell, command.args().clone()),
-        KILL_NAME => Kill::run(shell, command.args().clone()),
-        UNSET_NAME => Unset::run(shell, command.args().clone()),
+/// Returns (`exit_status_code`, `builtin_result`)
+pub fn run<T: AsRef<str>>(shell: &mut Shell, argv: &[T]) -> (i32, Result<()>) {
+    assert!(is_builtin(argv));
+    let result = match &*program(argv) {
+        CD_NAME => Cd::run(shell, args(argv)),
+        DECLARE_NAME => Declare::run(shell, args(argv)),
+        EXIT_NAME => Exit::run(shell, args(argv)),
+        HELP_NAME => Help::run(shell, args(argv)),
+        HISTORY_NAME => History::run(shell, args(argv)),
+        KILL_NAME => Kill::run(shell, args(argv)),
+        UNSET_NAME => Unset::run(shell, args(argv)),
         _ => unreachable!(),
     };
 
-    command.status = get_builtin_exit_status(&result);
-    result
+    let exit_status = get_builtin_exit_status(&result);
+    (exit_status, result)
 }
 
 fn get_builtin_exit_status(result: &Result<()>) -> i32 {
@@ -84,4 +84,15 @@ fn get_builtin_exit_status(result: &Result<()>) -> i32 {
     } else {
         0
     }
+}
+
+fn program<T: AsRef<str>>(argv: &[T]) -> String {
+    argv.first().expect("argv is empty").as_ref().to_string()
+}
+
+fn args<T: AsRef<str>>(argv: &[T]) -> Vec<String> {
+    argv.iter()
+        .skip(1)
+        .map(|s| s.as_ref().to_string())
+        .collect()
 }
