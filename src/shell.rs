@@ -79,9 +79,29 @@ impl Shell {
     }
 
     /// Expands shell and environment variables in command parts.
+    /// note: rustfmt formatting makes function less readable
+    #[cfg_attr(rustfmt, rustfmt_skip)]
     fn expand_variables(&mut self, command: &mut Command) {
-        // TODO: re-enable variable expansion, Rust doesn't support tail-call optimization
-        warn!("variable expansion temporarily unimplemented");
+        let mut current = &mut command.inner;
+        loop {
+            // restrict scope of borrowing `current` via `{current}` (new scope)
+            // solves E0506 rustc error, "cannot assign to `current` because it is borrowed"
+            current = match *{current} {
+                ast::Command::Simple { ref mut words, ref mut redirects, .. } => {
+                    expand_variables_simple_command(words, redirects.as_mut_slice());
+                    break;
+                },
+                ast::Command::Connection { ref mut first, ref mut second, .. } => {
+                    match &mut **first {
+                        &mut ast::Command::Simple { ref mut words, ref mut redirects, .. } => {
+                            expand_variables_simple_command(words, redirects.as_mut_slice());
+                        },
+                        _ => unreachable!(),
+                    };
+                    &mut *second
+                }
+            };
+        }
     }
 
     /// Runs a job from a command string.
@@ -140,14 +160,11 @@ impl Shell {
 
     /// Runs a job.
     fn execute_command(&mut self, command: &mut Command) -> Result<()> {
+        // TODO: fix me to implement redirects and connection command
         let mut current = command;
         loop {
-            let next = match current.inner {
-                ast::Command::Simple {
-                    ref words,
-                    ref redirects,
-                    background,
-                } => {
+            match current.inner {
+                ast::Command::Simple { ref words, .. } => {
                     let (status_code, result) =
                         BackgroundJobManager::execute_simple_command(self, words.as_slice());
                     self.last_exit_status = status_code;
@@ -155,16 +172,10 @@ impl Shell {
                         eprintln!("{}", e);
                     };
                     result?;
-                    None
+                    break;
                 }
                 _ => unreachable!(),
             };
-
-            if let Some(c) = next {
-                current = c;
-            } else {
-                break;
-            }
         }
         // for command in &mut job.commands {
         //     if builtins::is_builtin(&command.program()) {
@@ -279,6 +290,20 @@ impl Shell {
     }
 }
 
+fn expand_variables_simple_command(words: &mut Vec<String>, redirects: &mut [ast::Redirect]) {
+    for word in words.iter_mut() {
+        *word = expand_variables_helper(word);
+    }
+    for redirect in redirects.iter_mut() {
+        if let Some(ast::Redirectee::Filename(ref mut filename)) = redirect.redirector {
+            *filename = expand_variables_helper(&filename);
+        }
+        if let ast::Redirectee::Filename(ref mut filename) = redirect.redirectee {
+            *filename = expand_variables_helper(&filename);
+        }
+    }
+}
+
 fn expand_variables_helper(s: &str) -> String {
     let expansion = match s {
         "~" => env::home_dir().map(|p| p.to_string_lossy().into_owned()),
@@ -350,4 +375,12 @@ impl Default for ShellConfig {
             display_messages: false,
         }
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn expand_variables() {}
 }
