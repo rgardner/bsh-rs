@@ -177,67 +177,9 @@ impl Shell {
                 _ => unreachable!(),
             };
         }
-        // for command in &mut job.commands {
-        //     if builtins::is_builtin(&command.program()) {
-        //         let result = builtins::run(self, command);
-        //         if let Err(e) = result {
-        //             eprintln!("{}", e);
-        //         }
-        //     } else {
-        //         // TODO(rogardn): Add back support for executing jobs in background
-        //         self.execute_external_command(command, false)?;
-        //     }
-
-        //     self.last_exit_status = command.status;
-        // }
 
         Ok(())
     }
-
-    // fn execute_external_command(
-    //     &mut self,
-    //     command: &mut Command,
-    //     run_in_background: bool,
-    // ) -> Result<()> {
-    //     let mut external_command = command.to_command();
-
-    //     if command.infile.is_some() {
-    //         external_command.stdin(Stdio::piped());
-    //     }
-
-    //     if command.outfile.is_some() {
-    //         external_command.stdout(Stdio::piped());
-    //     }
-
-    //     let mut child = external_command.spawn()?;
-    //     if let Some(ref mut stdin) = child.stdin {
-    //         if let Some(ref infile) = command.infile {
-    //             let mut f = File::open(infile)?;
-    //             let mut buf: Vec<u8> = vec![];
-    //             f.read_to_end(&mut buf)?;
-    //             stdin.write_all(&buf)?;
-    //         }
-    //     }
-
-    //     if let Some(ref mut stdout) = child.stdout {
-    //         if let Some(ref outfile) = command.outfile {
-    //             let mut file = OpenOptions::new().write(true).create(true).open(outfile)?;
-    //             let mut buf: Vec<u8> = vec![];
-    //             stdout.read_to_end(&mut buf)?;
-    //             file.write_all(&buf)?;
-    //         }
-    //     }
-
-    //     if run_in_background {
-    //         self.background_jobs.add_job(child);
-    //     } else {
-    //         let output = child.wait_with_output().unwrap();
-    //         command.status = output.status.code().unwrap_or(0);
-    //         print!("{}", String::from_utf8_lossy(&output.stdout));
-    //     }
-
-    //     Ok(())
-    // }
 
     /// Returns `true` if the shell has background jobs.
     pub fn has_background_jobs(&self) -> bool {

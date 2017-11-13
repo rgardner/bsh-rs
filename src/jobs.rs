@@ -2,8 +2,9 @@ use builtins;
 use errors::*;
 use odds::vec::VecExt;
 use shell::Shell;
+use std::ffi::OsStr;
 use std::fmt;
-use std::process::Child;
+use std::process::{Child, Command, ExitStatus};
 
 #[derive(Default)]
 pub struct BackgroundJobManager {
@@ -21,14 +22,12 @@ impl BackgroundJobManager {
 
     pub fn execute_simple_command<S>(shell: &mut Shell, words: &[S]) -> (i32, Result<()>)
     where
-        S: AsRef<str>,
+        S: AsRef<str> + AsRef<OsStr>,
     {
         if builtins::is_builtin(words) {
             builtins::run(shell, words)
         } else {
-            // TODO: add back support for executing external commands
-            warn!("external commands temporarily unimplemented");
-            (1, Ok(()))
+            execute_external_command(words)
         }
     }
 
@@ -113,5 +112,31 @@ impl fmt::Debug for BackgroundJob {
             self.child.id(),
             self.idx
         )
+    }
+}
+
+fn execute_external_command<S: AsRef<OsStr>>(words: &[S]) -> (i32, Result<()>) {
+    let result = execute_external_command_internal(words);
+    match result {
+        Ok(exit_code) => (exit_code, Ok(())),
+        Err(e) => (1, Err(e)),
+    }
+}
+
+fn execute_external_command_internal<S: AsRef<OsStr>>(words: &[S]) -> Result<(i32)> {
+    let child = Command::new(&words[0]).args(words[1..].iter()).spawn()?;
+    let output = child.wait_with_output()?;
+    print!("{}", String::from_utf8_lossy(&output.stdout));
+    Ok(get_status_code(&output.status))
+}
+
+#[cfg(unix)]
+fn get_status_code(exit_status: &ExitStatus) -> i32 {
+    match exit_status.code() {
+        Some(code) => code,
+        None => {
+            use std::os::unix::process::ExitStatusExt;
+            128 + exit_status.signal().unwrap()
+        }
     }
 }
