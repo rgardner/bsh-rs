@@ -4,17 +4,17 @@ use std::str::FromStr;
 grammar;
 
 pub Command: ast::Command = {
-    <first:SimpleCommand> "|" <second:Command> => ast::Command::Connection {
+    <first:SimpleCommand> <connector:Connector> <second:Command> => ast::Command::Connection {
         first: Box::new(first),
         second: Box::new(second),
-        connector: ast::Connector::Pipe,
-    },
-    <first:SimpleCommand> ";" <second:Command> => ast::Command::Connection {
-        first: Box::new(first),
-        second: Box::new(second),
-        connector: ast::Connector::Semicolon,
+        connector,
     },
     SimpleCommand
+};
+
+Connector: ast::Connector = {
+    "|" => ast::Connector::Pipe,
+    ";" => ast::Connector::Semicolon,
 };
 
 SimpleCommand: ast::Command = {
@@ -35,30 +35,15 @@ Redirect: ast::Redirect = {
     "<" <Redirectee> => ast::Redirect {
         redirector: None, instruction: ast::RedirectInstruction::Input, redirectee: <>
     },
-    <num:Num?> ">" <redirectee:Redirectee> => ast::Redirect {
-        redirector: num.map(|n| ast::Redirectee::Dest(n)),
+    ">" <redirectee:Redirectee> => ast::Redirect {
+        redirector: None,
         instruction: ast::RedirectInstruction::Output,
         redirectee: redirectee,
     },
 };
 
 Redirectee: ast::Redirectee = {
-    <Num> => ast::Redirectee::Dest(<>),
     <Word> => ast::Redirectee::Filename(<>),
-};
-
-match {
-    r"\d+" => AllDigits,
-} else {
-    // Add in all other strings and regexes as lower priority
-    _
-}
-
-Num: i32 = {
-    r">" <AllDigits> => i32::from_str(<>).unwrap(),
-    r"<" <AllDigits> => i32::from_str(<>).unwrap(),
-    <AllDigits> r">"  => i32::from_str(<>).unwrap(),
-    <AllDigits> r"<"  => i32::from_str(<>).unwrap(),
 };
 
 Word: String = {
@@ -66,3 +51,5 @@ Word: String = {
     r#"'[^|;<>&']+'"# => <>[1..<>.len()-1].to_string(),
     r#""[^|;<>&"]+""# => <>[1..<>.len()-1].to_string(),
 };
+
+// vim: ft=rust

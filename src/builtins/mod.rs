@@ -87,12 +87,9 @@ fn get_builtin_exit_status(result: &Result<()>) -> i32 {
 }
 
 fn program<T: AsRef<str>>(argv: &[T]) -> String {
-    argv.first().expect("argv is empty").as_ref().to_string()
+    argv[0].as_ref().to_string()
 }
 
 fn args<T: AsRef<str>>(argv: &[T]) -> Vec<String> {
-    argv.iter()
-        .skip(1)
-        .map(|s| s.as_ref().to_string())
-        .collect()
+    argv[1..].iter().map(|s| s.as_ref().to_string()).collect()
 }

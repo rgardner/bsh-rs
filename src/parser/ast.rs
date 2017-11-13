@@ -105,6 +105,14 @@ mod tests {
         }
     }
 
+    fn fd_to_file_redirection(fd: i32, filename: &str) -> Redirect {
+        Redirect {
+            redirector: Some(Redirectee::Dest(fd)),
+            instruction: RedirectInstruction::Output,
+            redirectee: Redirectee::Filename(filename.into()),
+        }
+    }
+
     #[test]
     fn test_simple_command() {
         assert!(grammar::parse_Command("").is_err());
@@ -115,6 +123,10 @@ mod tests {
         assert_eq!(
             grammar::parse_Command("ls ~/1code").expect("'ls ~/1code' should be valid"),
             simple_command(vec!["ls", "~/1code"])
+        );
+        assert_eq!(
+            grammar::parse_Command("echo 5").expect("'echo 5' should be valid"),
+            simple_command(vec!["echo", "5"])
         );
     }
 
@@ -160,6 +172,19 @@ mod tests {
         );
         assert!(grammar::parse_Command(">").is_err());
         assert!(grammar::parse_Command("echo >").is_err());
+    }
+
+    #[test]
+    #[ignore]
+    fn test_fd_to_file_redirection() {
+        assert_eq!(
+            grammar::parse_Command("echo bob 1>out").expect("'echo bob 1>out' should be valid"),
+            Command::Simple {
+                words: vec!["echo".into(), "bob".into()],
+                redirects: vec![fd_to_file_redirection(1, "out".into())],
+                background: false,
+            }
+        );
     }
 
     #[test]

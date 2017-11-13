@@ -25,13 +25,15 @@ pub struct Command {
 
 impl Command {
     pub fn parse(input: &str) -> Result<Command> {
-        grammar::parse_Command(input)
+        let result = grammar::parse_Command(input)
             .map_err(|_| ErrorKind::SyntaxError(input.into()).into())
             .map(|inner| {
                 Command {
                     input: input.into(),
                     inner,
                 }
-            })
+            });
+        debug!("parsed Command: {:?}", result);
+        result
     }
 }
