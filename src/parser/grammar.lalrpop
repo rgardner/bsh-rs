@@ -33,26 +33,30 @@ SimpleCommandPart: ast::SimpleCommandPart = {
 
 Redirect: ast::Redirect = {
     "<" <Redirectee> => ast::Redirect {
-        redirector: None, instruction: ast::RedirectInstruction::Input, redirectee: <>
+        redirector: None,
+        instruction: ast::RedirectInstruction::Input,
+        redirectee: <>
     },
-    <input_fd:AllDigits?> ">" <redirectee:Redirectee> => ast::Redirect {
-        redirector: input_fd.map(|fd| ast::Redirectee::Dest(i32::from_str(&fd).unwrap())),
+    ">" <redirectee:Redirectee> => ast::Redirect {
+        redirector: None,
         instruction: ast::RedirectInstruction::Output,
         redirectee: redirectee,
     },
-    <input_fd:AllDigits?> ">" "&" <output_fd:AllDigits> => ast::Redirect {
-        redirector: input_fd.map(|fd| ast::Redirectee::Dest(i32::from_str(&fd).unwrap())),
+    <input_fd:RedirectorFd> <redirectee:Redirectee> => ast::Redirect {
+        redirector: Some(ast::Redirectee::Dest(i32::from_str(&input_fd[..input_fd.len()-1]).unwrap())),
         instruction: ast::RedirectInstruction::Output,
-        redirectee: ast::Redirectee::Dest(i32::from_str(&output_fd).unwrap()),
+        redirectee: redirectee,
     },
 };
 
 Redirectee: ast::Redirectee = {
     <Word> => ast::Redirectee::Filename(<>),
+    <RedirecteeFd> => ast::Redirectee::Dest(i32::from_str(&<>[1..]).unwrap()),
 };
 
 match {
-    r"\d+" => AllDigits,
+    r"\d+>" => RedirectorFd,
+    r"&\d+" => RedirecteeFd,
 } else {
     _
 }

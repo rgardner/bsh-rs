@@ -409,8 +409,11 @@ mod tests {
 
     #[test]
     fn test_quotes_allow_special_characters() {
-        // echo '& ; |'
-        // echo 'echo & ; echo |'
-        assert!(false);
+        assert_eq!(
+            grammar::parse_Command(r#"echo '& ; echo |'"#).expect(
+                r#"'echo '& ; echo |'' should be valid"#,
+            ),
+            simple_command(vec!["echo".into(), r#"& ; echo |"#.into()])
+        );
     }
 }
