@@ -113,6 +113,14 @@ mod tests {
         }
     }
 
+    fn fd_to_fd_redirection(input_fd: i32, output_fd: i32) -> Redirect {
+        Redirect {
+            redirector: Some(Redirectee::Dest(input_fd)),
+            instruction: RedirectInstruction::Output,
+            redirectee: Redirectee::Dest(output_fd),
+        }
+    }
+
     #[test]
     fn test_simple_command() {
         assert!(grammar::parse_Command("").is_err());
@@ -175,13 +183,20 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
-    fn test_fd_to_file_redirection() {
+    fn test_fd_redirection() {
         assert_eq!(
             grammar::parse_Command("echo bob 1>out").expect("'echo bob 1>out' should be valid"),
             Command::Simple {
                 words: vec!["echo".into(), "bob".into()],
                 redirects: vec![fd_to_file_redirection(1, "out".into())],
+                background: false,
+            }
+        );
+        assert_eq!(
+            grammar::parse_Command("echo bob 1>&2").expect("'echo bob 1>&2' should be valid"),
+            Command::Simple {
+                words: vec!["echo".into(), "bob".into()],
+                redirects: vec![fd_to_fd_redirection(1, 2)],
                 background: false,
             }
         );
@@ -390,5 +405,12 @@ mod tests {
             grammar::parse_Command(r#"echo "arg'""#).expect(r#"'echo "arg'""' should be valid"#),
             simple_command(vec!["echo".into(), r#"arg'"#.into()])
         );
+    }
+
+    #[test]
+    fn test_quotes_allow_special_characters() {
+        // echo '& ; |'
+        // echo 'echo & ; echo |'
+        assert!(false);
     }
 }

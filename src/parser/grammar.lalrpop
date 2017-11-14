@@ -35,10 +35,15 @@ Redirect: ast::Redirect = {
     "<" <Redirectee> => ast::Redirect {
         redirector: None, instruction: ast::RedirectInstruction::Input, redirectee: <>
     },
-    ">" <redirectee:Redirectee> => ast::Redirect {
-        redirector: None,
+    <input_fd:AllDigits?> ">" <redirectee:Redirectee> => ast::Redirect {
+        redirector: input_fd.map(|fd| ast::Redirectee::Dest(i32::from_str(&fd).unwrap())),
         instruction: ast::RedirectInstruction::Output,
         redirectee: redirectee,
+    },
+    <input_fd:AllDigits?> ">" "&" <output_fd:AllDigits> => ast::Redirect {
+        redirector: input_fd.map(|fd| ast::Redirectee::Dest(i32::from_str(&fd).unwrap())),
+        instruction: ast::RedirectInstruction::Output,
+        redirectee: ast::Redirectee::Dest(i32::from_str(&output_fd).unwrap()),
     },
 };
 
@@ -46,10 +51,16 @@ Redirectee: ast::Redirectee = {
     <Word> => ast::Redirectee::Filename(<>),
 };
 
+match {
+    r"\d+" => AllDigits,
+} else {
+    _
+}
+
 Word: String = {
     r#"[^|;<>&\s'"]+"# => <>.to_string(),
-    r#"'[^|;<>&']+'"# => <>[1..<>.len()-1].to_string(),
-    r#""[^|;<>&"]+""# => <>[1..<>.len()-1].to_string(),
+    r#"'[^']+'"# => <>[1..<>.len()-1].to_string(),
+    r#""[^"]+""# => <>[1..<>.len()-1].to_string(),
 };
 
 // vim: ft=rust
