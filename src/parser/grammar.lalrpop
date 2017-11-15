@@ -37,25 +37,31 @@ Redirect: ast::Redirect = {
         instruction: ast::RedirectInstruction::Input,
         redirectee: <>
     },
+    <fd:InputDupTargetFd> <redirectee:Redirectee> => ast::Redirect {
+        redirector: Some(ast::Redirectee::FileDescriptor(i32::from_str(&fd[..fd.len()-1]).unwrap())),
+        instruction: ast::RedirectInstruction::Input,
+        redirectee,
+    },
     ">" <redirectee:Redirectee> => ast::Redirect {
         redirector: None,
         instruction: ast::RedirectInstruction::Output,
         redirectee: redirectee,
     },
-    <input_fd:RedirectorFd> <redirectee:Redirectee> => ast::Redirect {
-        redirector: Some(ast::Redirectee::Dest(i32::from_str(&input_fd[..input_fd.len()-1]).unwrap())),
+    <fd:OutputDupSourceFd> <redirectee:Redirectee> => ast::Redirect {
+        redirector: Some(ast::Redirectee::FileDescriptor(i32::from_str(&fd[..fd.len()-1]).unwrap())),
         instruction: ast::RedirectInstruction::Output,
-        redirectee: redirectee,
+        redirectee,
     },
 };
 
 Redirectee: ast::Redirectee = {
     <Word> => ast::Redirectee::Filename(<>),
-    <RedirecteeFd> => ast::Redirectee::Dest(i32::from_str(&<>[1..]).unwrap()),
+    <RedirecteeFd> => ast::Redirectee::FileDescriptor(i32::from_str(&<>[1..]).unwrap()),
 };
 
 match {
-    r"\d+>" => RedirectorFd,
+    r"\d+<" => InputDupTargetFd,
+    r"\d+>" => OutputDupSourceFd,
     r"&\d+" => RedirecteeFd,
 } else {
     _

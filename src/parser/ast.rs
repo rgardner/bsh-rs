@@ -1,6 +1,6 @@
 #[derive(Clone, Debug, PartialEq)]
 pub enum Redirectee {
-    Dest(i32),
+    FileDescriptor(i32),
     Filename(String),
 }
 
@@ -107,17 +107,21 @@ mod tests {
 
     fn fd_to_file_redirection(fd: i32, filename: &str) -> Redirect {
         Redirect {
-            redirector: Some(Redirectee::Dest(fd)),
+            redirector: Some(Redirectee::FileDescriptor(fd)),
             instruction: RedirectInstruction::Output,
             redirectee: Redirectee::Filename(filename.into()),
         }
     }
 
-    fn fd_to_fd_redirection(input_fd: i32, output_fd: i32) -> Redirect {
+    fn fd_to_fd_redirection(
+        input_fd: i32,
+        instruction: RedirectInstruction,
+        output_fd: i32,
+    ) -> Redirect {
         Redirect {
-            redirector: Some(Redirectee::Dest(input_fd)),
-            instruction: RedirectInstruction::Output,
-            redirectee: Redirectee::Dest(output_fd),
+            redirector: Some(Redirectee::FileDescriptor(input_fd)),
+            instruction,
+            redirectee: Redirectee::FileDescriptor(output_fd),
         }
     }
 
@@ -178,12 +182,6 @@ mod tests {
                 background: false,
             }
         );
-        assert!(grammar::parse_Command(">").is_err());
-        assert!(grammar::parse_Command("echo >").is_err());
-    }
-
-    #[test]
-    fn test_fd_redirection() {
         assert_eq!(
             grammar::parse_Command("echo bob 1>out").expect("'echo bob 1>out' should be valid"),
             Command::Simple {
@@ -193,10 +191,32 @@ mod tests {
             }
         );
         assert_eq!(
+            grammar::parse_Command("echo bob 1> out").expect("'echo bob 1>out' should be valid"),
+            Command::Simple {
+                words: vec!["echo".into(), "bob".into()],
+                redirects: vec![fd_to_file_redirection(1, "out".into())],
+                background: false,
+            }
+        );
+        assert!(grammar::parse_Command(">").is_err());
+        assert!(grammar::parse_Command("echo >").is_err());
+    }
+
+    #[test]
+    fn test_fd_duplication() {
+        assert_eq!(
             grammar::parse_Command("echo bob 1>&2").expect("'echo bob 1>&2' should be valid"),
             Command::Simple {
                 words: vec!["echo".into(), "bob".into()],
-                redirects: vec![fd_to_fd_redirection(1, 2)],
+                redirects: vec![fd_to_fd_redirection(1, RedirectInstruction::Output, 2)],
+                background: false,
+            }
+        );
+        assert_eq!(
+            grammar::parse_Command("echo bob 2<&1").expect("'echo bob 2>&1' should be valid"),
+            Command::Simple {
+                words: vec!["echo".into(), "bob".into()],
+                redirects: vec![fd_to_fd_redirection(2, RedirectInstruction::Input, 1)],
                 background: false,
             }
         );
