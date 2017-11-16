@@ -1,7 +1,7 @@
 //! Bsh - Shell Module
 //!
 //! The Shell itself is responsible for managing background jobs and for
-//! maintaining a editor of previous commands.
+//! maintaining an editor of previous commands.
 
 use editor::Editor;
 use errors::*;
@@ -12,6 +12,7 @@ use std::env;
 use std::fmt;
 use std::fs::{File, OpenOptions};
 use std::io::{self, Read, Write};
+use std::ops::DerefMut;
 use std::path::{Path, PathBuf};
 use std::process::{self, Stdio};
 
@@ -92,8 +93,8 @@ impl Shell {
                     break;
                 },
                 ast::Command::Connection { ref mut first, ref mut second, .. } => {
-                    match &mut **first {
-                        &mut ast::Command::Simple { ref mut words, ref mut redirects, .. } => {
+                    match *first.deref_mut() {
+                        ast::Command::Simple { ref mut words, ref mut redirects, .. } => {
                             expand_variables_simple_command(words, redirects.as_mut_slice());
                         },
                         _ => unreachable!(),
@@ -238,10 +239,10 @@ fn expand_variables_simple_command(words: &mut Vec<String>, redirects: &mut [ast
     }
     for redirect in redirects.iter_mut() {
         if let Some(ast::Redirectee::Filename(ref mut filename)) = redirect.redirector {
-            *filename = expand_variables_helper(&filename);
+            *filename = expand_variables_helper(filename);
         }
         if let ast::Redirectee::Filename(ref mut filename) = redirect.redirectee {
-            *filename = expand_variables_helper(&filename);
+            *filename = expand_variables_helper(filename);
         }
     }
 }
