@@ -21,7 +21,7 @@ bsh.
 
 Usage:
     bsh
-    bsh -c <command>
+    bsh -c <command_string>
     bsh <file>
     bsh (-h | --help)
     bsh --version

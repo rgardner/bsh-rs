@@ -1,0 +1,1 @@
+echo "needle" | grep "needle"

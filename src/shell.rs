@@ -307,11 +307,3 @@ impl Default for ShellConfig {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn expand_variables() {}
-}

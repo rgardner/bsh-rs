@@ -1,13 +1,26 @@
 //! Integration Tests
 
+extern crate assert_cli;
 #[macro_use]
 extern crate lazy_static;
 
+use assert_cli::Assert;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use workdir::WorkDir;
 
-mod workdir;
+trait AssertExt {
+    fn exit_status_is(self, exit_status: i32) -> Self;
+}
+
+impl AssertExt for Assert {
+    fn exit_status_is(self, exit_status: i32) -> Self {
+        if exit_status == 0 {
+            self.succeeds()
+        } else {
+            self.fails_with(exit_status)
+        }
+    }
+}
 
 struct ScriptData<'a> {
     pub stdout: &'a str,
@@ -19,6 +32,12 @@ lazy_static! {
     static ref BSH_SCRIPTS_MAP: HashMap<&'static str, ScriptData<'static>> = {
         let mut map = HashMap::new();
         map.insert("simple_echo.bsh", ScriptData { stdout: "test\n", stderr: "", exit_status: 0 });
+        map.insert("simple_pipeline.bsh", ScriptData {
+            stdout: "needle\n",
+            stderr: "",
+            exit_status: 0
+        });
+        map.insert("simple_exit_error.bsh", ScriptData { stdout: "", stderr: "", exit_status: 85 });
         map
     };
 }
@@ -32,19 +51,21 @@ fn test_all_bsh_scripts() {
         .expect("read_dir failed")
     {
         let entry = entry.expect("unable to open test script");
-        let file_name = entry.file_name();
-        let wd = WorkDir::new();
-        let mut cmd = wd.command(&[entry.path()]);
+        let filename = entry.file_name();
         let expected_data = BSH_SCRIPTS_MAP
-            .get(file_name.to_str().expect("foo"))
+            .get(filename.to_str().expect("filename should be valid Unicode"))
             .expect("bar");
 
-        let actual_stdout: String = wd.stdout(&mut cmd);
-        let actual_status = cmd.output().ok().and_then(|o| o.status.code()).expect(
-            "failed to get exit status",
+        let file_path = entry.path();
+        let unicode_file_path = file_path.to_str().expect(
+            "file path should be valid Unicode",
         );
-        assert_eq!(actual_stdout, expected_data.stdout);
-        assert_eq!(actual_status, expected_data.exit_status);
+        Assert::cargo_binary("bsh")
+            .with_args(&[unicode_file_path])
+            .stdout()
+            .is(expected_data.stdout)
+            .exit_status_is(expected_data.exit_status)
+            .unwrap();
     }
 }
 
