@@ -5,16 +5,17 @@
 
 use editor::Editor;
 use errors::*;
-use jobs::{BackgroundJob, BackgroundJobManager};
+use execute_command;
+use job_control::{BackgroundJob, BackgroundJobManager};
 use parser::{Command, ast};
 use rustyline::error::ReadlineError;
 use std::env;
 use std::fmt;
-use std::fs::{File, OpenOptions};
-use std::io::{self, Read, Write};
+use std::fs::File;
+use std::io;
 use std::ops::DerefMut;
 use std::path::{Path, PathBuf};
-use std::process::{self, Stdio};
+use std::process;
 
 const HISTORY_FILE_NAME: &str = ".bsh_history";
 
@@ -161,25 +162,12 @@ impl Shell {
 
     /// Runs a job.
     fn execute_command(&mut self, command: &mut Command) -> Result<()> {
-        // TODO: fix me to implement redirects and connection command
-        let mut current = command;
-        loop {
-            match current.inner {
-                ast::Command::Simple { ref words, .. } => {
-                    let (status_code, result) =
-                        BackgroundJobManager::execute_simple_command(self, words.as_slice());
-                    self.last_exit_status = status_code;
-                    if let Err(ref e) = result {
-                        eprintln!("{}", e);
-                    };
-                    result?;
-                    break;
-                }
-                _ => unreachable!(),
-            };
-        }
-
-        Ok(())
+        let (status_code, result) = execute_command::execute_command(self, command);
+        self.last_exit_status = status_code;
+        if let Err(ref e) = result {
+            eprintln!("{}", e);
+        };
+        result
     }
 
     /// Returns `true` if the shell has background jobs.

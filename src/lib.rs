@@ -24,6 +24,7 @@ mod builtins;
 mod editor;
 #[allow(missing_docs)]
 pub mod errors;
-mod jobs;
+mod execute_command;
+mod job_control;
 mod parser;
 pub mod shell;
