@@ -32,10 +32,10 @@ SimpleCommandPart: ast::SimpleCommandPart = {
 };
 
 Redirect: ast::Redirect = {
-    "<" <Redirectee> => ast::Redirect {
+    "<" <Word> => ast::Redirect {
         redirector: None,
         instruction: ast::RedirectInstruction::Input,
-        redirectee: <>
+        redirectee: ast::Redirectee::Filename(<>),
     },
     <fd:InputDupTargetFd> <redirectee:Redirectee> => ast::Redirect {
         redirector: Some(ast::Redirectee::FileDescriptor(i32::from_str(&fd[..fd.len()-1]).unwrap())),

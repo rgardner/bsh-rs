@@ -3,10 +3,14 @@
 extern crate assert_cli;
 #[macro_use]
 extern crate lazy_static;
+extern crate tempdir;
 
 use assert_cli::Assert;
 use std::collections::HashMap;
+use std::fs::DirEntry;
+use std::io;
 use std::path::PathBuf;
+use tempdir::TempDir;
 
 trait AssertExt {
     fn exit_status_is(self, exit_status: i32) -> Self;
@@ -44,23 +48,27 @@ lazy_static! {
 
 #[test]
 #[ignore]
-fn test_all_bsh_scripts() {
-    for entry in get_path_to_test_fixtures()
-        .join("scripts")
+fn test_all_simple_bsh_scripts() {
+    let simple_scripts = get_path_to_test_scripts()
         .read_dir()
         .expect("read_dir failed")
-    {
-        let entry = entry.expect("unable to open test script");
+        .map(|entry| entry.expect("filename should be valid Unicode"))
+        .filter(|entry| is_simple_bsh_script(entry));
+
+    for entry in simple_scripts {
+        let temp_dir = generate_temp_directory().expect("unable to generate temp dir");
+        let file_path = entry.path();
+        let unicode_file_path = file_path.to_str().expect(
+            "file path should be valid Unicode",
+        );
+
         let filename = entry.file_name();
         let expected_data = BSH_SCRIPTS_MAP
             .get(filename.to_str().expect("filename should be valid Unicode"))
             .expect("bar");
 
-        let file_path = entry.path();
-        let unicode_file_path = file_path.to_str().expect(
-            "file path should be valid Unicode",
-        );
         Assert::cargo_binary("bsh")
+            .current_dir(temp_dir.path())
             .with_args(&[unicode_file_path])
             .stdout()
             .is(expected_data.stdout)
@@ -69,8 +77,39 @@ fn test_all_bsh_scripts() {
     }
 }
 
-fn get_path_to_test_fixtures() -> PathBuf {
+#[test]
+fn test_redirects() {
+    let script_path = get_path_to_test_scripts().join("redirect.bsh");
+    let unicode_script_path = script_path.to_str().expect(
+        "file path should be valid Unicode",
+    );
+    let temp_dir = generate_temp_directory().expect("unable to generate temp dir");
+    Assert::cargo_binary("bsh")
+        .current_dir(temp_dir.path())
+        .with_args(&[unicode_script_path])
+        .stdout()
+        .is("test output, please ignore")
+        .exit_status_is(0)
+        .unwrap();
+}
+
+fn get_path_to_test_scripts() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("tests")
         .join("fixtures")
+        .join("scripts")
+}
+
+/// Does filename start with 'simple' and end with '.bsh'?
+fn is_simple_bsh_script(entry: &DirEntry) -> bool {
+    let filename = entry.file_name();
+    let unicode_filename = filename.to_str().expect("filename should be valid Unicode");
+    unicode_filename.starts_with("simple") && unicode_filename.ends_with(".bsh")
+}
+
+fn generate_temp_directory() -> io::Result<TempDir> {
+    // Because of limitation in `assert_cli`, temporary directory must be
+    // subdirectory of directory containing Cargo.toml
+    let temp_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests");
+    TempDir::new_in(temp_root, "temp")
 }
