@@ -36,12 +36,31 @@ lazy_static! {
     static ref BSH_SCRIPTS_MAP: HashMap<&'static str, ScriptData<'static>> = {
         let mut map = HashMap::new();
         map.insert("simple_echo.bsh", ScriptData { stdout: "test\n", stderr: "", exit_status: 0 });
+        map.insert("simple_redirects.bsh", ScriptData {
+            stdout: "test output, please ignore",
+            stderr: "",
+            exit_status: 0
+        });
         map.insert("simple_pipeline.bsh", ScriptData {
             stdout: "needle\n",
             stderr: "",
             exit_status: 0
         });
-        map.insert("simple_exit_error.bsh", ScriptData { stdout: "", stderr: "", exit_status: 85 });
+        map.insert("simple_exit_error.bsh", ScriptData {
+            stdout: "",
+            stderr: "",
+            exit_status: 85
+        });
+        map.insert("simple_exit_large.bsh", ScriptData {
+            stdout: "",
+            stderr: "",
+            exit_status: 244
+        });
+        map.insert("simple_exit_negative.bsh", ScriptData {
+            stdout: "",
+            stderr: "",
+            exit_status: 12
+        });
         map
     };
 }
@@ -63,9 +82,10 @@ fn test_all_simple_bsh_scripts() {
         );
 
         let filename = entry.file_name();
-        let expected_data = BSH_SCRIPTS_MAP
-            .get(filename.to_str().expect("filename should be valid Unicode"))
-            .expect("bar");
+        let expected_data =
+            BSH_SCRIPTS_MAP
+                .get(filename.to_str().expect("filename should be valid Unicode"))
+                .expect("simple script should have matching data in BSH_SCRIPTS_MAP");
 
         Assert::cargo_binary("bsh")
             .current_dir(temp_dir.path())
@@ -75,22 +95,6 @@ fn test_all_simple_bsh_scripts() {
             .exit_status_is(expected_data.exit_status)
             .unwrap();
     }
-}
-
-#[test]
-fn test_redirects() {
-    let script_path = get_path_to_test_scripts().join("redirect.bsh");
-    let unicode_script_path = script_path.to_str().expect(
-        "file path should be valid Unicode",
-    );
-    let temp_dir = generate_temp_directory().expect("unable to generate temp dir");
-    Assert::cargo_binary("bsh")
-        .current_dir(temp_dir.path())
-        .with_args(&[unicode_script_path])
-        .stdout()
-        .is("test output, please ignore")
-        .exit_status_is(0)
-        .unwrap();
 }
 
 fn get_path_to_test_scripts() -> PathBuf {

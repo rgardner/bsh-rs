@@ -186,7 +186,7 @@ impl Shell {
     ///
     /// Valid exit codes are between 0 and 255. Like bash and its descendents, it automatically
     /// converts exit codes to a u8 such that positive n becomes n & 256 and negative n becomes
-    /// 256 + (n % 256).
+    /// (256 + n) % 256.
     ///
     /// Exit the shell with a status of n. If n is None, then the exit status is that of the last
     /// command executed.
@@ -200,7 +200,7 @@ impl Shell {
             None => self.last_exit_status,
         };
         let code_like_u8 = if code < 0 {
-            256 + (code % 256)
+            (256 + code) % 256
         } else {
             code % 256
         };
