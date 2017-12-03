@@ -3,8 +3,7 @@
 //! This module includes the implementations of common shell builtin commands.
 //! Where possible the commands conform to their standard Bash counterparts.
 
-use errors::*;
-use shell::Shell;
+use self::prelude::*;
 
 use self::dirs::Cd;
 use self::env::Declare;
@@ -13,6 +12,12 @@ use self::exit::Exit;
 use self::help::Help;
 use self::history::History;
 use self::kill::Kill;
+
+pub mod prelude {
+    pub use errors::*;
+    pub use shell::Shell;
+    pub use std::io::Write;
+}
 
 mod dirs;
 mod env;
@@ -40,7 +45,7 @@ pub trait BuiltinCommand {
         Self::HELP.lines().nth(0).unwrap().to_owned()
     }
     /// Runs the command with the given arguments in the `shell` environment.
-    fn run(shell: &mut Shell, args: Vec<String>) -> Result<()>;
+    fn run(shell: &mut Shell, args: Vec<String>, stdout: &mut Write) -> Result<()>;
 }
 
 pub fn is_builtin<T: AsRef<str>>(argv: &[T]) -> bool {
@@ -57,16 +62,16 @@ pub fn is_builtin<T: AsRef<str>>(argv: &[T]) -> bool {
 
 /// precondition: command is a builtin.
 /// Returns (`exit_status_code`, `builtin_result`)
-pub fn run<T: AsRef<str>>(shell: &mut Shell, argv: &[T]) -> (i32, Result<()>) {
+pub fn run<T: AsRef<str>>(shell: &mut Shell, argv: &[T], stdout: &mut Write) -> (i32, Result<()>) {
     assert!(is_builtin(argv));
     let result = match &*program(argv) {
-        CD_NAME => Cd::run(shell, args(argv)),
-        DECLARE_NAME => Declare::run(shell, args(argv)),
-        EXIT_NAME => Exit::run(shell, args(argv)),
-        HELP_NAME => Help::run(shell, args(argv)),
-        HISTORY_NAME => History::run(shell, args(argv)),
-        KILL_NAME => Kill::run(shell, args(argv)),
-        UNSET_NAME => Unset::run(shell, args(argv)),
+        CD_NAME => Cd::run(shell, args(argv), stdout),
+        DECLARE_NAME => Declare::run(shell, args(argv), stdout),
+        EXIT_NAME => Exit::run(shell, args(argv), stdout),
+        HELP_NAME => Help::run(shell, args(argv), stdout),
+        HISTORY_NAME => History::run(shell, args(argv), stdout),
+        KILL_NAME => Kill::run(shell, args(argv), stdout),
+        UNSET_NAME => Unset::run(shell, args(argv), stdout),
         _ => unreachable!(),
     };
 

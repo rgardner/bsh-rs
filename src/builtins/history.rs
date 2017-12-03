@@ -1,7 +1,6 @@
 use builtins;
+use builtins::prelude::*;
 use editor::Editor;
-use errors::*;
-use shell::Shell;
 
 pub struct History;
 
@@ -15,9 +14,9 @@ history: history [-c] [-s size] [n]
     the history list to be cleared by deleting all of the entries.
     The `-s' option sets the size of the history list.";
 
-    fn run(shell: &mut Shell, args: Vec<String>) -> Result<()> {
+    fn run(shell: &mut Shell, args: Vec<String>, stdout: &mut Write) -> Result<()> {
         if args.is_empty() {
-            print!("{}", shell.editor);
+            write!(stdout, "{}", shell.editor)?;
             return Ok(());
         }
 
@@ -32,7 +31,7 @@ history: history [-c] [-s size] [n]
             }
             s => {
                 match s.parse::<usize>() {
-                    Ok(n) => println!("{}", history_display(&shell.editor, n)),
+                    Ok(n) => writeln!(stdout, "{}", history_display(&shell.editor, n))?,
                     Err(_) => {
                         let msg = format!("history: {}: nonnegative numeric argument required", s);
                         bail!(ErrorKind::BuiltinCommandError(msg, 1));

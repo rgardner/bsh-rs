@@ -1,6 +1,5 @@
 use builtins::{self, BuiltinCommand, dirs, env, exit, history, kill};
-use errors::*;
-use shell::Shell;
+use builtins::prelude::*;
 
 pub struct Help;
 
@@ -13,9 +12,9 @@ HELP: HELP [command ...]
     gives detailed HELP on all commands matching COMMAND, otherwise a list of the
     builtins is printed.";
 
-    fn run(_shell: &mut Shell, args: Vec<String>) -> Result<()> {
+    fn run(_shell: &mut Shell, args: Vec<String>, stdout: &mut Write) -> Result<()> {
         if args.is_empty() {
-            print_all_usage_strings();
+            print_all_usage_strings(stdout)?;
         } else {
             let mut all_invalid = true;
             for arg in &args {
@@ -30,7 +29,7 @@ HELP: HELP [command ...]
                     _ => None,
                 };
                 if let Some(msg) = msg {
-                    println!("{}", msg);
+                    stdout.write_all(msg.as_bytes())?;
                     all_invalid = false;
                 }
             }
@@ -46,12 +45,13 @@ HELP: HELP [command ...]
     }
 }
 
-fn print_all_usage_strings() {
-    println!("{}", dirs::Cd::usage());
-    println!("{}", env::Declare::usage());
-    println!("{}", exit::Exit::usage());
-    println!("{}", Help::usage());
-    println!("{}", history::History::usage());
-    println!("{}", kill::Kill::usage());
-    println!("{}", env::Unset::usage());
+fn print_all_usage_strings(stdout: &mut Write) -> Result<()> {
+    writeln!(stdout, "{}", dirs::Cd::usage())?;
+    writeln!(stdout, "{}", env::Declare::usage())?;
+    writeln!(stdout, "{}", exit::Exit::usage())?;
+    writeln!(stdout, "{}", Help::usage())?;
+    writeln!(stdout, "{}", history::History::usage())?;
+    writeln!(stdout, "{}", kill::Kill::usage())?;
+    writeln!(stdout, "{}", env::Unset::usage())?;
+    Ok(())
 }

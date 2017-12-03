@@ -1,6 +1,5 @@
 use builtins;
-use errors::*;
-use shell::Shell;
+use builtins::prelude::*;
 use std::process::Command;
 
 pub struct Kill;
@@ -20,9 +19,8 @@ kill: kill pid | %jobspec
     Exit Status:
     Returns success unless an invalid option is given or an error occurs.";
 
-    fn run(shell: &mut Shell, args: Vec<String>) -> Result<()> {
+    fn run(shell: &mut Shell, args: Vec<String>, stdout: &mut Write) -> Result<()> {
         if args.is_empty() {
-            println!("{}", Self::usage());
             bail!(ErrorKind::BuiltinCommandError(Self::usage(), 2));
         }
 
@@ -32,7 +30,7 @@ kill: kill pid | %jobspec
                 Ok(n) => {
                     match shell.kill_background_job(n) {
                         Ok(Some(job)) => {
-                            println!("[{}]+\tTerminated: 15\t{}", n, job.command);
+                            writeln!(stdout, "[{}]+\tTerminated: 15\t{}", n, job.command)?;
                             Ok(())
                         }
                         Ok(None) => {
@@ -57,7 +55,7 @@ kill: kill pid | %jobspec
             }
         } else {
             let output = Command::new("kill").args(&args).output()?;
-            print!("{}", String::from_utf8_lossy(&output.stdout));
+            write!(stdout, "{}", String::from_utf8_lossy(&output.stdout))?;
             Ok(())
         }
     }

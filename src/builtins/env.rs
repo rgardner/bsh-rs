@@ -1,6 +1,5 @@
 use builtins;
-use errors::*;
-use shell::Shell;
+use builtins::prelude::*;
 use std::env;
 
 pub struct Declare;
@@ -12,7 +11,7 @@ impl builtins::BuiltinCommand for Declare {
 declare: declare [name[=value] ...]
     Declare a variable and assign it a value.";
 
-    fn run(_shell: &mut Shell, args: Vec<String>) -> Result<()> {
+    fn run(_shell: &mut Shell, args: Vec<String>, _stdout: &mut Write) -> Result<()> {
         let mut bad_args = Vec::new();
         for arg in args {
             let key_value: Vec<&str> = arg.splitn(2, '=').collect();
@@ -44,7 +43,7 @@ impl builtins::BuiltinCommand for Unset {
 unset: unset [name ...]
     For each name, remove the corresponding variable.";
 
-    fn run(_shell: &mut Shell, args: Vec<String>) -> Result<()> {
+    fn run(_shell: &mut Shell, args: Vec<String>, _stdout: &mut Write) -> Result<()> {
         let mut bad_args = Vec::new();
         for arg in args {
             if arg.is_empty() || arg.contains('=') {
@@ -74,6 +73,7 @@ mod tests {
     use rand::{Rng, thread_rng};
     use shell::Shell;
     use std::env;
+    use std::io;
 
     fn generate_unique_env_key() -> String {
         loop {
@@ -88,8 +88,8 @@ mod tests {
     fn declare_invalid_identifier() {
         let mut shell = Shell::new(Default::default()).unwrap();
 
-        assert!(Declare::run(&mut shell, vec!["".into()]).is_err());
-        assert!(Declare::run(&mut shell, vec!["=FOO".into()]).is_err());
+        assert!(Declare::run(&mut shell, vec!["".into()], &mut io::sink()).is_err());
+        assert!(Declare::run(&mut shell, vec!["=FOO".into()], &mut io::sink()).is_err());
 
         let key = generate_unique_env_key();
         let value = "bar";
@@ -97,6 +97,7 @@ mod tests {
             Declare::run(
                 &mut shell,
                 vec!["=baz".into(), format!("{}={}", key, value), "=baz".into()],
+                &mut io::sink(),
             ).is_err()
         );
         assert_eq!(env::var(key).unwrap(), value);
@@ -107,15 +108,27 @@ mod tests {
         let mut shell = Shell::new(Default::default()).unwrap();
 
         let key = generate_unique_env_key();
-        assert!(Declare::run(&mut shell, vec![key.clone()]).is_ok());
+        assert!(Declare::run(&mut shell, vec![key.clone()], &mut io::sink()).is_ok());
         assert_eq!(&env::var(&key).unwrap(), "");
 
         let value1 = "bar";
-        assert!(Declare::run(&mut shell, vec![format!("{}={}", key, value1)]).is_ok());
+        assert!(
+            Declare::run(
+                &mut shell,
+                vec![format!("{}={}", key, value1)],
+                &mut io::sink(),
+            ).is_ok()
+        );
         assert_eq!(env::var(&key).unwrap(), value1);
 
         let value2 = "baz";
-        assert!(Declare::run(&mut shell, vec![format!("{}={}", key, value2)]).is_ok());
+        assert!(
+            Declare::run(
+                &mut shell,
+                vec![format!("{}={}", key, value2)],
+                &mut io::sink(),
+            ).is_ok()
+        );
         assert_eq!(env::var(&key).unwrap(), value2);
     }
 
@@ -130,6 +143,7 @@ mod tests {
             Declare::run(
                 &mut shell,
                 vec![format!("{}={}", key1, value), format!("{}={}", key2, value)],
+                &mut io::sink(),
             ).is_ok()
         );
         assert_eq!(env::var(&key1).unwrap(), value);
@@ -140,8 +154,14 @@ mod tests {
     fn unset_invalid_identifier() {
         let mut shell = Shell::new(Default::default()).unwrap();
         let key = generate_unique_env_key();
-        assert!(Declare::run(&mut shell, vec![key.clone()]).is_ok());
-        assert!(Unset::run(&mut shell, vec!["".into(), key.clone(), "=FOO".into()]).is_err());
+        assert!(Declare::run(&mut shell, vec![key.clone()], &mut io::sink()).is_ok());
+        assert!(
+            Unset::run(
+                &mut shell,
+                vec!["".into(), key.clone(), "=FOO".into()],
+                &mut io::sink(),
+            ).is_err()
+        );
         assert!(env::var(key).is_err());
     }
 
@@ -150,9 +170,21 @@ mod tests {
         let mut shell = Shell::new(Default::default()).unwrap();
         let key1 = generate_unique_env_key();
         let key2 = generate_unique_env_key();
-        assert!(Declare::run(&mut shell, vec![key1.clone(), key2.clone()]).is_ok());
+        assert!(
+            Declare::run(
+                &mut shell,
+                vec![key1.clone(), key2.clone()],
+                &mut io::sink(),
+            ).is_ok()
+        );
 
-        assert!(Unset::run(&mut shell, vec![key1.clone(), key2.clone()]).is_ok());
+        assert!(
+            Unset::run(
+                &mut shell,
+                vec![key1.clone(), key2.clone()],
+                &mut io::sink(),
+            ).is_ok()
+        );
         assert!(env::var(key1).is_err());
         assert!(env::var(key2).is_err());
     }

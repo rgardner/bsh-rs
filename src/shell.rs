@@ -5,7 +5,7 @@
 
 use editor::Editor;
 use errors::*;
-use execute_command;
+use execute_command::run_command;
 use job_control::{BackgroundJob, BackgroundJobManager};
 use parser::{Command, ast};
 use rustyline::error::ReadlineError;
@@ -162,11 +162,8 @@ impl Shell {
 
     /// Runs a job.
     fn execute_command(&mut self, command: &mut Command) -> Result<()> {
-        let (status_code, result) = execute_command::execute_command(self, command);
+        let (status_code, result) = run_command(self, &command.inner);
         self.last_exit_status = status_code;
-        if let Err(ref e) = result {
-            eprintln!("{}", e);
-        };
         result
     }
 
