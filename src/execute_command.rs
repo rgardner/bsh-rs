@@ -8,14 +8,40 @@ use std::io;
 use std::os::unix::io::FromRawFd;
 use std::process::{Command, ExitStatus, Stdio};
 
+pub struct Process {
+    argv: Vec<String>,
+    completed: bool,
+    stopped: bool,
+    status_code: Option<i32>,
+}
+
+impl Process {
+    pub fn new(argv: &Vec<String>) -> Process {
+        Process {
+            argv: argv.clone(),
+            completed: false,
+            stopped: false,
+            status_code: None,
+        }
+    }
+
+    pub fn status_code(&self) -> Option<i32> {
+        self.status_code
+    }
+    pub fn set_status_code(&mut self, status_code: i32) {
+        self.status_code = Some(status_code);
+    }
+
+}
+
 /// note: rustfmt formatting makes function less readable
 #[cfg_attr(rustfmt, rustfmt_skip)]
-pub fn run_command(shell: &mut Shell, command: &ast::Command) -> (i32, Result<()>) {
+pub fn spawn_processes(shell: &mut Shell, command: &ast::Command) -> Result<Vec<Process>> {
     // restrict scope of borrowing `current` via `{current}` (new scope)
     // solves E0506 rustc error, "cannot assign to `current` because it is borrowed"
     match *{command} {
         ast::Command::Simple { ref words, ref redirects, .. } => {
-            run_simple_command(shell, words, redirects)
+            Ok(vec![run_simple_command(shell, words, redirects)?])
         }
         ast::Command::Connection { ref first, ref second, ref connector } => {
             run_connection_command(shell, first, second, connector)
@@ -23,13 +49,11 @@ pub fn run_command(shell: &mut Shell, command: &ast::Command) -> (i32, Result<()
     }
 }
 
-fn run_simple_command<S>(
+fn run_simple_command(
     shell: &mut Shell,
-    words: &[S],
+    words: &Vec<String>,
     redirects: &[ast::Redirect],
-) -> (i32, Result<()>)
-where
-    S: AsRef<str> + AsRef<OsStr>,
+) -> Result<Process>
 {
     let stdin_redirect = get_stdin_redirect(redirects);
     let stdout_redirect = get_stdout_redirect(redirects);
@@ -48,15 +72,20 @@ where
         .map_or(Ok(None), |v| v.map(Some))
         .unwrap();
 
+    let mut process = Process::new(&words);
     if builtins::is_builtin(words) {
-        if let Some(mut stdout) = stdout {
+        let (status_code, _) = if let Some(mut stdout) = stdout {
             builtins::run(shell, words, &mut stdout)
         } else {
             builtins::run(shell, words, &mut io::stdout())
-        }
+        };
+        process.set_status_code(status_code);
     } else {
-        run_external_command(words, stdin.map(Into::into), stdout.map(Into::into))
+        let status_code = run_external_command(words, stdin.map(Into::into), stdout.map(Into::into))?;
+        process.set_status_code(status_code);
     }
+
+    Ok(process)
 }
 
 fn run_connection_command(
@@ -64,27 +93,13 @@ fn run_connection_command(
     first: &ast::Command,
     second: &ast::Command,
     connector: &ast::Connector,
-) -> (i32, Result<()>) {
-    run_command(shell, first);
-    run_command(shell, second)
+) -> Result<Vec<Process>> {
+    let mut result = spawn_processes(shell, first)?;
+    result.extend(spawn_processes(shell, second)?);
+    Ok(result)
 }
 
 fn run_external_command<S>(
-    words: &[S],
-    stdin: Option<Stdio>,
-    stdout: Option<Stdio>,
-) -> (i32, Result<()>)
-where
-    S: AsRef<OsStr>,
-{
-    let result = try_run_external_command(words, stdin, stdout);
-    match result {
-        Ok(exit_code) => (exit_code, Ok(())),
-        Err(e) => (1, Err(e)),
-    }
-}
-
-fn try_run_external_command<S>(
     words: &[S],
     stdin: Option<Stdio>,
     stdout: Option<Stdio>,

@@ -5,7 +5,7 @@
 
 use editor::Editor;
 use errors::*;
-use execute_command::run_command;
+use execute_command::spawn_processes;
 use job_control::{BackgroundJob, BackgroundJobManager};
 use parser::{Command, ast};
 use rustyline::error::ReadlineError;
@@ -162,9 +162,9 @@ impl Shell {
 
     /// Runs a job.
     fn execute_command(&mut self, command: &mut Command) -> Result<()> {
-        let (status_code, result) = run_command(self, &command.inner);
-        self.last_exit_status = status_code;
-        result
+        let processes = spawn_processes(self, &command.inner)?;
+        self.last_exit_status = processes.last().unwrap().status_code().unwrap();
+        Ok(())
     }
 
     /// Returns `true` if the shell has background jobs.
