@@ -12,6 +12,7 @@ extern crate error_chain;
 extern crate lalrpop_util;
 #[macro_use]
 extern crate log;
+extern crate nix;
 extern crate odds;
 extern crate rustyline;
 

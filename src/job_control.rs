@@ -1,7 +1,100 @@
 use errors::*;
+use execute_command::{Process, ProcessStatus};
+use nix::libc;
+use nix::sys::wait::{self, WaitStatus};
+use nix::unistd::Pid;
 use odds::vec::VecExt;
 use std::fmt;
 use std::process::Child;
+
+pub struct Job {
+    input: String,
+    processes: Vec<Process>,
+    last_status_code: Option<i32>,
+    notified_stopped_job: bool,
+}
+
+impl Job {
+    pub fn new(input: &str, processes: &[Process]) -> Job {
+        Job {
+            input: input.to_string(),
+            processes: processes.to_vec(),
+            last_status_code: None,
+            notified_stopped_job: false,
+        }
+    }
+
+    pub fn last_status_code(&self) -> Option<i32> {
+        self.last_status_code
+    }
+
+    pub fn wait(&mut self) -> Result<()> {
+        loop {
+            let wait_any_child = Pid::from_raw(-1);
+            let wait_status = wait::waitpid(Some(wait_any_child), Some(wait::WUNTRACED))?;
+            match wait_status {
+                WaitStatus::Exited(pid, status_code) => {
+                    debug!("{} exited with {}.", pid, status_code);
+                    let process = &mut find_process(&mut self.processes, pid).unwrap();
+                    process.set_status(ProcessStatus::Completed);
+                    let status_code = i32::from(status_code);
+                    process.set_status_code(status_code);
+                    self.last_status_code = Some(status_code);
+                }
+                WaitStatus::Stopped(pid, signal) => {
+                    debug!("{} was signaled to stop {:?}.", pid, signal);
+                    let process = &mut find_process(&mut self.processes, pid).unwrap();
+                    process.set_status(ProcessStatus::Stopped);
+                }
+                WaitStatus::Signaled(pid, signal, ..) => {
+                    eprintln!("{}: terminated by signal {:?}.", pid, signal);
+                    let process = &mut find_process(&mut self.processes, pid).unwrap();
+                    process.set_status(ProcessStatus::Stopped);
+                    let status_code = 128 + (signal as i32);
+                    process.set_status_code(status_code);
+                    self.last_status_code = Some(status_code);
+                }
+                _ => continue,
+            }
+
+            if self.is_stopped() || self.is_completed() {
+                break;
+            }
+        }
+
+        Ok(())
+    }
+
+    fn is_stopped(&self) -> bool {
+        for process in &self.processes {
+            if process.status() != ProcessStatus::Stopped {
+                return false;
+            }
+        }
+
+        true
+    }
+
+    fn is_completed(&self) -> bool {
+        for process in &self.processes {
+            if process.status() != ProcessStatus::Completed {
+                return false;
+            }
+        }
+
+        true
+    }
+}
+
+fn find_process(processes: &mut Vec<Process>, pid: Pid) -> Option<&mut Process> {
+    for process in processes.iter_mut() {
+        if Pid::from_raw(process.pid().unwrap() as libc::pid_t) == pid {
+            return Some(process);
+        }
+    }
+
+    None
+}
 
 #[derive(Default)]
 pub struct BackgroundJobManager {

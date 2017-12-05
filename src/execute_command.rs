@@ -2,36 +2,73 @@ use builtins;
 use errors::*;
 use parser::ast;
 use shell::Shell;
-use std::ffi::OsStr;
 use std::fs::{File, OpenOptions};
 use std::io;
 use std::os::unix::io::FromRawFd;
-use std::process::{Command, ExitStatus, Stdio};
+use std::process::{Command, Stdio};
 
+#[derive(Clone)]
 pub struct Process {
     argv: Vec<String>,
-    completed: bool,
-    stopped: bool,
+    /// `pid` is None when the process hasn't launched or the command is a Shell builtin
+    pid: Option<u32>,
+    status: ProcessStatus,
     status_code: Option<i32>,
 }
 
+#[derive(Clone, Copy, PartialEq)]
+pub enum ProcessStatus {
+    Running,
+    Stopped,
+    Completed,
+}
+
 impl Process {
-    pub fn new(argv: &Vec<String>) -> Process {
+    pub fn new_builtin(argv: &[String]) -> Process {
         Process {
-            argv: argv.clone(),
-            completed: false,
-            stopped: false,
-            status_code: None,
+            argv: argv.to_vec(),
+            ..Default::default()
         }
+    }
+
+    pub fn new_external(argv: &[String], pid: u32) -> Process {
+        Process {
+            argv: argv.to_vec(),
+            pid: Some(pid),
+            ..Default::default()
+        }
+    }
+
+    pub fn pid(&self) -> Option<u32> {
+        self.pid
+    }
+
+    pub fn status(&self) -> ProcessStatus {
+        self.status
+    }
+
+    pub fn set_status(&mut self, status: ProcessStatus) {
+        self.status = status
     }
 
     pub fn status_code(&self) -> Option<i32> {
         self.status_code
     }
+
     pub fn set_status_code(&mut self, status_code: i32) {
         self.status_code = Some(status_code);
     }
+}
 
+impl Default for Process {
+    fn default() -> Self {
+        Process {
+            argv: Vec::new(),
+            pid: None,
+            status: ProcessStatus::Running,
+            status_code: None,
+        }
+    }
 }
 
 /// note: rustfmt formatting makes function less readable
@@ -53,8 +90,7 @@ fn run_simple_command(
     shell: &mut Shell,
     words: &Vec<String>,
     redirects: &[ast::Redirect],
-) -> Result<Process>
-{
+) -> Result<Process> {
     let stdin_redirect = get_stdin_redirect(redirects);
     let stdout_redirect = get_stdout_redirect(redirects);
 
@@ -72,20 +108,18 @@ fn run_simple_command(
         .map_or(Ok(None), |v| v.map(Some))
         .unwrap();
 
-    let mut process = Process::new(&words);
     if builtins::is_builtin(words) {
+        let mut process = Process::new_builtin(words);
         let (status_code, _) = if let Some(mut stdout) = stdout {
             builtins::run(shell, words, &mut stdout)
         } else {
             builtins::run(shell, words, &mut io::stdout())
         };
         process.set_status_code(status_code);
+        Ok(process)
     } else {
-        let status_code = run_external_command(words, stdin.map(Into::into), stdout.map(Into::into))?;
-        process.set_status_code(status_code);
+        run_external_command(words, stdin.map(Into::into), stdout.map(Into::into))
     }
-
-    Ok(process)
 }
 
 fn run_connection_command(
@@ -99,40 +133,24 @@ fn run_connection_command(
     Ok(result)
 }
 
-fn run_external_command<S>(
-    words: &[S],
+fn run_external_command(
+    words: &Vec<String>,
     stdin: Option<Stdio>,
     stdout: Option<Stdio>,
-) -> Result<i32>
-where
-    S: AsRef<OsStr>,
-{
+) -> Result<Process> {
     let mut command = Command::new(&words[0]);
     command.args(words[1..].iter());
 
     if let Some(stdin) = stdin {
         command.stdin(stdin);
     }
-
     if let Some(stdout) = stdout {
         command.stdout(stdout);
     }
 
     let child = command.spawn()?;
-    let output = child.wait_with_output()?;
-    print!("{}", String::from_utf8_lossy(&output.stdout));
-    Ok(get_status_code(&output.status))
-}
 
-#[cfg(unix)]
-fn get_status_code(exit_status: &ExitStatus) -> i32 {
-    match exit_status.code() {
-        Some(code) => code,
-        None => {
-            use std::os::unix::process::ExitStatusExt;
-            128 + exit_status.signal().unwrap()
-        }
-    }
+    Ok(Process::new_external(words, child.id()))
 }
 
 /// Gets the last stdin redirect in `redirects`
