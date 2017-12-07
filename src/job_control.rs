@@ -15,10 +15,10 @@ pub struct Job {
 }
 
 impl Job {
-    pub fn new(input: &str, processes: &[Process]) -> Job {
+    pub fn new(input: &str, processes: Vec<Process>) -> Job {
         Job {
             input: input.to_string(),
-            processes: processes.to_vec(),
+            processes,
             last_status_code: None,
             notified_stopped_job: false,
         }
@@ -88,8 +88,10 @@ impl Job {
 
 fn find_process(processes: &mut Vec<Process>, pid: Pid) -> Option<&mut Process> {
     for process in processes.iter_mut() {
-        if Pid::from_raw(process.pid().unwrap() as libc::pid_t) == pid {
-            return Some(process);
+        if let Some(id) = process.id() {
+            if Pid::from_raw(id as libc::pid_t) == pid {
+                return Some(process);
+            }
         }
     }
 

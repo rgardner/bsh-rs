@@ -163,7 +163,7 @@ impl Shell {
     /// Runs a job.
     fn execute_command(&mut self, command: &mut Command) -> Result<()> {
         let processes = spawn_processes(self, &command.inner)?;
-        let mut job = Job::new(&command.input, &processes);
+        let mut job = Job::new(&command.input, processes);
         job.wait()?;
         if let Some(status_code) = job.last_status_code() {
             self.last_exit_status = status_code;

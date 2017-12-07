@@ -66,7 +66,6 @@ lazy_static! {
 }
 
 #[test]
-#[ignore]
 fn test_all_simple_bsh_scripts() {
     let simple_scripts = get_path_to_test_scripts()
         .read_dir()
