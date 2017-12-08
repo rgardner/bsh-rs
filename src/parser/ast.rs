@@ -22,6 +22,7 @@ pub enum Connector {
     Pipe,
     Semicolon,
     And,
+    Or,
 }
 
 #[derive(Debug, PartialEq)]

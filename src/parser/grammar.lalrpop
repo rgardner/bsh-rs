@@ -16,6 +16,7 @@ Connector: ast::Connector = {
     "|" => ast::Connector::Pipe,
     ";" => ast::Connector::Semicolon,
     "&&" => ast::Connector::And,
+    "||" => ast::Connector::Or,
 };
 
 SimpleCommand: ast::Command = {

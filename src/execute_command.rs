@@ -274,6 +274,17 @@ fn run_connection_command(
             };
             Ok((first_result, output))
         }
+        ast::Connector::Or => {
+            let (mut first_result, _) = _spawn_processes(shell, first, stdin, None)?;
+            let output = if !first_result.last_mut().unwrap().wait()?.success() {
+                let (second_result, output) = _spawn_processes(shell, second, None, stdout)?;
+                first_result.extend(second_result);
+                output
+            } else {
+                None
+            };
+            Ok((first_result, output))
+        }
     }
 }
 
