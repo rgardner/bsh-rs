@@ -6,7 +6,8 @@ use shell::Shell;
 use std::fs::{File, OpenOptions};
 use std::io;
 use std::os::unix::io::FromRawFd;
-use std::process::{ChildStdout, Command, Stdio};
+use std::process::{ChildStdout, Command, ExitStatus, Stdio};
+use util::BshExitStatusExt;
 
 #[derive(Debug)]
 enum Stdin {
@@ -23,14 +24,14 @@ enum Stdout {
 }
 
 impl Stdin {
+    /// precondition: `redirect` is an input redirect
     fn new(redirect: &ast::Redirect) -> Result<Self> {
         match redirect.redirectee {
             ast::Redirectee::FileDescriptor(fd) => unsafe { Ok(File::from_raw_fd(fd).into()) },
             ast::Redirectee::Filename(ref filename) => {
                 match redirect.instruction {
                     ast::RedirectInstruction::Output => {
-                        assert!(false, "Stdin::new called with stdout redirect");
-                        unreachable!();
+                        panic!("Stdin::new called with stdout redirect");
                     }
                     ast::RedirectInstruction::Input => Ok(Stdin::File(File::open(filename)?)),
                 }
@@ -40,6 +41,7 @@ impl Stdin {
 }
 
 impl Stdout {
+    /// precondition: `redirect` is an output redirect
     fn new(redirect: &ast::Redirect) -> Result<Self> {
         match redirect.redirectee {
             ast::Redirectee::FileDescriptor(fd) => unsafe { Ok(File::from_raw_fd(fd).into()) },
@@ -50,8 +52,7 @@ impl Stdout {
                         Ok(Stdout::File(file))
                     }
                     ast::RedirectInstruction::Input => {
-                        assert!(false, "Stdout::new called with stdin redirect");
-                        unreachable!();
+                        panic!("Stdout::new called with stdin redirect");
                     }
                 }
             }
@@ -97,7 +98,7 @@ pub struct Process {
     /// `id` is None when the process hasn't launched or the command is a Shell builtin
     id: Option<u32>,
     status: ProcessStatus,
-    status_code: Option<i32>,
+    status_code: Option<ExitStatus>,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -108,7 +109,7 @@ pub enum ProcessStatus {
 }
 
 impl Process {
-    pub fn new_builtin(argv: &[String], status_code: i32) -> Process {
+    pub fn new_builtin(argv: &[String], status_code: ExitStatus) -> Process {
         Process {
             argv: argv.to_vec(),
             status: ProcessStatus::Completed,
@@ -138,12 +139,25 @@ impl Process {
         self.status = status
     }
 
-    pub fn status_code(&self) -> Option<i32> {
+    pub fn status_code(&self) -> Option<ExitStatus> {
         self.status_code
     }
 
-    pub fn set_status_code(&mut self, status_code: i32) {
+    pub fn set_status_code(&mut self, status_code: ExitStatus) {
         self.status_code = Some(status_code);
+    }
+
+    pub fn wait(&mut self) -> Result<ExitStatus> {
+        if let ProcessStatus::Completed = self.status {
+            Ok(self.status_code.unwrap())
+        } else if let Some(pid) = self.id {
+            let status_code = wait_for_process(pid)?;
+            self.status_code = Some(status_code);
+            self.status = ProcessStatus::Completed;
+            Ok(status_code)
+        } else {
+            panic!("process status is not 'Completed' and pid is not set");
+        }
     }
 }
 
@@ -249,6 +263,17 @@ fn run_connection_command(
             first_result.extend(second_result);
             Ok((first_result, output))
         }
+        ast::Connector::And => {
+            let (mut first_result, _) = _spawn_processes(shell, first, stdin, None)?;
+            let output = if first_result.last_mut().unwrap().wait()?.success() {
+                let (second_result, output) = _spawn_processes(shell, second, None, stdout)?;
+                first_result.extend(second_result);
+                output
+            } else {
+                None
+            };
+            Ok((first_result, output))
+        }
     }
 }
 
@@ -272,6 +297,7 @@ fn run_external_command(
 fn get_stdin_redirect(redirects: &[ast::Redirect]) -> Option<&ast::Redirect> {
     redirects
         .iter()
+        .rev()
         .filter(|r| {
             if (r.instruction != ast::RedirectInstruction::Input) || (r.redirector.is_some()) {
                 return false;
@@ -282,13 +308,14 @@ fn get_stdin_redirect(redirects: &[ast::Redirect]) -> Option<&ast::Redirect> {
                 _ => false,
             }
         })
-        .last()
+        .nth(0)
 }
 
 /// Gets the last stdout redirect in `redirects`
 fn get_stdout_redirect(redirects: &[ast::Redirect]) -> Option<&ast::Redirect> {
     redirects
         .iter()
+        .rev()
         .filter(|r| {
             if r.instruction != ast::RedirectInstruction::Output {
                 return false;
@@ -299,7 +326,7 @@ fn get_stdout_redirect(redirects: &[ast::Redirect]) -> Option<&ast::Redirect> {
                 _ => false,
             }
         })
-        .last()
+        .nth(0)
 }
 
 /// Wraps `unistd::pipe()` to return RAII structs instead of raw, owning file descriptors
@@ -317,5 +344,18 @@ fn create_pipe() -> Result<(File, File)> {
             File::from_raw_fd(read_end_pipe),
             File::from_raw_fd(write_end_pipe),
         ))
+    }
+}
+
+fn wait_for_process(pid: u32) -> Result<ExitStatus> {
+    use nix::unistd::Pid;
+    use nix::sys::wait::{self, WaitStatus};
+
+    let pid = Pid::from_raw(pid as i32);
+    let wait_status = wait::waitpid(pid, None)?;
+    match wait_status {
+        WaitStatus::Exited(_, status) => Ok(ExitStatus::from_status(i32::from(status))),
+        WaitStatus::Signaled(_, signal, _) => Ok(ExitStatus::from_status(128 + signal as i32)),
+        _ => panic!("not sure what to do here"),
     }
 }

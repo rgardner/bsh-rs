@@ -17,6 +17,8 @@ pub mod prelude {
     pub use errors::*;
     pub use shell::Shell;
     pub use std::io::Write;
+    pub use std::process::ExitStatus;
+    pub use util::BshExitStatusExt;
 }
 
 mod dirs;
@@ -62,7 +64,11 @@ pub fn is_builtin<T: AsRef<str>>(argv: &[T]) -> bool {
 
 /// precondition: command is a builtin.
 /// Returns (`exit_status_code`, `builtin_result`)
-pub fn run<T: AsRef<str>>(shell: &mut Shell, argv: &[T], stdout: &mut Write) -> (i32, Result<()>) {
+pub fn run<T: AsRef<str>>(
+    shell: &mut Shell,
+    argv: &[T],
+    stdout: &mut Write,
+) -> (ExitStatus, Result<()>) {
     assert!(is_builtin(argv));
     let result = match &*program(argv) {
         CD_NAME => Cd::run(shell, args(argv), stdout),
@@ -79,8 +85,8 @@ pub fn run<T: AsRef<str>>(shell: &mut Shell, argv: &[T], stdout: &mut Write) -> 
     (exit_status, result)
 }
 
-fn get_builtin_exit_status(result: &Result<()>) -> i32 {
-    if let Err(ref e) = *result {
+fn get_builtin_exit_status(result: &Result<()>) -> ExitStatus {
+    let status = if let Err(ref e) = *result {
         match *e {
             Error(ErrorKind::BuiltinCommandError(_, code), _) => code,
             Error(ErrorKind::Msg(_), _) => 2,
@@ -88,7 +94,9 @@ fn get_builtin_exit_status(result: &Result<()>) -> i32 {
         }
     } else {
         0
-    }
+    };
+
+    ExitStatus::from_status(status)
 }
 
 fn program<T: AsRef<str>>(argv: &[T]) -> String {

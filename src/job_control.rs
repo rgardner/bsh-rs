@@ -5,39 +5,51 @@ use nix::sys::wait::{self, WaitStatus};
 use nix::unistd::Pid;
 use odds::vec::VecExt;
 use std::fmt;
-use std::process::Child;
+use std::process::{Child, ExitStatus};
+use util::BshExitStatusExt;
 
 pub struct Job {
     input: String,
     processes: Vec<Process>,
-    last_status_code: Option<i32>,
+    last_status_code: Option<ExitStatus>,
     notified_stopped_job: bool,
 }
 
 impl Job {
     pub fn new(input: &str, processes: Vec<Process>) -> Job {
+        // Initialize last_status_code if possible; this prevents a completed
+        // job from having a None last_status_code if all processes have
+        // already completed (e.g. 'false && echo foo')
+        let last_status_code = processes
+            .iter()
+            .rev()
+            .filter(|p| p.status_code().is_some())
+            .nth(0)
+            .map(|p| p.status_code().unwrap());
+
         Job {
             input: input.to_string(),
             processes,
-            last_status_code: None,
+            last_status_code,
             notified_stopped_job: false,
         }
     }
 
-    pub fn last_status_code(&self) -> Option<i32> {
+    pub fn last_status_code(&self) -> Option<ExitStatus> {
         self.last_status_code
     }
 
     pub fn wait(&mut self) -> Result<()> {
-        loop {
+        while !self.is_stopped() && !self.is_completed() {
             let wait_any_child = Pid::from_raw(-1);
-            let wait_status = wait::waitpid(Some(wait_any_child), Some(wait::WUNTRACED))?;
+            let wait_status = wait::waitpid(wait_any_child, Some(wait::WUNTRACED))?;
             match wait_status {
                 WaitStatus::Exited(pid, status_code) => {
                     debug!("{} exited with {}.", pid, status_code);
                     let process = &mut find_process(&mut self.processes, pid).unwrap();
                     process.set_status(ProcessStatus::Completed);
                     let status_code = i32::from(status_code);
+                    let status_code = ExitStatus::from_status(status_code);
                     process.set_status_code(status_code);
                     self.last_status_code = Some(status_code);
                 }
@@ -47,18 +59,17 @@ impl Job {
                     process.set_status(ProcessStatus::Stopped);
                 }
                 WaitStatus::Signaled(pid, signal, ..) => {
-                    eprintln!("{}: terminated by signal {:?}.", pid, signal);
+                    eprintln!("{} terminated by signal {:?}.", pid, signal);
                     let process = &mut find_process(&mut self.processes, pid).unwrap();
                     process.set_status(ProcessStatus::Stopped);
+                    // TODO: decide if ExitStatus should preserve signal and status
+                    // separately or if should combine together
                     let status_code = 128 + (signal as i32);
+                    let status_code = ExitStatus::from_status(status_code);
                     process.set_status_code(status_code);
                     self.last_status_code = Some(status_code);
                 }
                 _ => continue,
-            }
-
-            if self.is_stopped() || self.is_completed() {
-                break;
             }
         }
 

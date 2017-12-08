@@ -15,7 +15,8 @@ use std::fs::File;
 use std::io;
 use std::ops::DerefMut;
 use std::path::{Path, PathBuf};
-use std::process;
+use std::process::{self, ExitStatus};
+use util::BshExitStatusExt;
 
 const HISTORY_FILE_NAME: &str = ".bsh_history";
 
@@ -26,7 +27,7 @@ pub struct Shell {
     history_file: Option<PathBuf>,
     background_jobs: BackgroundJobManager,
     /// Exit status of last command executed.
-    last_exit_status: i32,
+    last_exit_status: ExitStatus,
     config: ShellConfig,
 }
 
@@ -37,7 +38,7 @@ impl Shell {
             editor: Editor::with_capacity(config.command_history_capacity),
             history_file: None,
             background_jobs: Default::default(),
-            last_exit_status: 0,
+            last_exit_status: ExitStatus::from_success(),
             config,
         };
 
@@ -75,7 +76,11 @@ impl Shell {
             Err(_) => cwd.clone(),
         };
 
-        let prompt = format!("{}|{}\n$ ", self.last_exit_status, rel.display());
+        let prompt = format!(
+            "{}|{}\n$ ",
+            self.last_exit_status.code().unwrap(),
+            rel.display()
+        );
         let line = self.editor.readline(&prompt)?;
         Ok(line)
     }
@@ -165,9 +170,7 @@ impl Shell {
         let processes = spawn_processes(self, &command.inner)?;
         let mut job = Job::new(&command.input, processes);
         job.wait()?;
-        if let Some(status_code) = job.last_status_code() {
-            self.last_exit_status = status_code;
-        }
+        self.last_exit_status = job.last_status_code().unwrap();
         Ok(())
     }
 
@@ -191,14 +194,14 @@ impl Shell {
     ///
     /// Exit the shell with a status of n. If n is None, then the exit status is that of the last
     /// command executed.
-    pub fn exit(&mut self, n: Option<i32>) -> ! {
+    pub fn exit(&mut self, n: Option<ExitStatus>) -> ! {
         if self.config.display_messages {
             println!("exit");
         }
 
         let code = match n {
-            Some(n) => n,
-            None => self.last_exit_status,
+            Some(n) => n.code().unwrap(),
+            None => self.last_exit_status.code().unwrap(),
         };
         let code_like_u8 = if code < 0 {
             (256 + code) % 256

@@ -21,6 +21,7 @@ pub struct Redirect {
 pub enum Connector {
     Pipe,
     Semicolon,
+    And,
 }
 
 #[derive(Debug, PartialEq)]

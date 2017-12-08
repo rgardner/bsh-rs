@@ -8,13 +8,12 @@ extern crate env_logger;
 extern crate log;
 extern crate rustc_serialize;
 
-use bsh_rs::{Shell, ShellConfig};
+use bsh_rs::{BshExitStatusExt, Shell, ShellConfig};
 use bsh_rs::errors::*;
 use docopt::Docopt;
-use std::process;
+use std::process::{self, ExitStatus};
 
 const COMMAND_HISTORY_CAPACITY: usize = 10;
-const EXIT_FAILURE: i32 = 1;
 
 const USAGE: &str = "
 bsh.
@@ -85,13 +84,13 @@ fn execute_from_stdin() -> ! {
 fn display_error_and_exit(error: &Error) -> ! {
     error!("failed to create shell: {}", error);
     eprintln!("bsh: {}", error);
-    process::exit(EXIT_FAILURE);
+    process::exit(ExitStatus::from_failure().code().unwrap());
 }
 
 fn exit(result: Result<()>, shell: &mut Shell) -> ! {
     if let Err(e) = result {
         eprintln!("bsh: {}", e);
-        shell.exit(Some(EXIT_FAILURE));
+        shell.exit(Some(ExitStatus::from_failure()));
     } else {
         shell.exit(None);
     }

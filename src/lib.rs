@@ -20,6 +20,7 @@ extern crate rustyline;
 extern crate rand;
 
 pub use self::shell::{Shell, ShellConfig};
+pub use self::util::BshExitStatusExt;
 
 mod builtins;
 mod editor;
@@ -30,3 +31,4 @@ mod execute_command;
 mod job_control;
 mod parser;
 pub mod shell;
+mod util;

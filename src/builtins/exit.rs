@@ -1,5 +1,6 @@
 use builtins;
 use builtins::prelude::*;
+use std::process::ExitStatus;
 
 pub struct Exit;
 
@@ -18,11 +19,14 @@ exit: exit [n]
                 1,
             ));
         }
-        shell.exit(args.get(0).map(|arg| {
-            arg.parse::<i32>().unwrap_or_else(|_| {
-                eprintln!("bsh: exit: {}: numeric argument required", arg);
-                2
+        let status_code = args.get(0)
+            .map(|arg| {
+                arg.parse::<i32>().unwrap_or_else(|_| {
+                    eprintln!("bsh: exit: {}: numeric argument required", arg);
+                    2
+                })
             })
-        }));
+            .map(ExitStatus::from_status);
+        shell.exit(status_code);
     }
 }
