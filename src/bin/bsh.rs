@@ -46,7 +46,11 @@ fn main() {
         |e| e.exit(),
     );
 
-    env_logger::init().expect("failed to initialize logger");
+    // TODO: move away from env_logger because env variables aren't available
+    // when running shell from iTerm profile
+    let mut builder = env_logger::LogBuilder::new();
+    builder.parse("trace");
+    builder.init().expect("failed to initialize logger");
 
     if args.flag_version {
         println!("bsh version {}", env!("CARGO_PKG_VERSION"));

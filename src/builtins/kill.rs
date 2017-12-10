@@ -30,7 +30,7 @@ kill: kill pid | %jobspec
                 Ok(n) => {
                     match shell.kill_background_job(n) {
                         Ok(Some(job)) => {
-                            writeln!(stdout, "[{}]+\tTerminated: 15\t{}", n, job.command)?;
+                            writeln!(stdout, "[{}]+\tTerminated: 15\t{}", n, job.input())?;
                             Ok(())
                         }
                         Ok(None) => {

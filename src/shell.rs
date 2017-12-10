@@ -6,7 +6,10 @@
 use editor::Editor;
 use errors::*;
 use execute_command::spawn_processes;
-use job_control::{BackgroundJob, BackgroundJobManager, Job};
+use job_control::{Job, JobId, JobManager};
+use nix::libc;
+use nix::sys::signal::{self, SigHandler, Signal};
+use nix::unistd::{self, Pid};
 use parser::{Command, ast};
 use rustyline::error::ReadlineError;
 use std::env;
@@ -16,7 +19,7 @@ use std::io;
 use std::ops::DerefMut;
 use std::path::{Path, PathBuf};
 use std::process::{self, ExitStatus};
-use util::BshExitStatusExt;
+use util::{self, BshExitStatusExt};
 
 const HISTORY_FILE_NAME: &str = ".bsh_history";
 
@@ -25,10 +28,13 @@ pub struct Shell {
     /// Responsible for readline and history.
     pub editor: Editor,
     history_file: Option<PathBuf>,
-    background_jobs: BackgroundJobManager,
+    job_manager: JobManager,
     /// Exit status of last command executed.
     last_exit_status: ExitStatus,
     config: ShellConfig,
+    /// Is `false` if the shell is running a script or if initializing job
+    /// control fails.
+    is_interactive: bool,
 }
 
 impl Shell {
@@ -37,10 +43,22 @@ impl Shell {
         let mut shell = Shell {
             editor: Editor::with_capacity(config.command_history_capacity),
             history_file: None,
-            background_jobs: Default::default(),
+            job_manager: Default::default(),
             last_exit_status: ExitStatus::from_success(),
             config,
+            is_interactive: isatty(),
         };
+
+        if shell.is_interactive {
+            let result = shell.initialize_job_control();
+            if let Err(e) = result {
+                error!(
+                    "failed to initialize shell for job control despite isatty: {}",
+                    e
+                );
+                shell.is_interactive = false;
+            }
+        }
 
         if config.enable_command_history {
             shell.load_history()?
@@ -48,6 +66,47 @@ impl Shell {
 
         info!("bsh started up");
         Ok(shell)
+    }
+
+    pub(crate) fn is_interactive(&self) -> bool {
+        self.is_interactive
+    }
+
+    fn initialize_job_control(&mut self) -> Result<()> {
+        let shell_terminal = util::get_terminal();
+
+        // Loop until the shell is in the foreground
+        loop {
+            let shell_pgid = unistd::getpgrp();
+            if unistd::tcgetpgrp(shell_terminal)? == shell_pgid {
+                break;
+            } else {
+                signal::kill(
+                    Pid::from_raw(-libc::pid_t::from(shell_pgid)),
+                    Signal::SIGTTIN,
+                )?;
+            }
+        }
+
+        // Ignore interactive and job-control signals
+        unsafe {
+            signal::signal(Signal::SIGINT, SigHandler::SigIgn)?;
+            signal::signal(Signal::SIGQUIT, SigHandler::SigIgn)?;
+            signal::signal(Signal::SIGTSTP, SigHandler::SigIgn)?;
+            signal::signal(Signal::SIGTTIN, SigHandler::SigIgn)?;
+            signal::signal(Signal::SIGTTOU, SigHandler::SigIgn)?;
+        }
+
+        // Put outselves in our own process group
+        let shell_pgid = Pid::this();
+        unistd::setpgid(shell_pgid, shell_pgid)?;
+
+        // Grab control of the terminal and save default terminal attributes
+        let shell_terminal = util::get_terminal();
+        let temp_result = unistd::tcsetpgrp(shell_terminal, shell_pgid);
+        log_if_err!(temp_result, "failed to grab control of terminal");
+
+        Ok(())
     }
 
     fn load_history(&mut self) -> Result<()> {
@@ -62,6 +121,8 @@ impl Shell {
 
                 Err(e)
             })?;
+        } else {
+            warn!("unable to get home directory")
         }
 
         Ok(())
@@ -150,7 +211,7 @@ impl Shell {
         loop {
             if self.config.enable_job_control {
                 // Check the status of background jobs, removing exited ones.
-                self.background_jobs.check_jobs();
+                self.job_manager.do_job_notification();
             }
 
             let input = match self.prompt() {
@@ -159,31 +220,40 @@ impl Shell {
                 _ => continue,
             };
 
-            if let Err(e) = self.execute_command_string(&input) {
-                eprintln!("bsh: {}", e);
-            }
+            let temp_result = self.execute_command_string(&input);
+            log_if_err!(temp_result, "execute_command_string");
         }
     }
 
     /// Runs a job.
     fn execute_command(&mut self, command: &mut Command) -> Result<()> {
-        let processes = spawn_processes(self, &command.inner)?;
-        let mut job = Job::new(&command.input, processes);
-        job.wait()?;
-        self.last_exit_status = job.last_status_code().unwrap();
+        let (processes, pgid, foreground) = spawn_processes(self, &command.inner)?;
+        let job_id = self.job_manager.create_job(&command.input, pgid, processes);
+        if !self.is_interactive() {
+            self.last_exit_status = self.job_manager.wait_for_job(job_id)?.unwrap();
+        } else if foreground {
+            self.last_exit_status = self.job_manager
+                .put_job_in_foreground(job_id, false /* cont */)?
+                .unwrap();
+        } else {
+            self.job_manager.put_job_in_background(
+                job_id,
+                false, /* cont */
+            )?;
+        }
         Ok(())
     }
 
     /// Returns `true` if the shell has background jobs.
     pub fn has_background_jobs(&self) -> bool {
-        self.background_jobs.has_jobs()
+        self.job_manager.has_jobs()
     }
 
     /// Kills a child with the corresponding job id.
     ///
     /// Returns `true` if a corresponding job exists; `false`, otherwise.
-    pub fn kill_background_job(&mut self, job_id: u32) -> Result<Option<BackgroundJob>> {
-        self.background_jobs.kill_job(job_id)
+    pub fn kill_background_job(&mut self, job_id: u32) -> Result<Option<Job>> {
+        self.job_manager.kill_job(JobId(job_id))
     }
 
     /// Exit the shell.
@@ -251,7 +321,7 @@ fn expand_variables_helper(s: &str) -> String {
 
 impl fmt::Debug for Shell {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?} jobs\n{:?}", self.background_jobs, self.editor)
+        write!(f, "{:?} jobs\n{:?}", self.job_manager, self.editor)
     }
 }
 
@@ -261,16 +331,16 @@ pub struct ShellConfig {
     /// Determines if new command entries will be added to the shell's command history.
     ///
     /// Note: This is checked before the other command history config fields.
-    pub enable_command_history: bool,
+    enable_command_history: bool,
 
     /// Number of entries to store in the shell's command history
-    pub command_history_capacity: usize,
+    command_history_capacity: usize,
 
     /// Determines if job control (fg and bg) is supported.
-    pub enable_job_control: bool,
+    enable_job_control: bool,
 
     /// Determines if some messages (e.g. "exit") should be displayed.
-    pub display_messages: bool,
+    display_messages: bool,
 }
 
 impl ShellConfig {
@@ -310,4 +380,10 @@ impl Default for ShellConfig {
             display_messages: false,
         }
     }
+}
+
+fn isatty() -> bool {
+    let temp_result = unistd::isatty(util::get_terminal());
+    log_if_err!(temp_result, "unistd::isatty");
+    temp_result.unwrap_or(false)
 }

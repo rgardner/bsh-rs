@@ -1,13 +1,17 @@
 use builtins;
 use errors::*;
-use nix::unistd;
+use nix::libc;
+use nix::sys::signal::{self, SigHandler, Signal};
+use nix::unistd::{self, Pid};
 use parser::ast;
 use shell::Shell;
+use std::fmt;
 use std::fs::{File, OpenOptions};
 use std::io;
 use std::os::unix::io::FromRawFd;
+use std::os::unix::process::CommandExt;
 use std::process::{ChildStdout, Command, ExitStatus, Stdio};
-use util::BshExitStatusExt;
+use util::{self, BshExitStatusExt};
 
 #[derive(Debug)]
 enum Stdin {
@@ -24,7 +28,8 @@ enum Stdout {
 }
 
 impl Stdin {
-    /// precondition: `redirect` is an input redirect
+    /// # Panics
+    /// Panics if `redirect` is not an input redirect
     fn new(redirect: &ast::Redirect) -> Result<Self> {
         match redirect.redirectee {
             ast::Redirectee::FileDescriptor(fd) => unsafe { Ok(File::from_raw_fd(fd).into()) },
@@ -41,7 +46,8 @@ impl Stdin {
 }
 
 impl Stdout {
-    /// precondition: `redirect` is an output redirect
+    /// # Panics
+    /// Panics if `redirect` is not an output redirect
     fn new(redirect: &ast::Redirect) -> Result<Self> {
         match redirect.redirectee {
             ast::Redirectee::FileDescriptor(fd) => unsafe { Ok(File::from_raw_fd(fd).into()) },
@@ -92,7 +98,7 @@ impl From<Stdout> for Stdio {
     }
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct Process {
     argv: Vec<String>,
     /// `id` is None when the process hasn't launched or the command is a Shell builtin
@@ -101,11 +107,21 @@ pub struct Process {
     status_code: Option<ExitStatus>,
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ProcessStatus {
     Running,
     Stopped,
     Completed,
+}
+
+impl fmt::Display for ProcessStatus {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            ProcessStatus::Running => write!(f, "Running"),
+            ProcessStatus::Stopped => write!(f, "Stopped"),
+            ProcessStatus::Completed => write!(f, "Completed"),
+        }
+    }
 }
 
 impl Process {
@@ -147,6 +163,8 @@ impl Process {
         self.status_code = Some(status_code);
     }
 
+    /// # Panics
+    /// Panics if job is in an invalid state
     pub fn wait(&mut self) -> Result<ExitStatus> {
         if let ProcessStatus::Completed = self.status {
             Ok(self.status_code.unwrap())
@@ -167,8 +185,14 @@ impl Default for ProcessStatus {
     }
 }
 
-pub fn spawn_processes(shell: &mut Shell, command: &ast::Command) -> Result<Vec<Process>> {
-    Ok(_spawn_processes(shell, command, None, None)?.0)
+/// Spawn processes for each `command`, returning processes, the process group, and a `bool`
+/// representing whether the processes are running in the foreground.
+pub fn spawn_processes(
+    shell: &mut Shell,
+    command: &ast::Command,
+) -> Result<(Vec<Process>, Option<u32>, bool)> {
+    let (processes, pgid, _) = _spawn_processes(shell, command, None, None, None)?;
+    Ok((processes, pgid, true))
 }
 
 /// note: rustfmt formatting makes function less readable
@@ -177,7 +201,8 @@ fn _spawn_processes(
     shell: &mut Shell,
     command: &ast::Command,
     stdin: Option<Stdin>,
-    stdout: Option<Stdout>) -> Result<(Vec<Process>, Option<Stdin>)>
+    stdout: Option<Stdout>,
+    pgid: Option<u32>) -> Result<(Vec<Process>, Option<u32>, Option<Stdin>)>
 {
     // restrict scope of borrowing `current` via `{current}` (new scope)
     // solves E0506 rustc error, "cannot assign to `current` because it is borrowed"
@@ -203,11 +228,11 @@ fn _spawn_processes(
                 .or(stdout)
                 .unwrap_or(Stdout::Inherit);
 
-            let (result, output) = run_simple_command(shell, words, stdin, stdout)?;
-            Ok((vec![result], output))
+            let (result, pgid, output) = run_simple_command(shell, words, stdin, stdout, pgid)?;
+            Ok((vec![result], pgid, output))
         }
         ast::Command::Connection { ref first, ref second, ref connector } => {
-            run_connection_command(shell, first, second, connector, stdin, stdout)
+            run_connection_command(shell, first, second, connector, stdin, stdout, pgid)
         }
     }
 }
@@ -217,7 +242,8 @@ fn run_simple_command(
     words: &[String],
     stdin: Stdin,
     stdout: Stdout,
-) -> Result<(Process, Option<Stdin>)> {
+    pgid: Option<u32>,
+) -> Result<(Process, Option<u32>, Option<Stdin>)> {
     if builtins::is_builtin(words) {
         // TODO(rogardn): change Result usage in builtin to only be for rust
         // errors, e.g. builtin::execute shouldn't return a Result
@@ -234,9 +260,9 @@ fn run_simple_command(
         };
 
         let process = Process::new_builtin(words, status_code);
-        Ok((process, output))
+        Ok((process, pgid, output))
     } else {
-        run_external_command(&words[..], stdin, stdout)
+        run_external_command(shell, &words[..], stdin, stdout, pgid)
     }
 }
 
@@ -247,59 +273,104 @@ fn run_connection_command(
     connector: &ast::Connector,
     stdin: Option<Stdin>,
     stdout: Option<Stdout>,
-) -> Result<(Vec<Process>, Option<Stdin>)> {
+    pgid: Option<u32>,
+) -> Result<(Vec<Process>, Option<u32>, Option<Stdin>)> {
     match *connector {
         ast::Connector::Pipe => {
-            let (mut first_result, pipe) =
-                _spawn_processes(shell, first, stdin, Some(Stdout::CreatePipe))?;
-            let (second_result, output) = _spawn_processes(shell, second, pipe, stdout)?;
+            let (mut first_result, pgid, pipe) =
+                _spawn_processes(shell, first, stdin, Some(Stdout::CreatePipe), pgid)?;
+            let (second_result, pgid, output) =
+                _spawn_processes(shell, second, pipe, stdout, pgid)?;
             first_result.extend(second_result);
-            Ok((first_result, output))
+            Ok((first_result, pgid, output))
 
         }
         ast::Connector::Semicolon => {
-            let (mut first_result, _) = _spawn_processes(shell, first, stdin, None)?;
-            let (second_result, output) = _spawn_processes(shell, second, None, stdout)?;
+            let (mut first_result, pgid, _) = _spawn_processes(shell, first, stdin, None, pgid)?;
+            let (second_result, pgid, output) =
+                _spawn_processes(shell, second, None, stdout, pgid)?;
             first_result.extend(second_result);
-            Ok((first_result, output))
+            Ok((first_result, pgid, output))
         }
         ast::Connector::And => {
-            let (mut first_result, _) = _spawn_processes(shell, first, stdin, None)?;
-            let output = if first_result.last_mut().unwrap().wait()?.success() {
-                let (second_result, output) = _spawn_processes(shell, second, None, stdout)?;
+            let (mut first_result, pgid, _) = _spawn_processes(shell, first, stdin, None, pgid)?;
+            let (pgid, output) = if first_result.last_mut().unwrap().wait()?.success() {
+                let (second_result, pgid, output) =
+                    _spawn_processes(shell, second, None, stdout, pgid)?;
                 first_result.extend(second_result);
-                output
+                (pgid, output)
             } else {
-                None
+                (None, None)
             };
-            Ok((first_result, output))
+            Ok((first_result, pgid, output))
         }
         ast::Connector::Or => {
-            let (mut first_result, _) = _spawn_processes(shell, first, stdin, None)?;
-            let output = if !first_result.last_mut().unwrap().wait()?.success() {
-                let (second_result, output) = _spawn_processes(shell, second, None, stdout)?;
+            let (mut first_result, pgid, _) = _spawn_processes(shell, first, stdin, None, pgid)?;
+            let (pgid, output) = if !first_result.last_mut().unwrap().wait()?.success() {
+                let (second_result, pgid, output) =
+                    _spawn_processes(shell, second, None, stdout, pgid)?;
                 first_result.extend(second_result);
-                output
+                (pgid, output)
             } else {
-                None
+                (None, None)
             };
-            Ok((first_result, output))
+            Ok((first_result, pgid, output))
         }
     }
 }
 
 fn run_external_command(
+    shell: &Shell,
     words: &[String],
     stdin: Stdin,
     stdout: Stdout,
-) -> Result<(Process, Option<Stdin>)> {
-    let child = Command::new(&words[0])
-        .args(words[1..].iter())
-        .stdin(stdin)
-        .stdout(stdout)
-        .spawn()?;
+    pgid: Option<u32>,
+) -> Result<(Process, Option<u32>, Option<Stdin>)> {
+    let mut command = Command::new(&words[0]);
+    command.args(words[1..].iter());
+    command.stdin(stdin);
+    command.stdout(stdout);
+
+    let shell_is_interactive = shell.is_interactive();
+    command.before_exec(move || {
+        if shell_is_interactive {
+            // Put process into process group
+            let pid = unistd::getpid();
+            let pgid = pgid.map(|pgid| Pid::from_raw(pgid as i32)).unwrap_or(pid);
+            // Ignore error, may not be safe to log here
+            let _ = unistd::setpgid(pid, pgid);
+            let _ = unistd::tcsetpgrp(util::get_terminal(), pgid);
+
+            // Reset job control signal handling back to default
+            unsafe {
+                let _ = signal::signal(Signal::SIGINT, SigHandler::SigDfl);
+                let _ = signal::signal(Signal::SIGQUIT, SigHandler::SigDfl);
+                let _ = signal::signal(Signal::SIGTSTP, SigHandler::SigDfl);
+                let _ = signal::signal(Signal::SIGTTIN, SigHandler::SigDfl);
+                let _ = signal::signal(Signal::SIGTTOU, SigHandler::SigDfl);
+                let _ = signal::signal(Signal::SIGCHLD, SigHandler::SigDfl);
+            }
+        }
+        Ok(())
+    });
+
+    let child = command.spawn()?;
+
+    let pgid = pgid.unwrap_or_else(|| child.id());
+    let temp_result = unistd::setpgid(
+        Pid::from_raw(child.id() as libc::pid_t),
+        Pid::from_raw(pgid as libc::pid_t),
+    );
+    log_if_err!(
+        temp_result,
+        "failed to set pgid ({}) for pid ({})",
+        child.id(),
+        pgid
+    );
+
     Ok((
         Process::new_external(words, child.id()),
+        Some(pgid),
         child.stdout.map(Stdin::Child),
     ))
 }
@@ -365,7 +436,7 @@ fn wait_for_process(pid: u32) -> Result<ExitStatus> {
     let pid = Pid::from_raw(pid as i32);
     let wait_status = wait::waitpid(pid, None)?;
     match wait_status {
-        WaitStatus::Exited(_, status) => Ok(ExitStatus::from_status(i32::from(status))),
+        WaitStatus::Exited(_, status) => Ok(ExitStatus::from_status(status)),
         WaitStatus::Signaled(_, signal, _) => Ok(ExitStatus::from_status(128 + signal as i32)),
         _ => panic!("not sure what to do here"),
     }

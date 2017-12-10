@@ -13,7 +13,6 @@ extern crate lalrpop_util;
 #[macro_use]
 extern crate log;
 extern crate nix;
-extern crate odds;
 extern crate rustyline;
 
 #[cfg(test)]
@@ -21,6 +20,19 @@ extern crate rand;
 
 pub use self::shell::{Shell, ShellConfig};
 pub use self::util::BshExitStatusExt;
+
+macro_rules! log_if_err {
+    ($result:expr, $fmt:expr) => {{
+        if let Err(e) = $result {
+            error!(concat!($fmt, ": {}"), e);
+        }
+    }};
+    ($result:expr, $fmt:expr, $($arg:tt)*) => {{
+        if let Err(e) = $result {
+            error!(concat!($fmt, ": {}"), $($arg)*, e);
+        }
+    }};
+}
 
 mod builtins;
 mod editor;
@@ -30,5 +42,6 @@ pub mod errors;
 mod execute_command;
 mod job_control;
 mod parser;
+#[allow(unsafe_code)]
 pub mod shell;
 mod util;

@@ -1,3 +1,5 @@
+use std::io;
+use std::os::unix::prelude::*;
 use std::os::unix::process::ExitStatusExt;
 use std::process::ExitStatus;
 
@@ -53,4 +55,8 @@ impl BshExitStatusExt for ExitStatus {
     fn from_status(code: i32) -> Self {
         ExitStatus::from_raw(code << 8)
     }
+}
+
+pub fn get_terminal() -> RawFd {
+    io::stdin().as_raw_fd()
 }
