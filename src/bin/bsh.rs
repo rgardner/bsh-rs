@@ -6,7 +6,8 @@ extern crate docopt;
 extern crate env_logger;
 #[macro_use]
 extern crate log;
-extern crate rustc_serialize;
+#[macro_use]
+extern crate serde_derive;
 
 use bsh_rs::{BshExitStatusExt, Shell, ShellConfig};
 use bsh_rs::errors::*;
@@ -20,7 +21,7 @@ bsh.
 
 Usage:
     bsh
-    bsh -c <command_string>
+    bsh -c <command>
     bsh <file>
     bsh (-h | --help)
     bsh --version
@@ -33,7 +34,7 @@ Options:
 ";
 
 /// Docopts input arguments.
-#[derive(Debug, RustcDecodable)]
+#[derive(Debug, Deserialize)]
 struct Args {
     flag_version: bool,
     flag_c: bool,
@@ -42,15 +43,12 @@ struct Args {
 }
 
 fn main() {
-    let args: Args = Docopt::new(USAGE).and_then(|d| d.decode()).unwrap_or_else(
-        |e| e.exit(),
-    );
+    init_logger();
 
-    // TODO: move away from env_logger because env variables aren't available
-    // when running shell from iTerm profile
-    let mut builder = env_logger::LogBuilder::new();
-    builder.parse("trace");
-    builder.init().expect("failed to initialize logger");
+    let args: Args = Docopt::new(USAGE)
+        .and_then(|d| d.deserialize())
+        .unwrap_or_else(|e| e.exit());
+    debug!("{:?}", args);
 
     if args.flag_version {
         println!("bsh version {}", env!("CARGO_PKG_VERSION"));
@@ -61,18 +59,26 @@ fn main() {
     }
 }
 
+fn init_logger() {
+    // TODO: move away from env_logger because env variables aren't available
+    // when running shell from iTerm profile
+    let mut builder = env_logger::LogBuilder::new();
+    builder.parse("trace");
+    builder.init().expect("failed to initialize logger");
+}
+
 fn execute_from_command_string_or_file(args: &Args) -> ! {
     assert!(args.flag_c || args.arg_file.is_some());
 
     let shell_config = ShellConfig::noninteractive();
     let mut shell = Shell::new(shell_config).unwrap_or_else(|e| display_error_and_exit(&e));
 
-    let result = if let Some(ref command_string) = args.arg_command {
-        shell.execute_command_string(command_string)
+    let result = if let Some(ref command) = args.arg_command {
+        shell.execute_command_string(command)
     } else if let Some(ref file_path) = args.arg_file {
         shell.execute_commands_from_file(&file_path)
     } else {
-        Ok(())
+        unreachable!();
     };
 
     exit(result, &mut shell);

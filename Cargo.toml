@@ -14,24 +14,25 @@ path = "src/bin/bsh.rs"
 lalrpop = "0.13.1"
 
 [dependencies]
-docopt = "0.6.75"
+docopt = "0.8.1"
 env_logger = "0.4.3"
 error-chain = "0.11.0"
 lalrpop-util = "0.13.1"
 log = "0.3.8"
 regex = "0.2.2"
-rustc-serialize = "0.3.16"
+serde = "1.0.18"
+serde_derive = "1.0.18"
 
 [dependencies.clippy]
 optional = true
 version = "*"
 
+[dependencies.nix]
+branch = "implement-libc-signal"
+git = "https://github.com/rgardner/nix"
+
 [dependencies.rustyline]
 git = "https://github.com/rgardner/rustyline"
-
-[dependencies.nix]
-git = "https://github.com/rgardner/nix"
-branch = "implement-libc-signal"
 
 [dev-dependencies]
 assert_cli = "0.5.4"
