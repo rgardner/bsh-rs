@@ -264,6 +264,7 @@ impl JobManager {
             let wait_status =
                 wait::waitpid(None, Some(WaitPidFlag::WUNTRACED | WaitPidFlag::WNOHANG));
             match wait_status {
+                Ok(WaitStatus::StillAlive) => break,
                 Ok(status) => self.mark_process_status(&status),
                 Err(nix::Error::Sys(Errno::ECHILD)) => break,
                 Err(e) => return Err(e.into()),
@@ -319,6 +320,7 @@ impl JobManager {
                 job.mark_stopped(pid, &signal);
                 job.last_running_in_foreground = false;
             }
+            WaitStatus::StillAlive => panic!("mark_process_status called with StillAlive"),
             _ => (),
         }
     }
