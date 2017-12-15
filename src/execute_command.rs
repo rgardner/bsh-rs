@@ -98,7 +98,7 @@ impl From<Stdout> for Stdio {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct Process {
     argv: Vec<String>,
     /// `id` is None when the process hasn't launched or the command is a Shell builtin
@@ -130,7 +130,6 @@ impl Process {
             argv: argv.to_vec(),
             status: ProcessStatus::Completed,
             status_code: Some(status_code),
-
             ..Default::default()
         }
     }
@@ -141,6 +140,10 @@ impl Process {
             id: Some(id),
             ..Default::default()
         }
+    }
+
+    pub fn argv(&self) -> String {
+        self.argv[..].join(" ")
     }
 
     pub fn id(&self) -> Option<u32> {

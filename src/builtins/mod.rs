@@ -6,14 +6,18 @@
 use self::prelude::*;
 
 use self::dirs::Cd;
-use self::env::Declare;
-use self::env::Unset;
+use self::env::{Declare, Unset};
 use self::exit::Exit;
 use self::help::Help;
 use self::history::History;
+use self::jobs::{Bg, Fg, Jobs};
 use self::kill::Kill;
 
+use docopt::Docopt;
+use serde;
+
 pub mod prelude {
+    pub use super::parse_args;
     pub use errors::*;
     pub use shell::Shell;
     pub use std::io::Write;
@@ -26,13 +30,17 @@ mod env;
 mod exit;
 mod help;
 mod history;
+mod jobs;
 mod kill;
 
+const BG_NAME: &str = "bg";
 const CD_NAME: &str = "cd";
 const DECLARE_NAME: &str = "declare";
 const EXIT_NAME: &str = "exit";
+const FG_NAME: &str = "fg";
 const HELP_NAME: &str = "help";
 const HISTORY_NAME: &str = "history";
+const JOBS_NAME: &str = "jobs";
 const KILL_NAME: &str = "kill";
 const UNSET_NAME: &str = "unset";
 
@@ -52,12 +60,15 @@ pub trait BuiltinCommand {
 
 pub fn is_builtin<T: AsRef<str>>(argv: &[T]) -> bool {
     [
+        BG_NAME,
         CD_NAME,
         DECLARE_NAME,
         EXIT_NAME,
+        FG_NAME,
         HELP_NAME,
         HISTORY_NAME,
         KILL_NAME,
+        JOBS_NAME,
         UNSET_NAME,
     ].contains(&(program(argv).as_str()))
 }
@@ -71,11 +82,14 @@ pub fn run<T: AsRef<str>>(
 ) -> (ExitStatus, Result<()>) {
     assert!(is_builtin(argv));
     let result = match &*program(argv) {
+        BG_NAME => Bg::run(shell, get_argv(argv), stdout),
         CD_NAME => Cd::run(shell, args(argv), stdout),
         DECLARE_NAME => Declare::run(shell, args(argv), stdout),
         EXIT_NAME => Exit::run(shell, args(argv), stdout),
+        FG_NAME => Fg::run(shell, get_argv(argv), stdout),
         HELP_NAME => Help::run(shell, args(argv), stdout),
         HISTORY_NAME => History::run(shell, args(argv), stdout),
+        JOBS_NAME => Jobs::run(shell, get_argv(argv), stdout),
         KILL_NAME => Kill::run(shell, args(argv), stdout),
         UNSET_NAME => Unset::run(shell, args(argv), stdout),
         _ => unreachable!(),
@@ -103,6 +117,21 @@ fn program<T: AsRef<str>>(argv: &[T]) -> String {
     argv[0].as_ref().to_string()
 }
 
+fn get_argv<T: AsRef<str>>(argv: &[T]) -> Vec<String> {
+    argv.iter().map(|s| s.as_ref().to_string()).collect()
+}
+
 fn args<T: AsRef<str>>(argv: &[T]) -> Vec<String> {
-    argv[1..].iter().map(|s| s.as_ref().to_string()).collect()
+    get_argv(argv)[1..].to_vec()
+}
+
+pub fn parse_args<'a, 'de: 'a, D>(usage: &str, argv: &[String]) -> Result<D>
+where
+    D: serde::Deserialize<'de>,
+{
+    Docopt::new(usage)
+        .unwrap()
+        .argv(argv)
+        .deserialize()
+        .map_err(From::from)
 }

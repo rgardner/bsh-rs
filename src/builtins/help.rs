@@ -1,4 +1,4 @@
-use builtins::{self, BuiltinCommand, dirs, env, exit, history, kill};
+use builtins::{self, BuiltinCommand, dirs, env, exit, history, jobs, kill};
 use builtins::prelude::*;
 
 pub struct Help;
@@ -19,17 +19,20 @@ HELP: HELP [command ...]
             let mut all_invalid = true;
             for arg in &args {
                 let msg = match arg.as_str() {
+                    builtins::BG_NAME => Some(jobs::Bg::HELP),
                     builtins::CD_NAME => Some(dirs::Cd::HELP),
                     builtins::DECLARE_NAME => Some(env::Declare::HELP),
                     builtins::EXIT_NAME => Some(exit::Exit::HELP),
+                    builtins::FG_NAME => Some(jobs::Fg::HELP),
                     builtins::HELP_NAME => Some(Self::HELP),
                     builtins::HISTORY_NAME => Some(history::History::HELP),
+                    builtins::JOBS_NAME => Some(jobs::Jobs::HELP),
                     builtins::KILL_NAME => Some(kill::Kill::HELP),
                     builtins::UNSET_NAME => Some(env::Unset::HELP),
                     _ => None,
                 };
                 if let Some(msg) = msg {
-                    stdout.write_all(msg.as_bytes())?;
+                    writeln!(stdout, "{}", msg)?;
                     all_invalid = false;
                 }
             }

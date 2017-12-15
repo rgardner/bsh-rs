@@ -8,6 +8,7 @@ error_chain! {
     }
 
     foreign_links {
+        Docopt(::docopt::Error);
         Io(::std::io::Error);
         Nix(::nix::Error);
         ReadlineError(::rustyline::error::ReadlineError);
@@ -15,6 +16,9 @@ error_chain! {
 
     errors {
         BuiltinCommandError(message: String, code: i32) {
+            description(message)
+        }
+        NoSuchJobError(message: String) {
             description(message)
         }
     }

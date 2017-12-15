@@ -7,6 +7,7 @@
 // necessary for `error-chain`
 #![recursion_limit = "1024"]
 
+extern crate docopt;
 #[macro_use]
 extern crate error_chain;
 extern crate lalrpop_util;
@@ -14,6 +15,9 @@ extern crate lalrpop_util;
 extern crate log;
 extern crate nix;
 extern crate rustyline;
+extern crate serde;
+#[macro_use]
+extern crate serde_derive;
 
 #[cfg(test)]
 extern crate rand;

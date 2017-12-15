@@ -233,11 +233,11 @@ impl Shell {
             self.last_exit_status = self.job_manager.wait_for_job(job_id)?.unwrap();
         } else if foreground {
             self.last_exit_status = self.job_manager
-                .put_job_in_foreground(job_id, false /* cont */)?
+                .put_job_in_foreground(&Some(job_id), false /* cont */)?
                 .unwrap();
         } else {
             self.job_manager.put_job_in_background(
-                job_id,
+                &Some(job_id),
                 false, /* cont */
             )?;
         }
@@ -247,6 +247,27 @@ impl Shell {
     /// Returns `true` if the shell has background jobs.
     pub fn has_background_jobs(&self) -> bool {
         self.job_manager.has_jobs()
+    }
+
+    /// Returns the shell's jobs (running and stopped).
+    pub fn get_jobs(&self) -> Vec<Job> {
+        self.job_manager.get_jobs()
+    }
+
+    /// Starts the specified job or the current one.
+    pub fn put_job_in_foreground(&mut self, job_id: &Option<JobId>) -> Result<Option<ExitStatus>> {
+        self.job_manager.put_job_in_foreground(
+            job_id,
+            true, /* cont */
+        )
+    }
+
+    /// Puts the specified job in the background, or the current one.
+    pub fn put_job_in_background(&mut self, job_id: &Option<JobId>) -> Result<()> {
+        self.job_manager.put_job_in_background(
+            job_id,
+            true, /* cont */
+        )
     }
 
     /// Kills a child with the corresponding job id.
