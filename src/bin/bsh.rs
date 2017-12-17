@@ -5,16 +5,16 @@ extern crate bsh_rs;
 extern crate docopt;
 #[macro_use]
 extern crate log;
+extern crate fern;
+extern crate nix;
 #[macro_use]
 extern crate serde_derive;
-extern crate simplelog;
 
 use bsh_rs::{BshExitStatusExt, Shell, ShellConfig};
 use bsh_rs::errors::*;
 use docopt::Docopt;
-use simplelog::{WriteLogger, LogLevelFilter, Config};
+use nix::unistd::Pid;
 use std::env;
-use std::fs::OpenOptions;
 use std::process::{self, ExitStatus};
 
 const COMMAND_HISTORY_CAPACITY: usize = 10;
@@ -66,8 +66,22 @@ fn main() {
 fn init_logger() {
     let mut log_path = env::home_dir().unwrap();
     log_path.push(LOG_FILE_NAME);
-    let log_file = OpenOptions::new().create(true).append(true).open(log_path).unwrap();
-    let _ = WriteLogger::init(LogLevelFilter::Trace, Config::default(), log_file);
+
+    let pid = Pid::this();
+    fern::Dispatch::new()
+        .format(move |out, message, record| {
+            out.finish(format_args!(
+                "{} [{}] {}: {}",
+                pid,
+                record.level(),
+                record.target(),
+                message
+            ))
+        })
+        .level(log::LogLevelFilter::Trace)
+        .chain(fern::log_file(log_path).unwrap())
+        .apply()
+        .unwrap();
 }
 
 fn execute_from_command_string_or_file(args: &Args) -> ! {

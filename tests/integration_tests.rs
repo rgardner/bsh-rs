@@ -83,11 +83,11 @@ fn test_simple_redirects() {
 #[ignore]
 fn test_command_not_found() {
     let args = ["-c", "foo"];
-    let expected_stdout = "bsh: foo: command not found\n";
+    let expected_stderr = "bsh: foo: command not found\n";
     Assert::cargo_binary("bsh")
         .with_args(&args)
-        .stdout()
-        .is(expected_stdout)
+        .stderr()
+        .is(expected_stderr)
         .exit_status_is(127)
         .unwrap();
 }
