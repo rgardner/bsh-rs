@@ -1,13 +1,9 @@
 //! Integration Tests
 
 extern crate assert_cli;
-#[macro_use]
-extern crate lazy_static;
 extern crate tempdir;
 
 use assert_cli::Assert;
-use std::collections::HashMap;
-use std::fs::DirEntry;
 use std::io;
 use std::path::PathBuf;
 use tempdir::TempDir;
@@ -26,88 +22,74 @@ impl AssertExt for Assert {
     }
 }
 
-struct ScriptData<'a> {
-    pub stdout: &'a str,
-    pub stderr: &'a str,
-    pub exit_status: i32,
-}
-
-lazy_static! {
-    static ref BSH_SCRIPTS_MAP: HashMap<&'static str, ScriptData<'static>> = {
-        let mut map = HashMap::new();
-        map.insert("simple_echo.bsh", ScriptData { stdout: "test\n", stderr: "", exit_status: 0 });
-        map.insert("simple_redirects.bsh", ScriptData {
-            stdout: "test output, please ignore",
-            stderr: "",
-            exit_status: 0
-        });
-        map.insert("simple_pipeline.bsh", ScriptData {
-            stdout: "needle\n",
-            stderr: "",
-            exit_status: 0
-        });
-        map.insert("simple_exit_error.bsh", ScriptData {
-            stdout: "",
-            stderr: "",
-            exit_status: 85
-        });
-        map.insert("simple_exit_large.bsh", ScriptData {
-            stdout: "",
-            stderr: "",
-            exit_status: 244
-        });
-        map.insert("simple_exit_negative.bsh", ScriptData {
-            stdout: "",
-            stderr: "",
-            exit_status: 12
-        });
-        map
-    };
+#[test]
+fn test_simple_echo() {
+    let args = ["-c", "echo foo"];
+    let expected_stdout = "foo";
+    Assert::cargo_binary("bsh")
+        .with_args(&args)
+        .stdout()
+        .is(expected_stdout)
+        .unwrap();
 }
 
 #[test]
-fn test_all_simple_bsh_scripts() {
-    let simple_scripts = get_path_to_test_scripts()
-        .read_dir()
-        .expect("read_dir failed")
-        .map(|entry| entry.expect("filename should be valid Unicode"))
-        .filter(|entry| is_simple_bsh_script(entry));
+fn test_exit_normal_large_negative() {
+    let args = ["-c", "exit 85"];
+    Assert::cargo_binary("bsh")
+        .with_args(&args)
+        .exit_status_is(85)
+        .unwrap();
 
-    for entry in simple_scripts {
-        let temp_dir = generate_temp_directory().expect("unable to generate temp dir");
-        let file_path = entry.path();
-        let unicode_file_path = file_path.to_str().expect(
-            "file path should be valid Unicode",
-        );
+    let args = ["-c", "exit 500"];
+    Assert::cargo_binary("bsh")
+        .with_args(&args)
+        .exit_status_is(244)
+        .unwrap();
 
-        let filename = entry.file_name();
-        let expected_data =
-            BSH_SCRIPTS_MAP
-                .get(filename.to_str().expect("filename should be valid Unicode"))
-                .expect("simple script should have matching data in BSH_SCRIPTS_MAP");
-
-        Assert::cargo_binary("bsh")
-            .current_dir(temp_dir.path())
-            .with_args(&[unicode_file_path])
-            .stdout()
-            .is(expected_data.stdout)
-            .exit_status_is(expected_data.exit_status)
-            .unwrap();
-    }
+    let args = ["-c", "exit -500"];
+    Assert::cargo_binary("bsh")
+        .with_args(&args)
+        .exit_status_is(12)
+        .unwrap();
 }
 
-fn get_path_to_test_scripts() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests")
-        .join("fixtures")
-        .join("scripts")
+#[test]
+fn test_simple_pipeline() {
+    let args = ["-c", "echo needle | grep needle"];
+    let expected_stdout = "needle\n";
+    Assert::cargo_binary("bsh")
+        .with_args(&args)
+        .stdout()
+        .is(expected_stdout)
+        .unwrap();
 }
 
-/// Does filename start with 'simple' and end with '.bsh'?
-fn is_simple_bsh_script(entry: &DirEntry) -> bool {
-    let filename = entry.file_name();
-    let unicode_filename = filename.to_str().expect("filename should be valid Unicode");
-    unicode_filename.starts_with("simple") && unicode_filename.ends_with(".bsh")
+#[test]
+fn test_simple_redirects() {
+    let temp_dir = generate_temp_directory().unwrap();
+    let command = "echo 'test needle, please ignore' >outfile; grep <outfile 'needle'";
+    let args = ["-c", command];
+    let expected_stdout = "test needle, please ignore\n";
+    Assert::cargo_binary("bsh")
+        .current_dir(temp_dir.path())
+        .with_args(&args)
+        .stdout()
+        .is(expected_stdout)
+        .unwrap();
+}
+
+#[test]
+#[ignore]
+fn test_command_not_found() {
+    let args = ["-c", "foo"];
+    let expected_stdout = "bsh: foo: command not found\n";
+    Assert::cargo_binary("bsh")
+        .with_args(&args)
+        .stdout()
+        .is(expected_stdout)
+        .exit_status_is(127)
+        .unwrap();
 }
 
 fn generate_temp_directory() -> io::Result<TempDir> {
