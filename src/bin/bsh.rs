@@ -3,18 +3,22 @@
 
 extern crate bsh_rs;
 extern crate docopt;
-extern crate env_logger;
 #[macro_use]
 extern crate log;
 #[macro_use]
 extern crate serde_derive;
+extern crate simplelog;
 
 use bsh_rs::{BshExitStatusExt, Shell, ShellConfig};
 use bsh_rs::errors::*;
 use docopt::Docopt;
+use simplelog::{WriteLogger, LogLevelFilter, Config};
+use std::env;
+use std::fs::OpenOptions;
 use std::process::{self, ExitStatus};
 
 const COMMAND_HISTORY_CAPACITY: usize = 10;
+const LOG_FILE_NAME: &str = ".bsh_log";
 
 const USAGE: &str = "
 bsh.
@@ -60,16 +64,13 @@ fn main() {
 }
 
 fn init_logger() {
-    // TODO: move away from env_logger because env variables aren't available
-    // when running shell from iTerm profile
-    let mut builder = env_logger::LogBuilder::new();
-    builder.parse("trace");
-    builder.init().expect("failed to initialize logger");
+    let mut log_path = env::home_dir().unwrap();
+    log_path.push(LOG_FILE_NAME);
+    let log_file = OpenOptions::new().create(true).append(true).open(log_path).unwrap();
+    let _ = WriteLogger::init(LogLevelFilter::Trace, Config::default(), log_file);
 }
 
 fn execute_from_command_string_or_file(args: &Args) -> ! {
-    assert!(args.flag_c || args.arg_file.is_some());
-
     let shell_config = ShellConfig::noninteractive();
     let mut shell = Shell::new(shell_config).unwrap_or_else(|e| display_error_and_exit(&e));
 
