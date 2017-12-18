@@ -6,10 +6,8 @@
 use editor::Editor;
 use errors::*;
 use execute_command::spawn_processes;
-use job_control::{Job, JobId, JobManager};
-use nix::libc;
-use nix::sys::signal::{self, SigHandler, Signal};
-use nix::unistd::{self, Pid};
+use job_control::{self, Job, JobId, JobManager};
+use nix::unistd;
 use parser::{Command, ast};
 use rustyline::error::ReadlineError;
 use std::env;
@@ -50,7 +48,7 @@ impl Shell {
         };
 
         if shell.is_interactive {
-            let result = shell.initialize_job_control();
+            let result = job_control::initialize_job_control();
             if let Err(e) = result {
                 error!(
                     "failed to initialize shell for job control despite isatty: {}",
@@ -70,43 +68,6 @@ impl Shell {
 
     pub(crate) fn is_interactive(&self) -> bool {
         self.is_interactive
-    }
-
-    fn initialize_job_control(&mut self) -> Result<()> {
-        let shell_terminal = util::get_terminal();
-
-        // Loop until the shell is in the foreground
-        loop {
-            let shell_pgid = unistd::getpgrp();
-            if unistd::tcgetpgrp(shell_terminal)? == shell_pgid {
-                break;
-            } else {
-                signal::kill(
-                    Pid::from_raw(-libc::pid_t::from(shell_pgid)),
-                    Signal::SIGTTIN,
-                )?;
-            }
-        }
-
-        // Ignore interactive and job-control signals
-        unsafe {
-            signal::signal(Signal::SIGINT, SigHandler::SigIgn)?;
-            signal::signal(Signal::SIGQUIT, SigHandler::SigIgn)?;
-            signal::signal(Signal::SIGTSTP, SigHandler::SigIgn)?;
-            signal::signal(Signal::SIGTTIN, SigHandler::SigIgn)?;
-            signal::signal(Signal::SIGTTOU, SigHandler::SigIgn)?;
-        }
-
-        // Put outselves in our own process group
-        let shell_pgid = Pid::this();
-        unistd::setpgid(shell_pgid, shell_pgid)?;
-
-        // Grab control of the terminal and save default terminal attributes
-        let shell_terminal = util::get_terminal();
-        let temp_result = unistd::tcsetpgrp(shell_terminal, shell_pgid);
-        log_if_err!(temp_result, "failed to grab control of terminal");
-
-        Ok(())
     }
 
     fn load_history(&mut self) -> Result<()> {
@@ -148,27 +109,20 @@ impl Shell {
 
     /// Expands shell and environment variables in command parts.
     /// note: rustfmt formatting makes function less readable
-    #[cfg_attr(rustfmt, rustfmt_skip)]
-    fn expand_variables(&mut self, command: &mut Command) {
-        let mut current = &mut command.inner;
-        loop {
-            // restrict scope of borrowing `current` via `{current}` (new scope)
-            // solves E0506 rustc error, "cannot assign to `current` because it is borrowed"
-            current = match *{current} {
-                ast::Command::Simple { ref mut words, ref mut redirects, .. } => {
-                    expand_variables_simple_command(words, redirects.as_mut_slice());
-                    break;
-                },
-                ast::Command::Connection { ref mut first, ref mut second, .. } => {
-                    match *first.deref_mut() {
-                        ast::Command::Simple { ref mut words, ref mut redirects, .. } => {
-                            expand_variables_simple_command(words, redirects.as_mut_slice());
-                        },
-                        _ => unreachable!(),
-                    };
-                    &mut *second
-                }
-            };
+    fn expand_variables(&self, command: &mut ast::Command) {
+        match *command {
+            ast::Command::Simple { ref mut words, ref mut redirects, .. } => {
+                expand_variables_simple_command(words, redirects.as_mut_slice());
+            },
+            ast::Command::Connection { ref mut first, ref mut second, .. } => {
+                match *first.deref_mut() {
+                    ast::Command::Simple { ref mut words, ref mut redirects, .. } => {
+                        expand_variables_simple_command(words, redirects.as_mut_slice());
+                    },
+                    _ => unreachable!(),
+                };
+                self.expand_variables(&mut **second)
+            }
         }
     }
 
@@ -186,7 +140,7 @@ impl Shell {
         }
 
         let mut command = Command::parse(input)?;
-        self.expand_variables(&mut command);
+        self.expand_variables(&mut command.inner);
         self.execute_command(&mut command)?;
 
         Ok(())
@@ -316,30 +270,6 @@ impl Shell {
     }
 }
 
-fn expand_variables_simple_command(words: &mut Vec<String>, redirects: &mut [ast::Redirect]) {
-    for word in words.iter_mut() {
-        *word = expand_variables_helper(word);
-    }
-    for redirect in redirects.iter_mut() {
-        if let Some(ast::Redirectee::Filename(ref mut filename)) = redirect.redirector {
-            *filename = expand_variables_helper(filename);
-        }
-        if let ast::Redirectee::Filename(ref mut filename) = redirect.redirectee {
-            *filename = expand_variables_helper(filename);
-        }
-    }
-}
-
-fn expand_variables_helper(s: &str) -> String {
-    let expansion = match s {
-        "~" => env::home_dir().map(|p| p.to_string_lossy().into_owned()),
-        s if s.starts_with('$') => env::var(s[1..].to_string()).ok(),
-        _ => Some(s.to_string()),
-    };
-
-    expansion.unwrap_or_else(|| "".to_string())
-}
-
 impl fmt::Debug for Shell {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:?} jobs\n{:?}", self.job_manager, self.editor)
@@ -407,4 +337,28 @@ fn isatty() -> bool {
     let temp_result = unistd::isatty(util::get_terminal());
     log_if_err!(temp_result, "unistd::isatty");
     temp_result.unwrap_or(false)
+}
+
+fn expand_variables_simple_command(words: &mut Vec<String>, redirects: &mut [ast::Redirect]) {
+    for word in words.iter_mut() {
+        *word = expand_variables_word(word);
+    }
+    for redirect in redirects.iter_mut() {
+        if let Some(ast::Redirectee::Filename(ref mut filename)) = redirect.redirector {
+            *filename = expand_variables_word(filename);
+        }
+        if let ast::Redirectee::Filename(ref mut filename) = redirect.redirectee {
+            *filename = expand_variables_word(filename);
+        }
+    }
+}
+
+fn expand_variables_word(s: &str) -> String {
+    let expansion = match s {
+        "~" => env::home_dir().map(|p| p.to_string_lossy().into_owned()),
+        s if s.starts_with('$') => env::var(s[1..].to_string()).ok(),
+        _ => Some(s.to_string()),
+    };
+
+    expansion.unwrap_or_else(|| "".to_string())
 }

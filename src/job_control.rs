@@ -3,13 +3,51 @@ use execute_command::{Process, ProcessStatus};
 use nix;
 use nix::errno::Errno;
 use nix::libc;
-use nix::sys::signal::{self, Signal};
+use nix::sys::signal::{self, SigHandler, Signal};
 use nix::sys::termios::{self, Termios};
 use nix::sys::wait::{self, WaitPidFlag, WaitStatus};
 use nix::unistd::{self, Pid};
 use std::fmt;
 use std::process::ExitStatus;
 use util::{self, BshExitStatusExt};
+
+pub fn initialize_job_control() -> Result<()> {
+    let shell_terminal = util::get_terminal();
+
+    // Loop until the shell is in the foreground
+    loop {
+        let shell_pgid = unistd::getpgrp();
+        if unistd::tcgetpgrp(shell_terminal)? == shell_pgid {
+            break;
+        } else {
+            signal::kill(
+                Pid::from_raw(-libc::pid_t::from(shell_pgid)),
+                Signal::SIGTTIN,
+            )?;
+        }
+    }
+
+    // Ignore interactive and job-control signals
+    unsafe {
+        signal::signal(Signal::SIGINT, SigHandler::SigIgn)?;
+        signal::signal(Signal::SIGQUIT, SigHandler::SigIgn)?;
+        signal::signal(Signal::SIGTSTP, SigHandler::SigIgn)?;
+        signal::signal(Signal::SIGTTIN, SigHandler::SigIgn)?;
+        signal::signal(Signal::SIGTTOU, SigHandler::SigIgn)?;
+    }
+
+    // Put outselves in our own process group
+    let shell_pgid = Pid::this();
+    unistd::setpgid(shell_pgid, shell_pgid)?;
+
+    // Grab control of the terminal and save default terminal attributes
+    let shell_terminal = util::get_terminal();
+    let temp_result = unistd::tcsetpgrp(shell_terminal, shell_pgid);
+    log_if_err!(temp_result, "failed to grab control of terminal");
+
+    Ok(())
+}
+
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct JobId(pub u32);

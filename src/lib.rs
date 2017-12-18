@@ -44,8 +44,8 @@ mod editor;
 pub mod errors;
 #[allow(unsafe_code)]
 mod execute_command;
+#[allow(unsafe_code)]
 mod job_control;
 mod parser;
-#[allow(unsafe_code)]
 pub mod shell;
 mod util;
