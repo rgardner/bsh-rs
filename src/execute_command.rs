@@ -340,24 +340,51 @@ fn run_external_command(
             // Put process into process group
             let pid = unistd::getpid();
             let pgid = pgid.map(|pgid| Pid::from_raw(pgid as i32)).unwrap_or(pid);
-            // Ignore error, may not be safe to log here
-            let _ = unistd::setpgid(pid, pgid);
-            let _ = unistd::tcsetpgrp(util::get_terminal(), pgid);
+
+            // setpgid(2) failing represents programmer error, e.g.
+            // 1) invalid pid or pgid
+            unistd::setpgid(pid, pgid).unwrap();
+
+            // tcsetpgrp(3) failing represents programmer error, e.g.
+            // 1) invalid fd or pgid
+            // 2) not a tty
+            // 3) incorrect permissions
+            unistd::tcsetpgrp(util::get_terminal(), pgid).unwrap();
 
             // Reset job control signal handling back to default
             unsafe {
-                let _ = signal::signal(Signal::SIGINT, SigHandler::SigDfl);
-                let _ = signal::signal(Signal::SIGQUIT, SigHandler::SigDfl);
-                let _ = signal::signal(Signal::SIGTSTP, SigHandler::SigDfl);
-                let _ = signal::signal(Signal::SIGTTIN, SigHandler::SigDfl);
-                let _ = signal::signal(Signal::SIGTTOU, SigHandler::SigDfl);
-                let _ = signal::signal(Signal::SIGCHLD, SigHandler::SigDfl);
+                // signal(3) failing represents programmer error, e.g.
+                // 1) signal argument is not a valid signal number
+                // 2) an attempt is made to supply a signal handler for a
+                //    signal that cannot have a custom signal handler
+                signal::signal(Signal::SIGINT, SigHandler::SigDfl).unwrap();
+                signal::signal(Signal::SIGQUIT, SigHandler::SigDfl).unwrap();
+                signal::signal(Signal::SIGTSTP, SigHandler::SigDfl).unwrap();
+                signal::signal(Signal::SIGTTIN, SigHandler::SigDfl).unwrap();
+                signal::signal(Signal::SIGTTOU, SigHandler::SigDfl).unwrap();
+                signal::signal(Signal::SIGCHLD, SigHandler::SigDfl).unwrap();
             }
         }
         Ok(())
     });
 
-    let child = command.spawn()?;
+    let child = match command.spawn() {
+        Ok(child) => child,
+        Err(e) => {
+            if shell_is_interactive {
+                warn!("failed to spawn child, resetting terminal's pgrp");
+                // see above comment for tcsetpgrp(2) failing being programmer
+                // error
+                unistd::tcsetpgrp(util::get_terminal(), unistd::getpgrp()).unwrap();
+            }
+
+            if e.kind() == io::ErrorKind::NotFound {
+                bail!(ErrorKind::CommandNotFoundError(words[0].clone()));
+            } else {
+                bail!(ErrorKind::Io(e));
+            }
+        }
+    };
 
     let pgid = pgid.unwrap_or_else(|| child.id());
     let temp_result = unistd::setpgid(

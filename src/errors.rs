@@ -18,8 +18,11 @@ error_chain! {
         BuiltinCommandError(message: String, code: i32) {
             description(message)
         }
-        NoSuchJobError(message: String) {
-            description(message)
+        CommandNotFoundError(command: String) {
+            display("{}: command not found", command)
+        }
+        NoSuchJobError(job: String) {
+            display("{}: no such job", job)
         }
     }
 }

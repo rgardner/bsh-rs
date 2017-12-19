@@ -80,7 +80,6 @@ fn test_simple_redirects() {
 }
 
 #[test]
-#[ignore]
 fn test_command_not_found() {
     let args = ["-c", "foo"];
     let expected_stderr = "bsh: foo: command not found\n";

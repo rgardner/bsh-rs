@@ -20,6 +20,7 @@ use std::process::{self, ExitStatus};
 use util::{self, BshExitStatusExt};
 
 const HISTORY_FILE_NAME: &str = ".bsh_history";
+const COMMAND_NOT_FOUND_EXIT_STATUS: i32 = 127;
 
 /// Bsh Shell
 pub struct Shell {
@@ -171,7 +172,10 @@ impl Shell {
             let input = match self.prompt() {
                 Ok(line) => line.trim().to_owned(),
                 Err(Error(ErrorKind::ReadlineError(ReadlineError::Eof), _)) => break,
-                _ => continue,
+                e => {
+                    log_if_err!(e, "prompt");
+                    continue;
+                }
             };
 
             let temp_result = self.execute_command_string(&input);
@@ -181,7 +185,19 @@ impl Shell {
 
     /// Runs a job.
     fn execute_command(&mut self, command: &mut Command) -> Result<()> {
-        let (processes, pgid, foreground) = spawn_processes(self, &command.inner)?;
+        let (processes, pgid, foreground) = match spawn_processes(self, &command.inner) {
+            Ok((processes, pgid, foreground)) => Ok((processes, pgid, foreground)),
+            Err(e) => {
+                if let ErrorKind::CommandNotFoundError(ref command) = *e.kind() {
+                    eprintln!("bsh: {}: command not found", command);
+                    self.last_exit_status = ExitStatus::from_status(COMMAND_NOT_FOUND_EXIT_STATUS);
+                    return Ok(());
+                }
+
+                Err(e)
+            }
+        }?;
+
         let job_id = self.job_manager.create_job(&command.input, pgid, processes);
         if !self.is_interactive() {
             self.last_exit_status = self.job_manager.wait_for_job(job_id)?.unwrap();

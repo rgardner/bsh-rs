@@ -23,17 +23,17 @@ pub fn initialize_job_control() -> Result<()> {
             signal::kill(
                 Pid::from_raw(-libc::pid_t::from(shell_pgid)),
                 Signal::SIGTTIN,
-            )?;
+            ).unwrap();
         }
     }
 
     // Ignore interactive and job-control signals
     unsafe {
-        signal::signal(Signal::SIGINT, SigHandler::SigIgn)?;
-        signal::signal(Signal::SIGQUIT, SigHandler::SigIgn)?;
-        signal::signal(Signal::SIGTSTP, SigHandler::SigIgn)?;
-        signal::signal(Signal::SIGTTIN, SigHandler::SigIgn)?;
-        signal::signal(Signal::SIGTTOU, SigHandler::SigIgn)?;
+        signal::signal(Signal::SIGINT, SigHandler::SigIgn).unwrap();
+        signal::signal(Signal::SIGQUIT, SigHandler::SigIgn).unwrap();
+        signal::signal(Signal::SIGTSTP, SigHandler::SigIgn).unwrap();
+        signal::signal(Signal::SIGTTIN, SigHandler::SigIgn).unwrap();
+        signal::signal(Signal::SIGTTOU, SigHandler::SigIgn).unwrap();
     }
 
     // Put outselves in our own process group
@@ -257,13 +257,13 @@ impl JobManager {
         cont: bool,
     ) -> Result<Option<ExitStatus>> {
         let job_id = job_id.or(self.current_job).ok_or_else(|| {
-            ErrorKind::NoSuchJobError("current: no such job".into())
+            ErrorKind::NoSuchJobError("current".into())
         })?;
         debug!("putting job [{}] in foreground", job_id);
 
         let _terminal_state = {
             let job = self.find_job_mut(job_id).ok_or_else(|| {
-                ErrorKind::NoSuchJobError("no such job".into())
+                ErrorKind::NoSuchJobError(format!("{}", job_id))
             })?;
             job.last_running_in_foreground = true;
             let _terminal_state = job.pgid.map(|pgid| TerminalState::new(Pid::from_raw(pgid)));
@@ -293,12 +293,12 @@ impl JobManager {
 
     pub fn put_job_in_background(&mut self, job_id: &Option<JobId>, cont: bool) -> Result<()> {
         let job_id = job_id.or(self.current_job).ok_or_else(|| {
-            ErrorKind::NoSuchJobError("current: no such job".into())
+            ErrorKind::NoSuchJobError("current".into())
         })?;
         debug!("putting job [{}] in background", job_id);
         let job_pgid = {
             let job = self.find_job_mut(job_id).ok_or_else(|| {
-                ErrorKind::NoSuchJobError("no such job".into())
+                ErrorKind::NoSuchJobError(format!("{}", job_id))
             })?;
             job.last_running_in_foreground = false;
             job.pgid
@@ -460,8 +460,7 @@ impl TerminalState {
     fn new(new_pgid: Pid) -> TerminalState {
         debug!("setting terminal process group to job's process group");
         let shell_terminal = util::get_terminal();
-        let temp_result = unistd::tcsetpgrp(shell_terminal, new_pgid);
-        log_if_err!(temp_result, "failed to set terminal process group");
+        unistd::tcsetpgrp(shell_terminal, new_pgid).unwrap();
         TerminalState {
             prev_pgid: unistd::getpgrp(),
             prev_tmodes: termios::tcgetattr(shell_terminal).ok(),
@@ -473,8 +472,7 @@ impl Drop for TerminalState {
     fn drop(&mut self) {
         debug!("putting shell back into foreground and restoring shell's terminal modes");
         let shell_terminal = util::get_terminal();
-        let temp_result = unistd::tcsetpgrp(shell_terminal, self.prev_pgid);
-        log_if_err!(temp_result, "error putting shell in foreground");
+        unistd::tcsetpgrp(shell_terminal, self.prev_pgid).unwrap();
         if let Some(ref prev_tmodes) = self.prev_tmodes {
             let temp_result =
                 termios::tcsetattr(shell_terminal, termios::SetArg::TCSADRAIN, prev_tmodes);
