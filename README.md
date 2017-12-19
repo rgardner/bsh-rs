@@ -13,9 +13,9 @@ $ cd bsh-rs
 $ # run bsh via cargo
 $ cargo run
 $ # run bsh directly
-$ ./target/debug/bsh
+$ target/debug/bsh
 $ # display bsh help
-$ ./target/debug/bsh --help
+$ target/debug/bsh --help
 ```
 
 
@@ -35,6 +35,20 @@ $ rustup run +"$(cat rustnightly.txt)" cargo build --features "clippy"
 $ # run clippy lints via cargo subcommand
 $ rustup run +"$(cat rustnightly.txt)" cargo clippy
 ```
+
+## Features
+
+* runs builtin and external commands
+* expands history and environment variables
+* supports `|`, `;`, `||`, `&&`
+* supports job control
+* has the following builtins:
+  - `cd`
+  - `history`
+  - `kill`
+  - `exit`
+  - `bg`, `fg`, `jobs`
+  - `declare`, `unset`
 
 
 ## Goals
