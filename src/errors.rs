@@ -1,12 +1,6 @@
 //! Error module. See the [error-chain](https://crates.io/crates/error-chain) crate for details.
 
-use parser;
-
 error_chain! {
-    links {
-        Parser(parser::Error, parser::ErrorKind);
-    }
-
     foreign_links {
         Docopt(::docopt::Error);
         Io(::std::io::Error);
@@ -15,6 +9,11 @@ error_chain! {
     }
 
     errors {
+        /// Generic syntax error containing offending line
+        SyntaxError(line: String) {
+            description("syntax error")
+            display("syntax error: '{}'", line)
+        }
         BuiltinCommandError(message: String, code: i32) {
             description(message)
         }

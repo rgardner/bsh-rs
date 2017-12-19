@@ -98,6 +98,18 @@ fn test_command_not_found() {
         .unwrap();
 }
 
+#[test]
+fn test_syntax_error() {
+    let args = ["-c", ";"];
+    let expected_stderr = "bsh: syntax error near: ;\n";
+    bsh_assert()
+        .with_args(&args)
+        .stderr()
+        .is(expected_stderr)
+        .exit_status_is(2)
+        .unwrap();
+}
+
 fn generate_temp_directory() -> io::Result<TempDir> {
     // Because of limitation in `assert_cli`, temporary directory must be
     // subdirectory of directory containing Cargo.toml

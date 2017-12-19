@@ -20,6 +20,7 @@ use std::process::{self, ExitStatus};
 use util::{self, BshExitStatusExt};
 
 const HISTORY_FILE_NAME: &str = ".bsh_history";
+const SYNTAX_ERROR_EXIT_STATUS: i32 = 2;
 const COMMAND_NOT_FOUND_EXIT_STATUS: i32 = 127;
 
 /// Bsh Shell
@@ -121,7 +122,19 @@ impl Shell {
             self.editor.add_history_entry(input);
         }
 
-        let mut command = Command::parse(input)?;
+        let mut command = match Command::parse(input) {
+            Ok(command) => Ok(command),
+            Err(e) => {
+                if let ErrorKind::SyntaxError(ref line) = *e.kind() {
+                    eprintln!("bsh: syntax error near: {}", line);
+                    self.last_exit_status = ExitStatus::from_status(SYNTAX_ERROR_EXIT_STATUS);
+                    return Ok(());
+                }
+
+                Err(e)
+            }
+        }?;
+
         expand_variables(&mut command.inner);
         self.execute_command(&mut command)?;
 
