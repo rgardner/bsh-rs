@@ -108,25 +108,6 @@ impl Shell {
         Ok(line)
     }
 
-    /// Expands shell and environment variables in command parts.
-    /// note: rustfmt formatting makes function less readable
-    fn expand_variables(&self, command: &mut ast::Command) {
-        match *command {
-            ast::Command::Simple { ref mut words, ref mut redirects, .. } => {
-                expand_variables_simple_command(words, redirects.as_mut_slice());
-            },
-            ast::Command::Connection { ref mut first, ref mut second, .. } => {
-                match *first.deref_mut() {
-                    ast::Command::Simple { ref mut words, ref mut redirects, .. } => {
-                        expand_variables_simple_command(words, redirects.as_mut_slice());
-                    },
-                    _ => unreachable!(),
-                };
-                self.expand_variables(&mut **second)
-            }
-        }
-    }
-
     /// Runs a job from a command string.
     pub fn execute_command_string(&mut self, input: &str) -> Result<()> {
         // skip if empty
@@ -141,7 +122,7 @@ impl Shell {
         }
 
         let mut command = Command::parse(input)?;
-        self.expand_variables(&mut command.inner);
+        expand_variables(&mut command.inner);
         self.execute_command(&mut command)?;
 
         Ok(())
@@ -353,6 +334,39 @@ fn isatty() -> bool {
     let temp_result = unistd::isatty(util::get_terminal());
     log_if_err!(temp_result, "unistd::isatty");
     temp_result.unwrap_or(false)
+}
+
+// Variable Expansion Functions
+
+/// Expands shell and environment variables in command parts.
+/// note: rustfmt formatting makes function less readable
+fn expand_variables(command: &mut ast::Command) {
+    match *command {
+        ast::Command::Simple {
+            ref mut words,
+            ref mut redirects,
+            ..
+        } => {
+            expand_variables_simple_command(words, redirects.as_mut_slice());
+        }
+        ast::Command::Connection {
+            ref mut first,
+            ref mut second,
+            ..
+        } => {
+            match *first.deref_mut() {
+                ast::Command::Simple {
+                    ref mut words,
+                    ref mut redirects,
+                    ..
+                } => {
+                    expand_variables_simple_command(words, redirects.as_mut_slice());
+                }
+                _ => unreachable!(),
+            };
+            expand_variables(&mut **second)
+        }
+    }
 }
 
 fn expand_variables_simple_command(words: &mut Vec<String>, redirects: &mut [ast::Redirect]) {

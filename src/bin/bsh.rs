@@ -15,6 +15,7 @@ use bsh_rs::errors::*;
 use docopt::Docopt;
 use nix::unistd::Pid;
 use std::env;
+use std::path::PathBuf;
 use std::process::{self, ExitStatus};
 
 const COMMAND_HISTORY_CAPACITY: usize = 10;
@@ -24,34 +25,36 @@ const USAGE: &str = "
 bsh.
 
 Usage:
-    bsh
-    bsh -c <command>
-    bsh <file>
+    bsh [options]
+    bsh [options] -c <command>
+    bsh [options] <file>
     bsh (-h | --help)
     bsh --version
 
 Options:
-    -h --help    Show this screen.
-    --version    Show version.
-    -c           If the -c option is present, then commands are read from the first non-option
-                     argument command_string.
+    -h --help       Show this screen.
+    --version       Show version.
+    -c              If the -c option is present, then commands are read from the first non-option
+                        argument command_string.
+    --log=<path>    File to write log to, defaults to ~/.bsh_log
 ";
 
 /// Docopts input arguments.
 #[derive(Debug, Deserialize)]
 struct Args {
-    flag_version: bool,
-    flag_c: bool,
     arg_command: Option<String>,
     arg_file: Option<String>,
+    flag_version: bool,
+    flag_c: bool,
+    flag_log: Option<String>,
 }
 
 fn main() {
-    init_logger();
-
     let args: Args = Docopt::new(USAGE)
         .and_then(|d| d.deserialize())
         .unwrap_or_else(|e| e.exit());
+
+    init_logger(&args.flag_log);
     debug!("{:?}", args);
 
     if args.flag_version {
@@ -63,9 +66,10 @@ fn main() {
     }
 }
 
-fn init_logger() {
-    let mut log_path = env::home_dir().unwrap();
-    log_path.push(LOG_FILE_NAME);
+fn init_logger(path: &Option<String>) {
+    let log_path = path.clone().map(PathBuf::from).unwrap_or_else(
+        default_log_path,
+    );
 
     let pid = Pid::this();
     fern::Dispatch::new()
@@ -82,6 +86,10 @@ fn init_logger() {
         .chain(fern::log_file(log_path).unwrap())
         .apply()
         .unwrap();
+}
+
+fn default_log_path() -> PathBuf {
+    env::home_dir().unwrap().join(LOG_FILE_NAME)
 }
 
 fn execute_from_command_string_or_file(args: &Args) -> ! {

@@ -1,12 +1,24 @@
 //! Integration Tests
 
 extern crate assert_cli;
+extern crate chrono;
+#[macro_use]
+extern crate lazy_static;
 extern crate tempdir;
 
 use assert_cli::Assert;
+use chrono::{DateTime, Local};
 use std::io;
 use std::path::PathBuf;
 use tempdir::TempDir;
+
+lazy_static! {
+    static ref LOG_FILE_NAME: String = {
+        let local: DateTime<Local> = Local::now();
+        let log_name = local.format("%F.%H-%M-%S");
+        format!("test-{}.log", log_name)
+    };
+}
 
 trait AssertExt {
     fn exit_status_is(self, exit_status: i32) -> Self;
@@ -22,11 +34,15 @@ impl AssertExt for Assert {
     }
 }
 
+fn bsh_assert() -> Assert {
+    Assert::cargo_binary("bsh").with_args(&["--log", &LOG_FILE_NAME])
+}
+
 #[test]
 fn test_simple_echo() {
     let args = ["-c", "echo foo"];
     let expected_stdout = "foo";
-    Assert::cargo_binary("bsh")
+    bsh_assert()
         .with_args(&args)
         .stdout()
         .is(expected_stdout)
@@ -36,29 +52,20 @@ fn test_simple_echo() {
 #[test]
 fn test_exit_normal_large_negative() {
     let args = ["-c", "exit 85"];
-    Assert::cargo_binary("bsh")
-        .with_args(&args)
-        .exit_status_is(85)
-        .unwrap();
+    bsh_assert().with_args(&args).exit_status_is(85).unwrap();
 
     let args = ["-c", "exit 500"];
-    Assert::cargo_binary("bsh")
-        .with_args(&args)
-        .exit_status_is(244)
-        .unwrap();
+    bsh_assert().with_args(&args).exit_status_is(244).unwrap();
 
     let args = ["-c", "exit -500"];
-    Assert::cargo_binary("bsh")
-        .with_args(&args)
-        .exit_status_is(12)
-        .unwrap();
+    bsh_assert().with_args(&args).exit_status_is(12).unwrap();
 }
 
 #[test]
 fn test_simple_pipeline() {
     let args = ["-c", "echo needle | grep needle"];
     let expected_stdout = "needle\n";
-    Assert::cargo_binary("bsh")
+    bsh_assert()
         .with_args(&args)
         .stdout()
         .is(expected_stdout)
@@ -71,7 +78,7 @@ fn test_simple_redirects() {
     let command = "echo 'test needle, please ignore' >outfile; grep <outfile 'needle'";
     let args = ["-c", command];
     let expected_stdout = "test needle, please ignore\n";
-    Assert::cargo_binary("bsh")
+    bsh_assert()
         .current_dir(temp_dir.path())
         .with_args(&args)
         .stdout()
@@ -83,7 +90,7 @@ fn test_simple_redirects() {
 fn test_command_not_found() {
     let args = ["-c", "foo"];
     let expected_stderr = "bsh: foo: command not found\n";
-    Assert::cargo_binary("bsh")
+    bsh_assert()
         .with_args(&args)
         .stderr()
         .is(expected_stderr)
@@ -94,6 +101,6 @@ fn test_command_not_found() {
 fn generate_temp_directory() -> io::Result<TempDir> {
     // Because of limitation in `assert_cli`, temporary directory must be
     // subdirectory of directory containing Cargo.toml
-    let temp_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests");
-    TempDir::new_in(temp_root, "temp")
+    let root: PathBuf = [env!("CARGO_MANIFEST_DIR"), "tests"].iter().collect();
+    TempDir::new_in(root, "temp")
 }
