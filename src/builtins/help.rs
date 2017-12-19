@@ -49,11 +49,14 @@ HELP: HELP [command ...]
 }
 
 fn print_all_usage_strings(stdout: &mut Write) -> Result<()> {
+    writeln!(stdout, "{}", jobs::Bg::usage())?;
     writeln!(stdout, "{}", dirs::Cd::usage())?;
     writeln!(stdout, "{}", env::Declare::usage())?;
     writeln!(stdout, "{}", exit::Exit::usage())?;
+    writeln!(stdout, "{}", jobs::Fg::usage())?;
     writeln!(stdout, "{}", Help::usage())?;
     writeln!(stdout, "{}", history::History::usage())?;
+    writeln!(stdout, "{}", jobs::Jobs::usage())?;
     writeln!(stdout, "{}", kill::Kill::usage())?;
     writeln!(stdout, "{}", env::Unset::usage())?;
     Ok(())
