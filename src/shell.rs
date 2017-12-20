@@ -352,7 +352,6 @@ fn isatty() -> bool {
 // Variable Expansion Functions
 
 /// Expands shell and environment variables in command parts.
-/// note: rustfmt formatting makes function less readable
 fn expand_variables(command: &mut ast::Command) {
     match *command {
         ast::Command::Simple {
