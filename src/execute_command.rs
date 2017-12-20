@@ -289,17 +289,18 @@ fn run_connection_command(
 
         }
         ast::Connector::Semicolon => {
-            let (mut first_result, pgid, _) = _spawn_processes(shell, first, stdin, None, pgid)?;
+            let (mut first_result, _, _) = _spawn_processes(shell, first, stdin, None, pgid)?;
+            first_result.last_mut().unwrap().wait()?;
             let (second_result, pgid, output) =
-                _spawn_processes(shell, second, None, stdout, pgid)?;
+                _spawn_processes(shell, second, None, stdout, None)?;
             first_result.extend(second_result);
             Ok((first_result, pgid, output))
         }
         ast::Connector::And => {
-            let (mut first_result, pgid, _) = _spawn_processes(shell, first, stdin, None, pgid)?;
+            let (mut first_result, _, _) = _spawn_processes(shell, first, stdin, None, pgid)?;
             let (pgid, output) = if first_result.last_mut().unwrap().wait()?.success() {
                 let (second_result, pgid, output) =
-                    _spawn_processes(shell, second, None, stdout, pgid)?;
+                    _spawn_processes(shell, second, None, stdout, None)?;
                 first_result.extend(second_result);
                 (pgid, output)
             } else {
@@ -308,10 +309,10 @@ fn run_connection_command(
             Ok((first_result, pgid, output))
         }
         ast::Connector::Or => {
-            let (mut first_result, pgid, _) = _spawn_processes(shell, first, stdin, None, pgid)?;
+            let (mut first_result, _, _) = _spawn_processes(shell, first, stdin, None, pgid)?;
             let (pgid, output) = if !first_result.last_mut().unwrap().wait()?.success() {
                 let (second_result, pgid, output) =
-                    _spawn_processes(shell, second, None, stdout, pgid)?;
+                    _spawn_processes(shell, second, None, stdout, None)?;
                 first_result.extend(second_result);
                 (pgid, output)
             } else {
