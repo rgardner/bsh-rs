@@ -1,5 +1,5 @@
 [package]
-authors = ["Robert Gardner <rhg259@nyu.edu>"]
+authors = ["Bob Gardner <bob.hn.gardner@gmail.com>"]
 build = "build.rs"
 description = "Command line shell"
 name = "bsh-rs"
