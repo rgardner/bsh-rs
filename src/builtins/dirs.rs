@@ -1,8 +1,6 @@
 use std::env;
 use std::path::Path;
 
-use failure::ResultExt;
-
 use builtins;
 use builtins::prelude::*;
 use dirs;

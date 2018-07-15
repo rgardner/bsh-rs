@@ -3,6 +3,10 @@
 //! This module includes the implementations of common shell builtin commands.
 //! Where possible the commands conform to their standard Bash counterparts.
 
+use docopt::Docopt;
+use failure::Fail;
+use serde;
+
 use self::prelude::*;
 
 use self::dirs::Cd;
@@ -12,10 +16,6 @@ use self::help::Help;
 use self::history::History;
 use self::jobs::{Bg, Fg, Jobs};
 use self::kill::Kill;
-
-use docopt::Docopt;
-use failure::Fail;
-use serde;
 
 pub mod prelude {
     pub use std::io::Write;

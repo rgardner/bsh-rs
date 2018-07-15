@@ -1,6 +1,7 @@
+use std::env;
+
 use builtins;
 use builtins::prelude::*;
-use std::env;
 
 pub struct Declare;
 

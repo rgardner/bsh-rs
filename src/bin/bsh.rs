@@ -11,12 +11,13 @@ extern crate nix;
 #[macro_use]
 extern crate serde_derive;
 
+use std::path::PathBuf;
+use std::process::{self, ExitStatus};
+
 use bsh_rs::errors::*;
 use bsh_rs::{BshExitStatusExt, Shell, ShellConfig};
 use docopt::Docopt;
 use nix::unistd::Pid;
-use std::path::PathBuf;
-use std::process::{self, ExitStatus};
 
 const COMMAND_HISTORY_CAPACITY: usize = 10;
 const LOG_FILE_NAME: &str = ".bsh_log";

@@ -1,7 +1,7 @@
 //! BSH Parser
 
 use self::grammar::CommandParser;
-use errors::*;
+use errors::{Error, Result};
 
 pub mod ast;
 #[allow(dead_code, unused_qualifications)]

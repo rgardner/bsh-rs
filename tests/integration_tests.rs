@@ -6,10 +6,11 @@ extern crate chrono;
 extern crate lazy_static;
 extern crate tempdir;
 
-use assert_cli::Assert;
-use chrono::{DateTime, Local};
 use std::io;
 use std::path::PathBuf;
+
+use assert_cli::Assert;
+use chrono::{DateTime, Local};
 use tempdir::TempDir;
 
 lazy_static! {
