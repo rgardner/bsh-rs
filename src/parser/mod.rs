@@ -1,5 +1,6 @@
 //! BSH Parser
 
+use self::grammar::CommandParser;
 use errors::*;
 
 pub mod ast;
@@ -17,7 +18,7 @@ pub struct Command {
 
 impl Command {
     pub fn parse(input: &str) -> Result<Command> {
-        let result = grammar::CommandParser::new()
+        let result = CommandParser::new()
             .parse(input)
             .map_err(|_| ErrorKind::SyntaxError(input.into()).into())
             .map(|inner| Command {
