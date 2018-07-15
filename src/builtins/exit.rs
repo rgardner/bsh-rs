@@ -14,10 +14,7 @@ exit: exit [n]
 
     fn run(shell: &mut Shell, args: Vec<String>, _stdout: &mut Write) -> Result<()> {
         if shell.has_background_jobs() {
-            bail!(ErrorKind::BuiltinCommandError(
-                "There are stopped jobs.".into(),
-                1,
-            ));
+            return Err(Error::builtin_command("There are stopped jobs.", 1));
         }
         let status_code = args.get(0)
             .map(|arg| {

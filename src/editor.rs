@@ -1,9 +1,14 @@
-use errors::*;
-use rustyline::completion::FilenameCompleter;
-use rustyline::{self, history, CompletionType, Config};
 use std::fmt;
+use std::io;
 use std::path::Path;
 use std::str;
+
+use failure::{Fail, ResultExt};
+use rustyline::completion::FilenameCompleter;
+use rustyline::error::ReadlineError;
+use rustyline::{self, history, CompletionType, Config};
+
+use errors::{Error, ErrorKind, Result};
 
 pub struct Editor {
     internal: rustyline::Editor<(FilenameCompleter)>,
@@ -30,18 +35,38 @@ impl Editor {
         }
     }
 
-    pub fn readline(&mut self, prompt: &str) -> Result<String> {
-        let line = self.internal.readline(prompt)?;
-        Ok(line)
+    pub fn readline(&mut self, prompt: &str) -> Result<Option<String>> {
+        match self.internal.readline(prompt) {
+            Ok(line) => Ok(Some(line)),
+            Err(e) => {
+                if let ReadlineError::Eof = e {
+                    return Ok(None);
+                }
+
+                Err(e.context(ErrorKind::Readline).into())
+            }
+        }
     }
 
     pub fn load_history<P: AsRef<Path> + ?Sized>(&mut self, path: &P) -> Result<()> {
-        self.internal.load_history(path)?;
-        Ok(())
+        match self.internal.load_history(path) {
+            Ok(()) => Ok(()),
+            Err(e) => {
+                if let ReadlineError::Io(ref inner) = e {
+                    if inner.kind() == io::ErrorKind::NotFound {
+                        return Ok(());
+                    }
+                }
+
+                Err(e.context(ErrorKind::Readline).into())
+            }
+        }
     }
 
     pub fn save_history<P: AsRef<Path> + ?Sized>(&mut self, path: &P) -> Result<()> {
-        self.internal.save_history(path)?;
+        self.internal
+            .save_history(path)
+            .context(ErrorKind::Readline)?;
         Ok(())
     }
 
@@ -110,7 +135,7 @@ impl Editor {
                 command.push_str(line);
             }
             None => {
-                bail!(ErrorKind::BuiltinCommandError(
+                return Err(Error::builtin_command(
                     format!("{}: event not found", command),
                     1,
                 ));

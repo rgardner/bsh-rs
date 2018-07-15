@@ -21,7 +21,7 @@ kill: kill pid | %jobspec
 
     fn run(shell: &mut Shell, args: Vec<String>, stdout: &mut Write) -> Result<()> {
         if args.is_empty() {
-            bail!(ErrorKind::BuiltinCommandError(Self::usage(), 2));
+            return Err(Error::builtin_command(Self::usage(), 2));
         }
 
         let arg = args.first().unwrap();
@@ -29,31 +29,31 @@ kill: kill pid | %jobspec
             match arg[1..].parse::<u32>() {
                 Ok(n) => match shell.kill_background_job(n) {
                     Ok(Some(job)) => {
-                        writeln!(stdout, "[{}]+\tTerminated: 15\t{}", n, job.input())?;
+                        writeln!(stdout, "[{}]+\tTerminated: 15\t{}", n, job.input())
+                            .context(ErrorKind::Io)?;
                         Ok(())
                     }
-                    Ok(None) => {
-                        bail!(ErrorKind::BuiltinCommandError(
-                            format!("kill: {}: no such job", arg),
-                            1,
-                        ));
-                    }
+                    Ok(None) => Err(Error::builtin_command(
+                        format!("kill: {}: no such job", arg),
+                        1,
+                    )),
                     Err(e) => Err(e),
                 },
-                Err(_) => {
-                    bail!(ErrorKind::BuiltinCommandError(
-                        format!(
-                            "kill: {}: arguments must be \
-                             job IDs",
-                            arg
-                        ),
-                        1,
-                    ));
-                }
+                Err(_) => Err(Error::builtin_command(
+                    format!(
+                        "kill: {}: arguments must be \
+                         job IDs",
+                        arg
+                    ),
+                    1,
+                )),
             }
         } else {
-            let output = Command::new("kill").args(&args).output()?;
-            write!(stdout, "{}", String::from_utf8_lossy(&output.stdout))?;
+            let output = Command::new("kill")
+                .args(&args)
+                .output()
+                .context(ErrorKind::Io)?;
+            write!(stdout, "{}", String::from_utf8_lossy(&output.stdout)).context(ErrorKind::Io)?;
             Ok(())
         }
     }

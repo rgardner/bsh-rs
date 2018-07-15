@@ -1,8 +1,11 @@
+use std::num::ParseIntError;
+use std::result as res;
+
+use failure::ResultExt;
+
 use builtins;
 use builtins::prelude::*;
 use job_control::JobId;
-use std::num::ParseIntError;
-use std::result as res;
 
 pub struct Jobs;
 
@@ -50,7 +53,7 @@ Returns success unless an invalid option is given or an error occurs.";
                         first.id(),
                         first.status(),
                         first.argv()
-                    )?;
+                    ).context(ErrorKind::Io)?;
                 }
                 for process in processes.iter().skip(1) {
                     writeln!(
@@ -59,14 +62,14 @@ Returns success unless an invalid option is given or an error occurs.";
                         process.id(),
                         process.status(),
                         process.argv()
-                    )?;
+                    ).context(ErrorKind::Io)?;
                 }
             } else if args.flag_p {
                 for process in processes {
-                    writeln!(stdout, "{:?}", process.id())?;
+                    writeln!(stdout, "{:?}", process.id()).context(ErrorKind::Io)?;
                 }
             } else {
-                writeln!(stdout, "{}", job)?;
+                writeln!(stdout, "{}", job).context(ErrorKind::Io)?;
             }
         }
 
@@ -96,7 +99,7 @@ fg: fg [job_spec]
             .map_or(Ok(None), |v| v.map(Some));
         match job_id {
             Ok(job_id) => shell.put_job_in_foreground(job_id.map(JobId))?,
-            Err(e) => bail!(ErrorKind::BuiltinCommandError(format!("fg: {}", e), 1)),
+            Err(e) => return Err(Error::builtin_command(format!("fg: {}", e), 1)),
         };
         Ok(())
     }
@@ -121,7 +124,7 @@ bg: bg [<jobspec>...]
     fn run(shell: &mut Shell, argv: Vec<String>, stdout: &mut Write) -> Result<()> {
         if argv.len() == 1 {
             if let Err(e) = shell.put_job_in_background(None) {
-                writeln!(stdout, "{}", e)?;
+                writeln!(stdout, "{}", e).context(ErrorKind::Io)?;
             }
         } else {
             let job_ids: Vec<res::Result<JobId, ParseIntError>> = argv.iter()
@@ -133,10 +136,10 @@ bg: bg [<jobspec>...]
                 match *job_id {
                     Ok(ref job_id) => {
                         if let Err(e) = shell.put_job_in_background(Some(*job_id)) {
-                            writeln!(stdout, "{}", e)?;
+                            writeln!(stdout, "{}", e).context(ErrorKind::Io)?;
                         }
                     }
-                    Err(ref e) => writeln!(stdout, "{}", e)?,
+                    Err(ref e) => writeln!(stdout, "{}", e).context(ErrorKind::Io)?,
                 }
             }
         }

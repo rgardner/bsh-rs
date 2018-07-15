@@ -14,14 +14,18 @@ use self::jobs::{Bg, Fg, Jobs};
 use self::kill::Kill;
 
 use docopt::Docopt;
+use failure::Fail;
 use serde;
 
 pub mod prelude {
-    pub use super::parse_args;
-    pub use errors::*;
-    pub use shell::Shell;
     pub use std::io::Write;
     pub use std::process::ExitStatus;
+
+    pub use failure::ResultExt;
+
+    pub use super::parse_args;
+    pub use errors::{Error, ErrorKind, Result};
+    pub use shell::Shell;
     pub use util::BshExitStatusExt;
 }
 
@@ -100,10 +104,9 @@ pub fn run<T: AsRef<str>>(
 
 fn get_builtin_exit_status(result: &Result<()>) -> ExitStatus {
     let status = if let Err(ref e) = *result {
-        match *e {
-            Error(ErrorKind::BuiltinCommandError(_, code), _) => code,
-            Error(ErrorKind::Msg(_), _) => 2,
-            Error(_, _) => 1,
+        match *e.kind() {
+            ErrorKind::BuiltinCommand { code, .. } => code,
+            _ => 1,
         }
     } else {
         0
@@ -132,5 +135,5 @@ where
         .unwrap()
         .argv(argv)
         .deserialize()
-        .map_err(From::from)
+        .map_err(|e| e.context(ErrorKind::Docopt).into())
 }

@@ -11,8 +11,7 @@
 
 extern crate dirs;
 extern crate docopt;
-#[macro_use]
-extern crate error_chain;
+extern crate failure;
 extern crate lalrpop_util;
 #[macro_use]
 extern crate log;
@@ -25,8 +24,9 @@ extern crate serde_derive;
 #[cfg(test)]
 extern crate rand;
 
-pub use self::shell::{Shell, ShellConfig};
-pub use self::util::BshExitStatusExt;
+pub use errors::{Error, ErrorKind, Result};
+pub use shell::{Shell, ShellConfig};
+pub use util::BshExitStatusExt;
 
 macro_rules! log_if_err {
     ($result:expr, $fmt:expr) => {{

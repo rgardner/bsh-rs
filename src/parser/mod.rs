@@ -20,7 +20,7 @@ impl Command {
     pub fn parse(input: &str) -> Result<Command> {
         let result = CommandParser::new()
             .parse(input)
-            .map_err(|_| ErrorKind::SyntaxError(input.into()).into())
+            .map_err(|_| Error::syntax(input))
             .map(|inner| Command {
                 input: input.into(),
                 inner,

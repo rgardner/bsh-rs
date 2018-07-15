@@ -3,21 +3,22 @@
 //! The Shell itself is responsible for managing background jobs and for
 //! maintaining an editor of previous commands.
 
-use dirs;
-use editor::Editor;
-use errors::*;
-use execute_command::spawn_processes;
-use job_control::{self, Job, JobId, JobManager};
-use nix::unistd;
-use parser::{ast, Command};
-use rustyline::error::ReadlineError;
 use std::env;
 use std::fmt;
 use std::fs::File;
-use std::io;
 use std::ops::DerefMut;
 use std::path::{Path, PathBuf};
 use std::process::{self, ExitStatus};
+
+use dirs;
+use failure::ResultExt;
+use nix::unistd;
+
+use editor::Editor;
+use errors::{ErrorKind, Result};
+use execute_command::spawn_processes;
+use job_control::{self, Job, JobId, JobManager};
+use parser::{ast, Command};
 use util::{self, BshExitStatusExt};
 
 const HISTORY_FILE_NAME: &str = ".bsh_history";
@@ -77,10 +78,8 @@ impl Shell {
         self.history_file = dirs::home_dir().map(|p| p.join(HISTORY_FILE_NAME));
         if let Some(ref history_file) = self.history_file {
             self.editor.load_history(&history_file).or_else(|e| {
-                if let ErrorKind::ReadlineError(ReadlineError::Io(ref inner)) = *e.kind() {
-                    if inner.kind() == io::ErrorKind::NotFound {
-                        return Ok(());
-                    }
+                if let ErrorKind::HistoryFileNotFound = *e.kind() {
+                    return Ok(());
                 }
 
                 Err(e)
@@ -93,7 +92,8 @@ impl Shell {
     }
 
     /// Custom prompt to output to the user.
-    pub fn prompt(&mut self) -> Result<String> {
+    /// Returns `None` when end of file is reached.
+    pub fn prompt(&mut self) -> Result<Option<String>> {
         let cwd = env::current_dir().unwrap();
         let home = dirs::home_dir().unwrap();
         let rel = match cwd.strip_prefix(&home) {
@@ -126,7 +126,7 @@ impl Shell {
         let mut command = match Command::parse(input) {
             Ok(command) => Ok(command),
             Err(e) => {
-                if let ErrorKind::SyntaxError(ref line) = *e.kind() {
+                if let ErrorKind::Syntax(ref line) = *e.kind() {
                     eprintln!("bsh: syntax error near: {}", line);
                     self.last_exit_status = ExitStatus::from_status(SYNTAX_ERROR_EXIT_STATUS);
                     return Ok(());
@@ -145,9 +145,10 @@ impl Shell {
     /// Runs a bsh script from a file.
     pub fn execute_commands_from_file<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
         use std::io::Read;
-        let mut f = File::open(path)?;
+        let mut f = File::open(path).context(ErrorKind::Io)?;
         let mut buffer = String::new();
-        f.read_to_string(&mut buffer)?;
+        f.read_to_string(&mut buffer)
+            .with_context(|_| ErrorKind::Io)?;
 
         for line in buffer.split('\n') {
             self.execute_command_string(line)?
@@ -165,8 +166,8 @@ impl Shell {
             }
 
             let input = match self.prompt() {
-                Ok(line) => line.trim().to_owned(),
-                Err(Error(ErrorKind::ReadlineError(ReadlineError::Eof), _)) => break,
+                Ok(Some(line)) => line.trim().to_owned(),
+                Ok(None) => break,
                 e => {
                     log_if_err!(e, "prompt");
                     continue;
@@ -183,7 +184,7 @@ impl Shell {
         let (processes, pgid, foreground) = match spawn_processes(self, &command.inner) {
             Ok((processes, pgid, foreground)) => Ok((processes, pgid, foreground)),
             Err(e) => {
-                if let ErrorKind::CommandNotFoundError(ref command) = *e.kind() {
+                if let ErrorKind::CommandNotFound(ref command) = *e.kind() {
                     eprintln!("bsh: {}: command not found", command);
                     self.last_exit_status = ExitStatus::from_status(COMMAND_NOT_FOUND_EXIT_STATUS);
                     return Ok(());

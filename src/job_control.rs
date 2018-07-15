@@ -1,5 +1,7 @@
-use errors::*;
-use execute_command::{Process, ProcessStatus};
+use std::fmt;
+use std::process::ExitStatus;
+
+use failure::{Fail, ResultExt};
 use nix;
 use nix::errno::Errno;
 use nix::libc;
@@ -7,8 +9,9 @@ use nix::sys::signal::{self, SigHandler, Signal};
 use nix::sys::termios::{self, Termios};
 use nix::sys::wait::{self, WaitPidFlag, WaitStatus};
 use nix::unistd::{self, Pid};
-use std::fmt;
-use std::process::ExitStatus;
+
+use errors::{Error, ErrorKind, Result};
+use execute_command::{Process, ProcessStatus};
 use util::{self, BshExitStatusExt};
 
 pub fn initialize_job_control() -> Result<()> {
@@ -17,7 +20,7 @@ pub fn initialize_job_control() -> Result<()> {
     // Loop until the shell is in the foreground
     loop {
         let shell_pgid = unistd::getpgrp();
-        if unistd::tcgetpgrp(shell_terminal)? == shell_pgid {
+        if unistd::tcgetpgrp(shell_terminal).context(ErrorKind::Nix)? == shell_pgid {
             break;
         } else {
             signal::kill(
@@ -38,7 +41,7 @@ pub fn initialize_job_control() -> Result<()> {
 
     // Put outselves in our own process group
     let shell_pgid = Pid::this();
-    unistd::setpgid(shell_pgid, shell_pgid)?;
+    unistd::setpgid(shell_pgid, shell_pgid).context(ErrorKind::Nix)?;
 
     // Grab control of the terminal and save default terminal attributes
     let shell_terminal = util::get_terminal();
@@ -237,7 +240,8 @@ impl JobManager {
     /// a signal for one of their processes.
     pub fn wait_for_job(&mut self, job_id: JobId) -> Result<Option<ExitStatus>> {
         loop {
-            let wait_status = wait::waitpid(None, Some(WaitPidFlag::WUNTRACED))?;
+            let wait_status =
+                wait::waitpid(None, Some(WaitPidFlag::WUNTRACED)).context(ErrorKind::Nix)?;
             self.mark_process_status(&wait_status);
 
             if self.job_is_stopped(job_id) || self.job_is_completed(job_id) {
@@ -257,12 +261,12 @@ impl JobManager {
     ) -> Result<Option<ExitStatus>> {
         let job_id = job_id
             .or(self.current_job)
-            .ok_or_else(|| ErrorKind::NoSuchJobError("current".into()))?;
+            .ok_or_else(|| Error::no_such_job("current"))?;
         debug!("putting job [{}] in foreground", job_id);
 
         let _terminal_state = {
             let job = self.find_job_mut(job_id)
-                .ok_or_else(|| ErrorKind::NoSuchJobError(format!("{}", job_id)))?;
+                .ok_or_else(|| Error::no_such_job(format!("{}", job_id)))?;
             job.last_running_in_foreground = true;
             let _terminal_state = job.pgid.map(|pgid| TerminalState::new(Pid::from_raw(pgid)));
 
@@ -281,7 +285,7 @@ impl JobManager {
                     );
                 }
                 if let Some(ref pgid) = job.pgid {
-                    signal::kill(Pid::from_raw(-pgid), Signal::SIGCONT)?;
+                    signal::kill(Pid::from_raw(-pgid), Signal::SIGCONT).context(ErrorKind::Nix)?;
                 }
             }
             _terminal_state
@@ -292,18 +296,18 @@ impl JobManager {
     pub fn put_job_in_background(&mut self, job_id: Option<JobId>, cont: bool) -> Result<()> {
         let job_id = job_id
             .or(self.current_job)
-            .ok_or_else(|| ErrorKind::NoSuchJobError("current".into()))?;
+            .ok_or_else(|| Error::no_such_job("current"))?;
         debug!("putting job [{}] in background", job_id);
         let job_pgid = {
             let job = self.find_job_mut(job_id)
-                .ok_or_else(|| ErrorKind::NoSuchJobError(format!("{}", job_id)))?;
+                .ok_or_else(|| Error::no_such_job(format!("{}", job_id)))?;
             job.last_running_in_foreground = false;
             job.pgid
         };
 
         if cont {
             if let Some(ref pgid) = job_pgid {
-                signal::kill(Pid::from_raw(-pgid), Signal::SIGCONT)?;
+                signal::kill(Pid::from_raw(-pgid), Signal::SIGCONT).context(ErrorKind::Nix)?;
             }
         }
 
@@ -320,7 +324,7 @@ impl JobManager {
         {
             let job = &self.jobs[index.unwrap()];
             if let Some(pgid) = job.pgid {
-                signal::kill(Pid::from_raw(-pgid), Signal::SIGKILL)?;
+                signal::kill(Pid::from_raw(-pgid), Signal::SIGKILL).context(ErrorKind::Nix)?;
             }
         }
 
@@ -336,7 +340,7 @@ impl JobManager {
             match wait_status {
                 Ok(WaitStatus::StillAlive) | Err(nix::Error::Sys(Errno::ECHILD)) => break,
                 Ok(status) => self.mark_process_status(&status),
-                Err(e) => return Err(e.into()),
+                Err(e) => return Err(e.context(ErrorKind::Nix).into()),
             }
         }
 

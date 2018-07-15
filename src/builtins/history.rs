@@ -16,7 +16,7 @@ history: history [-c] [-s size] [n]
 
     fn run(shell: &mut Shell, args: Vec<String>, stdout: &mut Write) -> Result<()> {
         if args.is_empty() {
-            write!(stdout, "{}", shell.editor)?;
+            write!(stdout, "{}", shell.editor).context(ErrorKind::Io)?;
             return Ok(());
         }
 
@@ -30,10 +30,11 @@ history: history [-c] [-s size] [n]
                 }
             }
             s => match s.parse::<usize>() {
-                Ok(n) => writeln!(stdout, "{}", history_display(&shell.editor, n))?,
+                Ok(n) => writeln!(stdout, "{}", history_display(&shell.editor, n))
+                    .context(ErrorKind::Io)?,
                 Err(_) => {
                     let msg = format!("history: {}: nonnegative numeric argument required", s);
-                    bail!(ErrorKind::BuiltinCommandError(msg, 1));
+                    return Err(Error::builtin_command(msg, 1));
                 }
             },
         }

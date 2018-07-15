@@ -1,16 +1,19 @@
-use builtins;
-use errors::*;
-use nix::libc;
-use nix::sys::signal::{self, SigHandler, Signal};
-use nix::unistd::{self, Pid};
-use parser::ast;
-use shell::Shell;
 use std::fmt;
 use std::fs::{File, OpenOptions};
 use std::io;
 use std::os::unix::io::FromRawFd;
 use std::os::unix::process::CommandExt;
 use std::process::{ChildStdout, Command, ExitStatus, Stdio};
+
+use failure::{Fail, ResultExt};
+use nix::libc;
+use nix::sys::signal::{self, SigHandler, Signal};
+use nix::unistd::{self, Pid};
+
+use builtins;
+use errors::{Error, ErrorKind, Result};
+use parser::ast;
+use shell::Shell;
 use util::{self, BshExitStatusExt};
 
 #[derive(Debug)]
@@ -37,7 +40,9 @@ impl Stdin {
                 ast::RedirectInstruction::Output => {
                     panic!("Stdin::new called with stdout redirect");
                 }
-                ast::RedirectInstruction::Input => Ok(Stdin::File(File::open(filename)?)),
+                ast::RedirectInstruction::Input => Ok(Stdin::File(
+                    File::open(filename).with_context(|_| ErrorKind::Io)?
+                )),
             },
         }
     }
@@ -51,7 +56,11 @@ impl Stdout {
             ast::Redirectee::FileDescriptor(fd) => unsafe { Ok(File::from_raw_fd(fd).into()) },
             ast::Redirectee::Filename(ref filename) => match redirect.instruction {
                 ast::RedirectInstruction::Output => {
-                    let file = OpenOptions::new().write(true).create(true).open(filename)?;
+                    let file = OpenOptions::new()
+                        .write(true)
+                        .create(true)
+                        .open(filename)
+                        .context(ErrorKind::Io)?;
                     Ok(Stdout::File(file))
                 }
                 ast::RedirectInstruction::Input => {
@@ -375,9 +384,9 @@ fn run_external_command(
             }
 
             if e.kind() == io::ErrorKind::NotFound {
-                bail!(ErrorKind::CommandNotFoundError(words[0].clone()));
+                return Err(Error::command_not_found(&words[0]));
             } else {
-                bail!(ErrorKind::Io(e));
+                return Err(e.context(ErrorKind::Io).into());
             }
         }
     };
@@ -446,7 +455,7 @@ fn create_pipe() -> Result<(File, File)> {
     // It is safe to call from_raw_fd here because read_end_pipe and
     // write_end_pipe are the owners of the file descriptors, meaning no one
     // else will close them out from under us.
-    let (read_end_pipe, write_end_pipe) = unistd::pipe()?;
+    let (read_end_pipe, write_end_pipe) = unistd::pipe().context(ErrorKind::Nix)?;
     unsafe {
         Ok((
             File::from_raw_fd(read_end_pipe),
@@ -460,7 +469,7 @@ fn wait_for_process(pid: u32) -> Result<ExitStatus> {
     use nix::unistd::Pid;
 
     let pid = Pid::from_raw(pid as i32);
-    let wait_status = wait::waitpid(pid, None)?;
+    let wait_status = wait::waitpid(pid, None).context(ErrorKind::Nix)?;
     match wait_status {
         WaitStatus::Exited(_, status) => Ok(ExitStatus::from_status(status)),
         WaitStatus::Signaled(_, signal, _) => Ok(ExitStatus::from_status(128 + signal as i32)),

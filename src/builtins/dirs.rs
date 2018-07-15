@@ -1,8 +1,11 @@
+use std::env;
+use std::path::Path;
+
+use failure::ResultExt;
+
 use builtins;
 use builtins::prelude::*;
 use dirs;
-use std::env;
-use std::path::Path;
 
 pub struct Cd;
 
@@ -17,28 +20,25 @@ cd: cd [dir]
 
     fn run(_shell: &mut Shell, args: Vec<String>, stdout: &mut Write) -> Result<()> {
         let dir = match args.first().map(|x| &x[..]) {
-            None => dirs::home_dir()
-                .ok_or_else(|| ErrorKind::BuiltinCommandError("cd: HOME not set".into(), 1))?,
+            None => dirs::home_dir().ok_or_else(|| Error::builtin_command("cd: HOME not set", 1))?,
             Some("-") => match env::var_os("OLDPWD") {
                 Some(path) => {
-                    let unicode_path = path.to_str().ok_or_else(|| {
-                        ErrorKind::BuiltinCommandError("invalid Unicode".into(), 1)
-                    })?;
-                    stdout.write_all(unicode_path.as_bytes())?;
+                    let unicode_path = path.to_str()
+                        .ok_or_else(|| Error::builtin_command("invalid Unicode", 1))?;
+                    stdout
+                        .write_all(unicode_path.as_bytes())
+                        .context(ErrorKind::Io)?;
                     Path::new(path.as_os_str()).to_path_buf()
                 }
                 None => {
-                    bail!(ErrorKind::BuiltinCommandError(
-                        "cd: OLDPWD not set".to_string(),
-                        1,
-                    ));
+                    return Err(Error::builtin_command("cd: OLDPWD not set", 1));
                 }
             },
             Some(val) => Path::new(val).to_path_buf(),
         };
 
-        env::set_var("OLDPWD", env::current_dir()?);
-        env::set_current_dir(dir)?;
+        env::set_var("OLDPWD", env::current_dir().context(ErrorKind::Io)?);
+        env::set_current_dir(dir).context(ErrorKind::Io)?;
         Ok(())
     }
 }

@@ -32,13 +32,13 @@ HELP: HELP [command ...]
                     _ => None,
                 };
                 if let Some(msg) = msg {
-                    writeln!(stdout, "{}", msg)?;
+                    writeln!(stdout, "{}", msg).context(ErrorKind::Io)?;
                     all_invalid = false;
                 }
             }
             if all_invalid {
                 let cmd = args.last().unwrap();
-                bail!(ErrorKind::BuiltinCommandError(
+                return Err(Error::builtin_command(
                     format!("help: no help topics match {}", cmd),
                     1,
                 ));
@@ -48,16 +48,16 @@ HELP: HELP [command ...]
     }
 }
 
-fn print_all_usage_strings(stdout: &mut Write) -> Result<()> {
-    writeln!(stdout, "{}", jobs::Bg::usage())?;
-    writeln!(stdout, "{}", dirs::Cd::usage())?;
-    writeln!(stdout, "{}", env::Declare::usage())?;
-    writeln!(stdout, "{}", exit::Exit::usage())?;
-    writeln!(stdout, "{}", jobs::Fg::usage())?;
-    writeln!(stdout, "{}", Help::usage())?;
-    writeln!(stdout, "{}", history::History::usage())?;
-    writeln!(stdout, "{}", jobs::Jobs::usage())?;
-    writeln!(stdout, "{}", kill::Kill::usage())?;
-    writeln!(stdout, "{}", env::Unset::usage())?;
+fn print_all_usage_strings(writer: &mut Write) -> Result<()> {
+    writeln!(writer, "{}", jobs::Bg::usage()).context(ErrorKind::Io)?;
+    writeln!(writer, "{}", dirs::Cd::usage()).context(ErrorKind::Io)?;
+    writeln!(writer, "{}", env::Declare::usage()).context(ErrorKind::Io)?;
+    writeln!(writer, "{}", exit::Exit::usage()).context(ErrorKind::Io)?;
+    writeln!(writer, "{}", jobs::Fg::usage()).context(ErrorKind::Io)?;
+    writeln!(writer, "{}", Help::usage()).context(ErrorKind::Io)?;
+    writeln!(writer, "{}", history::History::usage()).context(ErrorKind::Io)?;
+    writeln!(writer, "{}", jobs::Jobs::usage()).context(ErrorKind::Io)?;
+    writeln!(writer, "{}", kill::Kill::usage()).context(ErrorKind::Io)?;
+    writeln!(writer, "{}", env::Unset::usage()).context(ErrorKind::Io)?;
     Ok(())
 }

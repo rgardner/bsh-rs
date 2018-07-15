@@ -27,7 +27,7 @@ declare: declare [name[=value] ...]
                 .map(|arg| format!("declare: {} is not a valid identifier", arg))
                 .collect::<Vec<String>>()
                 .join("\n");
-            bail!(ErrorKind::BuiltinCommandError(msg, 1));
+            return Err(Error::builtin_command(msg, 1));
         }
 
         Ok(())
@@ -59,7 +59,7 @@ unset: unset [name ...]
                 .map(|arg| format!("unset: {} is not a valid identifier", arg))
                 .collect::<Vec<String>>()
                 .join("\n");
-            bail!(ErrorKind::BuiltinCommandError(msg, 1));
+            return Err(Error::builtin_command(msg, 1));
         }
 
         Ok(())
