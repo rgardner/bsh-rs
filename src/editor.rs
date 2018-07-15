@@ -134,7 +134,7 @@ impl Editor {
 impl fmt::Display for Editor {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for (i, e) in self.enumerate_history_entries() {
-            write!(f, "\t{}\t{}\n", i + 1, e)?;
+            writeln!(f, "\t{}\t{}", i + 1, e)?;
         }
 
         Ok(())
@@ -143,8 +143,8 @@ impl fmt::Display for Editor {
 
 impl fmt::Debug for Editor {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "count: {}\n", self.history_count)?;
-        write!(f, "capacity: {}\n", self.history_capacity)?;
+        writeln!(f, "count: {}", self.history_count)?;
+        writeln!(f, "capacity: {}", self.history_capacity)?;
         write!(f, "{}", self)
     }
 }
@@ -171,7 +171,7 @@ impl<'a> Iterator for EditorEnumerate<'a> {
 
 impl<'a> fmt::Debug for EditorEnumerate<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "pos: {}\n", self.pos)
+        writeln!(f, "pos: {}", self.pos)
     }
 }
 

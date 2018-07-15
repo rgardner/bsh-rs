@@ -9,6 +9,7 @@
 // necessary for `error-chain`
 #![recursion_limit = "1024"]
 
+extern crate dirs;
 extern crate docopt;
 #[macro_use]
 extern crate error_chain;

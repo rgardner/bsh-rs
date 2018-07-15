@@ -95,7 +95,7 @@ fg: fg [job_spec]
             .map(|s| s.parse::<u32>())
             .map_or(Ok(None), |v| v.map(Some));
         match job_id {
-            Ok(job_id) => shell.put_job_in_foreground(&job_id.map(JobId))?,
+            Ok(job_id) => shell.put_job_in_foreground(job_id.map(JobId))?,
             Err(e) => bail!(ErrorKind::BuiltinCommandError(format!("fg: {}", e), 1)),
         };
         Ok(())
@@ -120,7 +120,7 @@ bg: bg [<jobspec>...]
 
     fn run(shell: &mut Shell, argv: Vec<String>, stdout: &mut Write) -> Result<()> {
         if argv.len() == 1 {
-            if let Err(e) = shell.put_job_in_background(&None) {
+            if let Err(e) = shell.put_job_in_background(None) {
                 writeln!(stdout, "{}", e)?;
             }
         } else {
@@ -132,7 +132,7 @@ bg: bg [<jobspec>...]
             for job_id in &job_ids {
                 match *job_id {
                     Ok(ref job_id) => {
-                        if let Err(e) = shell.put_job_in_background(&Some(*job_id)) {
+                        if let Err(e) = shell.put_job_in_background(Some(*job_id)) {
                             writeln!(stdout, "{}", e)?;
                         }
                     }

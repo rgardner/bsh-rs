@@ -1,5 +1,6 @@
 use builtins;
 use builtins::prelude::*;
+use dirs;
 use std::env;
 use std::path::Path;
 
@@ -16,7 +17,7 @@ cd: cd [dir]
 
     fn run(_shell: &mut Shell, args: Vec<String>, stdout: &mut Write) -> Result<()> {
         let dir = match args.first().map(|x| &x[..]) {
-            None => env::home_dir()
+            None => dirs::home_dir()
                 .ok_or_else(|| ErrorKind::BuiltinCommandError("cd: HOME not set".into(), 1))?,
             Some("-") => match env::var_os("OLDPWD") {
                 Some(path) => {

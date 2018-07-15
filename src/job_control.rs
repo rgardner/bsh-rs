@@ -142,7 +142,7 @@ impl Job {
         self.last_status_code = Some(status_code);
     }
 
-    fn mark_stopped(&mut self, pid: Pid, signal: &Signal) {
+    fn mark_stopped(&mut self, pid: Pid, signal: Signal) {
         let status_code = {
             let process = self.find_process_mut(pid);
             process.set_status(ProcessStatus::Stopped);
@@ -151,7 +151,7 @@ impl Job {
         self.last_status_code = Some(status_code);
     }
 
-    fn mark_signaled(&mut self, pid: Pid, signal: &Signal) {
+    fn mark_signaled(&mut self, pid: Pid, signal: Signal) {
         let status_code = {
             let process = self.find_process_mut(pid);
             process.set_status(ProcessStatus::Completed);
@@ -185,10 +185,10 @@ impl Job {
     }
 }
 
-fn get_status_code_for_signal(signal: &Signal) -> ExitStatus {
+fn get_status_code_for_signal(signal: Signal) -> ExitStatus {
     // TODO: decide if ExitStatus should preserve signal and status
     // separately or if should combine together
-    let status_code = 128 + (*signal as i32);
+    let status_code = 128 + (signal as i32);
     ExitStatus::from_status(status_code)
 }
 
@@ -252,7 +252,7 @@ impl JobManager {
 
     pub fn put_job_in_foreground(
         &mut self,
-        job_id: &Option<JobId>,
+        job_id: Option<JobId>,
         cont: bool,
     ) -> Result<Option<ExitStatus>> {
         let job_id = job_id
@@ -289,7 +289,7 @@ impl JobManager {
         self.wait_for_job(job_id)
     }
 
-    pub fn put_job_in_background(&mut self, job_id: &Option<JobId>, cont: bool) -> Result<()> {
+    pub fn put_job_in_background(&mut self, job_id: Option<JobId>, cont: bool) -> Result<()> {
         let job_id = job_id
             .or(self.current_job)
             .ok_or_else(|| ErrorKind::NoSuchJobError("current".into()))?;
@@ -381,13 +381,13 @@ impl JobManager {
             WaitStatus::Signaled(pid, signal, ..) => {
                 debug!("{} terminated by signal {:?}.", pid, signal);
                 let job = self.find_job_with_process_mut(pid);
-                job.mark_signaled(pid, &signal);
+                job.mark_signaled(pid, signal);
             }
             WaitStatus::Stopped(pid, signal) => {
                 debug!("{} was signaled to stop {:?}.", pid, signal);
                 let job_id = {
                     let job = self.find_job_with_process_mut(pid);
-                    job.mark_stopped(pid, &signal);
+                    job.mark_stopped(pid, signal);
                     job.last_running_in_foreground = false;
                     job.id
                 };
@@ -432,12 +432,7 @@ impl JobManager {
 
 impl fmt::Debug for JobManager {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{} jobs\tjob_count: {}\n",
-            self.jobs.len(),
-            self.job_count
-        )?;
+        writeln!(f, "{} jobs\tjob_count: {}", self.jobs.len(), self.job_count)?;
         for job in &self.jobs {
             write!(f, "{:?}", job)?;
         }

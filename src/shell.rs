@@ -3,6 +3,7 @@
 //! The Shell itself is responsible for managing background jobs and for
 //! maintaining an editor of previous commands.
 
+use dirs;
 use editor::Editor;
 use errors::*;
 use execute_command::spawn_processes;
@@ -73,7 +74,7 @@ impl Shell {
     }
 
     fn load_history(&mut self) -> Result<()> {
-        self.history_file = env::home_dir().map(|p| p.join(HISTORY_FILE_NAME));
+        self.history_file = dirs::home_dir().map(|p| p.join(HISTORY_FILE_NAME));
         if let Some(ref history_file) = self.history_file {
             self.editor.load_history(&history_file).or_else(|e| {
                 if let ErrorKind::ReadlineError(ReadlineError::Io(ref inner)) = *e.kind() {
@@ -94,7 +95,7 @@ impl Shell {
     /// Custom prompt to output to the user.
     pub fn prompt(&mut self) -> Result<String> {
         let cwd = env::current_dir().unwrap();
-        let home = env::home_dir().unwrap();
+        let home = dirs::home_dir().unwrap();
         let rel = match cwd.strip_prefix(&home) {
             Ok(rel) => Path::new("~").join(rel),
             Err(_) => cwd.clone(),
@@ -197,11 +198,11 @@ impl Shell {
             self.last_exit_status = self.job_manager.wait_for_job(job_id)?.unwrap();
         } else if foreground {
             self.last_exit_status = self.job_manager
-                .put_job_in_foreground(&Some(job_id), false /* cont */)?
+                .put_job_in_foreground(Some(job_id), false /* cont */)?
                 .unwrap();
         } else {
             self.job_manager
-                .put_job_in_background(&Some(job_id), false /* cont */)?;
+                .put_job_in_background(Some(job_id), false /* cont */)?;
         }
         Ok(())
     }
@@ -217,13 +218,13 @@ impl Shell {
     }
 
     /// Starts the specified job or the current one.
-    pub fn put_job_in_foreground(&mut self, job_id: &Option<JobId>) -> Result<Option<ExitStatus>> {
+    pub fn put_job_in_foreground(&mut self, job_id: Option<JobId>) -> Result<Option<ExitStatus>> {
         self.job_manager
             .put_job_in_foreground(job_id, true /* cont */)
     }
 
     /// Puts the specified job in the background, or the current one.
-    pub fn put_job_in_background(&mut self, job_id: &Option<JobId>) -> Result<()> {
+    pub fn put_job_in_background(&mut self, job_id: Option<JobId>) -> Result<()> {
         self.job_manager
             .put_job_in_background(job_id, true /* cont */)
     }
@@ -391,7 +392,7 @@ fn expand_variables_simple_command(words: &mut Vec<String>, redirects: &mut [ast
 
 fn expand_variables_word(s: &str) -> String {
     let expansion = match s {
-        "~" => env::home_dir().map(|p| p.to_string_lossy().into_owned()),
+        "~" => dirs::home_dir().map(|p| p.to_string_lossy().into_owned()),
         s if s.starts_with('$') => env::var(s[1..].to_string()).ok(),
         _ => Some(s.to_string()),
     };

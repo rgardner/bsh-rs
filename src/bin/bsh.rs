@@ -2,6 +2,7 @@
 #![cfg_attr(feature = "clippy", plugin(clippy))]
 
 extern crate bsh_rs;
+extern crate dirs;
 extern crate docopt;
 #[macro_use]
 extern crate log;
@@ -14,7 +15,6 @@ use bsh_rs::errors::*;
 use bsh_rs::{BshExitStatusExt, Shell, ShellConfig};
 use docopt::Docopt;
 use nix::unistd::Pid;
-use std::env;
 use std::path::PathBuf;
 use std::process::{self, ExitStatus};
 
@@ -49,6 +49,7 @@ struct Args {
     flag_log: Option<String>,
 }
 
+#[cfg_attr(feature = "cargo-clippy", allow(print_literal))]
 fn main() {
     let args: Args = Docopt::new(USAGE)
         .and_then(|d| d.deserialize())
@@ -89,7 +90,7 @@ fn init_logger(path: &Option<String>) {
 }
 
 fn default_log_path() -> PathBuf {
-    env::home_dir().unwrap().join(LOG_FILE_NAME)
+    dirs::home_dir().unwrap().join(LOG_FILE_NAME)
 }
 
 fn execute_from_command_string_or_file(args: &Args) -> ! {
