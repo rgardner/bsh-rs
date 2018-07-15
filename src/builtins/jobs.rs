@@ -91,10 +91,9 @@ fg: fg [job_spec]
     Status of command placed in foreground or failure if an error occurs.";
 
     fn run(shell: &mut Shell, argv: Vec<String>, _stdout: &mut Write) -> Result<()> {
-        let job_id = argv.get(1).map(|s| s.parse::<u32>()).map_or(
-            Ok(None),
-            |v| v.map(Some),
-        );
+        let job_id = argv.get(1)
+            .map(|s| s.parse::<u32>())
+            .map_or(Ok(None), |v| v.map(Some));
         match job_id {
             Ok(job_id) => shell.put_job_in_foreground(&job_id.map(JobId))?,
             Err(e) => bail!(ErrorKind::BuiltinCommandError(format!("fg: {}", e), 1)),

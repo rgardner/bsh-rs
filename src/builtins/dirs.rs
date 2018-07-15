@@ -16,28 +16,23 @@ cd: cd [dir]
 
     fn run(_shell: &mut Shell, args: Vec<String>, stdout: &mut Write) -> Result<()> {
         let dir = match args.first().map(|x| &x[..]) {
-            None => {
-                env::home_dir().ok_or_else(|| {
-                    ErrorKind::BuiltinCommandError("cd: HOME not set".into(), 1)
-                })?
-            }
-            Some("-") => {
-                match env::var_os("OLDPWD") {
-                    Some(path) => {
-                        let unicode_path = path.to_str().ok_or_else(|| {
-                            ErrorKind::BuiltinCommandError("invalid Unicode".into(), 1)
-                        })?;
-                        stdout.write_all(unicode_path.as_bytes())?;
-                        Path::new(path.as_os_str()).to_path_buf()
-                    }
-                    None => {
-                        bail!(ErrorKind::BuiltinCommandError(
-                            "cd: OLDPWD not set".to_string(),
-                            1,
-                        ));
-                    }
+            None => env::home_dir()
+                .ok_or_else(|| ErrorKind::BuiltinCommandError("cd: HOME not set".into(), 1))?,
+            Some("-") => match env::var_os("OLDPWD") {
+                Some(path) => {
+                    let unicode_path = path.to_str().ok_or_else(|| {
+                        ErrorKind::BuiltinCommandError("invalid Unicode".into(), 1)
+                    })?;
+                    stdout.write_all(unicode_path.as_bytes())?;
+                    Path::new(path.as_os_str()).to_path_buf()
                 }
-            }
+                None => {
+                    bail!(ErrorKind::BuiltinCommandError(
+                        "cd: OLDPWD not set".to_string(),
+                        1,
+                    ));
+                }
+            },
             Some(val) => Path::new(val).to_path_buf(),
         };
 

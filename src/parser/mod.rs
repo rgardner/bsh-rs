@@ -19,11 +19,9 @@ impl Command {
     pub fn parse(input: &str) -> Result<Command> {
         let result = grammar::parse_Command(input)
             .map_err(|_| ErrorKind::SyntaxError(input.into()).into())
-            .map(|inner| {
-                Command {
-                    input: input.into(),
-                    inner,
-                }
+            .map(|inner| Command {
+                input: input.into(),
+                inner,
             });
         debug!("parsed Command: {:?}", result);
         result

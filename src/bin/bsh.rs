@@ -10,8 +10,8 @@ extern crate nix;
 #[macro_use]
 extern crate serde_derive;
 
-use bsh_rs::{BshExitStatusExt, Shell, ShellConfig};
 use bsh_rs::errors::*;
+use bsh_rs::{BshExitStatusExt, Shell, ShellConfig};
 use docopt::Docopt;
 use nix::unistd::Pid;
 use std::env;
@@ -67,9 +67,9 @@ fn main() {
 }
 
 fn init_logger(path: &Option<String>) {
-    let log_path = path.clone().map(PathBuf::from).unwrap_or_else(
-        default_log_path,
-    );
+    let log_path = path.clone()
+        .map(PathBuf::from)
+        .unwrap_or_else(default_log_path);
 
     let pid = Pid::this();
     fern::Dispatch::new()

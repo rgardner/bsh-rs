@@ -8,7 +8,7 @@ use errors::*;
 use execute_command::spawn_processes;
 use job_control::{self, Job, JobId, JobManager};
 use nix::unistd;
-use parser::{Command, ast};
+use parser::{ast, Command};
 use rustyline::error::ReadlineError;
 use std::env;
 use std::fmt;
@@ -200,10 +200,8 @@ impl Shell {
                 .put_job_in_foreground(&Some(job_id), false /* cont */)?
                 .unwrap();
         } else {
-            self.job_manager.put_job_in_background(
-                &Some(job_id),
-                false, /* cont */
-            )?;
+            self.job_manager
+                .put_job_in_background(&Some(job_id), false /* cont */)?;
         }
         Ok(())
     }
@@ -220,18 +218,14 @@ impl Shell {
 
     /// Starts the specified job or the current one.
     pub fn put_job_in_foreground(&mut self, job_id: &Option<JobId>) -> Result<Option<ExitStatus>> {
-        self.job_manager.put_job_in_foreground(
-            job_id,
-            true, /* cont */
-        )
+        self.job_manager
+            .put_job_in_foreground(job_id, true /* cont */)
     }
 
     /// Puts the specified job in the background, or the current one.
     pub fn put_job_in_background(&mut self, job_id: &Option<JobId>) -> Result<()> {
-        self.job_manager.put_job_in_background(
-            job_id,
-            true, /* cont */
-        )
+        self.job_manager
+            .put_job_in_background(job_id, true /* cont */)
     }
 
     /// Kills a child with the corresponding job id.

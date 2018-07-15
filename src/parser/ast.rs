@@ -227,9 +227,8 @@ mod tests {
     #[test]
     fn test_multiple_unique_redirection() {
         assert_eq!(
-            grammar::parse_Command(">out echo <in bob").expect(
-                "'>out echo <in bob' should be valid",
-            ),
+            grammar::parse_Command(">out echo <in bob")
+                .expect("'>out echo <in bob' should be valid",),
             Command::Simple {
                 words: vec!["echo".into(), "bob".into()],
                 redirects: vec![
@@ -286,9 +285,8 @@ mod tests {
             }
         );
         assert_eq!(
-            grammar::parse_Command("<in cmd1 | cmd2 >out").expect(
-                "'<in cmd1 | cmd2 >out' should be valid",
-            ),
+            grammar::parse_Command("<in cmd1 | cmd2 >out")
+                .expect("'<in cmd1 | cmd2 >out' should be valid",),
             Command::Connection {
                 first: Box::new(Command::Simple {
                     words: vec!["cmd1".into()],
@@ -308,9 +306,8 @@ mod tests {
     #[test]
     fn test_long_connection_command() {
         assert_eq!(
-            grammar::parse_Command("cmd1 | cmd2 | cmd3").expect(
-                "'cmd1 | cmd2 | cmd3' should be valid",
-            ),
+            grammar::parse_Command("cmd1 | cmd2 | cmd3")
+                .expect("'cmd1 | cmd2 | cmd3' should be valid",),
             Command::Connection {
                 first: Box::new(simple_command(vec!["cmd1".into()])),
                 second: Box::new(Command::Connection {
@@ -322,9 +319,8 @@ mod tests {
             }
         );
         assert_eq!(
-            grammar::parse_Command("cmd1 | cmd2 ; cmd3").expect(
-                "'cmd1 | cmd2 ; cmd3' should be valid",
-            ),
+            grammar::parse_Command("cmd1 | cmd2 ; cmd3")
+                .expect("'cmd1 | cmd2 ; cmd3' should be valid",),
             Command::Connection {
                 first: Box::new(simple_command(vec!["cmd1".into()])),
                 second: Box::new(Command::Connection {
@@ -366,9 +362,8 @@ mod tests {
     #[test]
     fn test_quotes() {
         assert_eq!(
-            grammar::parse_Command(">'out' 'echo' <in 'arg'").expect(
-                r#">''out' 'echo' <in 'arg' should be valid"#,
-            ),
+            grammar::parse_Command(">'out' 'echo' <in 'arg'")
+                .expect(r#">''out' 'echo' <in 'arg' should be valid"#,),
             Command::Simple {
                 words: vec!["echo".into(), "arg".into()],
                 redirects: vec![
@@ -432,9 +427,8 @@ mod tests {
     #[test]
     fn test_quotes_allow_special_characters() {
         assert_eq!(
-            grammar::parse_Command(r#"echo '& ; echo |'"#).expect(
-                r#"'echo '& ; echo |'' should be valid"#,
-            ),
+            grammar::parse_Command(r#"echo '& ; echo |'"#)
+                .expect(r#"'echo '& ; echo |'' should be valid"#,),
             simple_command(vec!["echo".into(), r#"& ; echo |"#.into()])
         );
     }

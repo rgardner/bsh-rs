@@ -29,15 +29,13 @@ history: history [-c] [-s size] [n]
                     }
                 }
             }
-            s => {
-                match s.parse::<usize>() {
-                    Ok(n) => writeln!(stdout, "{}", history_display(&shell.editor, n))?,
-                    Err(_) => {
-                        let msg = format!("history: {}: nonnegative numeric argument required", s);
-                        bail!(ErrorKind::BuiltinCommandError(msg, 1));
-                    }
+            s => match s.parse::<usize>() {
+                Ok(n) => writeln!(stdout, "{}", history_display(&shell.editor, n))?,
+                Err(_) => {
+                    let msg = format!("history: {}: nonnegative numeric argument required", s);
+                    bail!(ErrorKind::BuiltinCommandError(msg, 1));
                 }
-            }
+            },
         }
         Ok(())
     }

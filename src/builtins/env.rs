@@ -70,7 +70,7 @@ unset: unset [name ...]
 mod tests {
     use super::*;
     use builtins::BuiltinCommand;
-    use rand::{Rng, thread_rng};
+    use rand::{thread_rng, Rng};
     use shell::Shell;
     use std::env;
     use std::io;

@@ -33,14 +33,12 @@ impl Stdin {
     fn new(redirect: &ast::Redirect) -> Result<Self> {
         match redirect.redirectee {
             ast::Redirectee::FileDescriptor(fd) => unsafe { Ok(File::from_raw_fd(fd).into()) },
-            ast::Redirectee::Filename(ref filename) => {
-                match redirect.instruction {
-                    ast::RedirectInstruction::Output => {
-                        panic!("Stdin::new called with stdout redirect");
-                    }
-                    ast::RedirectInstruction::Input => Ok(Stdin::File(File::open(filename)?)),
+            ast::Redirectee::Filename(ref filename) => match redirect.instruction {
+                ast::RedirectInstruction::Output => {
+                    panic!("Stdin::new called with stdout redirect");
                 }
-            }
+                ast::RedirectInstruction::Input => Ok(Stdin::File(File::open(filename)?)),
+            },
         }
     }
 }
@@ -51,17 +49,15 @@ impl Stdout {
     fn new(redirect: &ast::Redirect) -> Result<Self> {
         match redirect.redirectee {
             ast::Redirectee::FileDescriptor(fd) => unsafe { Ok(File::from_raw_fd(fd).into()) },
-            ast::Redirectee::Filename(ref filename) => {
-                match redirect.instruction {
-                    ast::RedirectInstruction::Output => {
-                        let file = OpenOptions::new().write(true).create(true).open(filename)?;
-                        Ok(Stdout::File(file))
-                    }
-                    ast::RedirectInstruction::Input => {
-                        panic!("Stdout::new called with stdin redirect");
-                    }
+            ast::Redirectee::Filename(ref filename) => match redirect.instruction {
+                ast::RedirectInstruction::Output => {
+                    let file = OpenOptions::new().write(true).create(true).open(filename)?;
+                    Ok(Stdout::File(file))
                 }
-            }
+                ast::RedirectInstruction::Input => {
+                    panic!("Stdout::new called with stdin redirect");
+                }
+            },
         }
     }
 }
@@ -286,7 +282,6 @@ fn run_connection_command(
                 _spawn_processes(shell, second, pipe, stdout, pgid)?;
             first_result.extend(second_result);
             Ok((first_result, pgid, output))
-
         }
         ast::Connector::Semicolon => {
             let (mut first_result, _, _) = _spawn_processes(shell, first, stdin, None, pgid)?;
@@ -461,8 +456,8 @@ fn create_pipe() -> Result<(File, File)> {
 }
 
 fn wait_for_process(pid: u32) -> Result<ExitStatus> {
-    use nix::unistd::Pid;
     use nix::sys::wait::{self, WaitStatus};
+    use nix::unistd::Pid;
 
     let pid = Pid::from_raw(pid as i32);
     let wait_status = wait::waitpid(pid, None)?;

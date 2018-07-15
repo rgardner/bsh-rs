@@ -1,5 +1,5 @@
-use builtins::{self, BuiltinCommand, dirs, env, exit, history, jobs, kill};
 use builtins::prelude::*;
+use builtins::{self, dirs, env, exit, history, jobs, kill, BuiltinCommand};
 
 pub struct Help;
 

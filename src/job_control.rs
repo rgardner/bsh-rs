@@ -48,7 +48,6 @@ pub fn initialize_job_control() -> Result<()> {
     Ok(())
 }
 
-
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct JobId(pub u32);
 
@@ -121,15 +120,15 @@ impl Job {
     }
 
     fn is_stopped(&self) -> bool {
-        self.processes.iter().all(|p| {
-            p.status() == ProcessStatus::Stopped
-        })
+        self.processes
+            .iter()
+            .all(|p| p.status() == ProcessStatus::Stopped)
     }
 
     fn is_completed(&self) -> bool {
-        self.processes.iter().all(|p| {
-            p.status() == ProcessStatus::Completed
-        })
+        self.processes
+            .iter()
+            .all(|p| p.status() == ProcessStatus::Completed)
     }
 
     fn mark_exited(&mut self, pid: Pid, status_code: i32) {
@@ -256,15 +255,14 @@ impl JobManager {
         job_id: &Option<JobId>,
         cont: bool,
     ) -> Result<Option<ExitStatus>> {
-        let job_id = job_id.or(self.current_job).ok_or_else(|| {
-            ErrorKind::NoSuchJobError("current".into())
-        })?;
+        let job_id = job_id
+            .or(self.current_job)
+            .ok_or_else(|| ErrorKind::NoSuchJobError("current".into()))?;
         debug!("putting job [{}] in foreground", job_id);
 
         let _terminal_state = {
-            let job = self.find_job_mut(job_id).ok_or_else(|| {
-                ErrorKind::NoSuchJobError(format!("{}", job_id))
-            })?;
+            let job = self.find_job_mut(job_id)
+                .ok_or_else(|| ErrorKind::NoSuchJobError(format!("{}", job_id)))?;
             job.last_running_in_foreground = true;
             let _terminal_state = job.pgid.map(|pgid| TerminalState::new(Pid::from_raw(pgid)));
 
@@ -292,14 +290,13 @@ impl JobManager {
     }
 
     pub fn put_job_in_background(&mut self, job_id: &Option<JobId>, cont: bool) -> Result<()> {
-        let job_id = job_id.or(self.current_job).ok_or_else(|| {
-            ErrorKind::NoSuchJobError("current".into())
-        })?;
+        let job_id = job_id
+            .or(self.current_job)
+            .ok_or_else(|| ErrorKind::NoSuchJobError("current".into()))?;
         debug!("putting job [{}] in background", job_id);
         let job_pgid = {
-            let job = self.find_job_mut(job_id).ok_or_else(|| {
-                ErrorKind::NoSuchJobError(format!("{}", job_id))
-            })?;
+            let job = self.find_job_mut(job_id)
+                .ok_or_else(|| ErrorKind::NoSuchJobError(format!("{}", job_id)))?;
             job.last_running_in_foreground = false;
             job.pgid
         };
@@ -337,8 +334,7 @@ impl JobManager {
             let wait_status =
                 wait::waitpid(None, Some(WaitPidFlag::WUNTRACED | WaitPidFlag::WNOHANG));
             match wait_status {
-                Ok(WaitStatus::StillAlive) |
-                Err(nix::Error::Sys(Errno::ECHILD)) => break,
+                Ok(WaitStatus::StillAlive) | Err(nix::Error::Sys(Errno::ECHILD)) => break,
                 Ok(status) => self.mark_process_status(&status),
                 Err(e) => return Err(e.into()),
             }
