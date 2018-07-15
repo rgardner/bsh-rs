@@ -11,14 +11,14 @@ name = "bsh"
 path = "src/bin/bsh.rs"
 
 [build-dependencies]
-lalrpop = "0.13.1"
+lalrpop = "0.15.2"
 
 [dependencies]
 dirs = "1.0.2"
 docopt = "0.8.1"
 error-chain = "0.11.0"
 fern = "0.4.3"
-lalrpop-util = "0.13.1"
+lalrpop-util = "0.15.2"
 log = "0.3.8"
 regex = "0.2.2"
 serde = "1.0.18"
