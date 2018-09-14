@@ -85,6 +85,8 @@ pub fn run<T: AsRef<str>>(
     argv: &[T],
     stdout: &mut Write,
 ) -> (ExitStatus, Result<()>) {
+    debug_assert!(is_builtin(argv));
+
     let result = match &*program(argv) {
         BG_NAME => Bg::run(shell, get_argv(argv), stdout),
         CD_NAME => Cd::run(shell, args(argv), stdout),

@@ -33,7 +33,7 @@ $ cargo clippy
 $ # run tests
 $ cargo test
 $ # generate documentation
-$ cargo doc
+$ cargo doc --document-private-items
 ```
 
 ## Features
