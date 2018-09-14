@@ -24,16 +24,16 @@ $ target/debug/bsh --help
 ```bash
 $ # setup dev environment (e.g. git hooks)
 $ ./scripts/dev_setup.sh
+$ # Check program for errors, quicker than full build
+$ cargo check
 $ # build
 $ cargo build
+$ # run lints
+$ cargo clippy
 $ # run tests
 $ cargo test
 $ # generate documentation
 $ cargo doc
-$ # run clippy lints via features
-$ rustup run +"$(cat rustnightly.txt)" cargo build --features "clippy"
-$ # run clippy lints via cargo subcommand
-$ rustup run +"$(cat rustnightly.txt)" cargo clippy
 ```
 
 ## Features

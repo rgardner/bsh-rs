@@ -1,12 +1,10 @@
 #!/bin/sh
 
-repo_root="$(git rev-parse --show-toplevel)"
-
 # warn, but do not block commit for clippy warnings
-cargo +"$(cat "$repo_root"/rustnightly.txt)" clippy
+cargo clippy || true
 
 # warn and block commit for rustfmt formatting changes
-cargo fmt -- --write-mode=diff
+cargo fmt --all -- --check
 exit_status="$?"
 if [ "$exit_status" -ne 0 ]; then
     >&2 echo "Review rustfmt changes"
