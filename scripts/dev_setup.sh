@@ -1,3 +1,3 @@
 #!/bin/sh
 
-ln -s scripts/git-hooks/* .git/hooks/
+ln -sf ../../scripts/git-hooks/pre-commit .git/hooks/

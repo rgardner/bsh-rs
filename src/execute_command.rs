@@ -41,7 +41,7 @@ impl Stdin {
                     panic!("Stdin::new called with stdout redirect");
                 }
                 ast::RedirectInstruction::Input => Ok(Stdin::File(
-                    File::open(filename).with_context(|_| ErrorKind::Io)?
+                    File::open(filename).with_context(|_| ErrorKind::Io)?,
                 )),
             },
         }
@@ -424,8 +424,7 @@ fn get_stdin_redirect(redirects: &[ast::Redirect]) -> Option<&ast::Redirect> {
                 ast::Redirectee::Filename(_) => true,
                 _ => false,
             }
-        })
-        .nth(0)
+        }).nth(0)
 }
 
 /// Gets the last stdout redirect in `redirects`
@@ -442,8 +441,7 @@ fn get_stdout_redirect(redirects: &[ast::Redirect]) -> Option<&ast::Redirect> {
                 ast::Redirectee::Filename(_) => true,
                 _ => false,
             }
-        })
-        .nth(0)
+        }).nth(0)
 }
 
 /// Wraps `unistd::pipe()` to return RAII structs instead of raw, owning file descriptors

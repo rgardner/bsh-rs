@@ -79,7 +79,8 @@ impl Editor {
     /// Get the history entry at an absolute position
     pub fn get_history_entry(&self, abs_pos: usize) -> Option<&String> {
         // map abs_pos to [0, self.history_capacity]
-        let begin = self.history_count
+        let begin = self
+            .history_count
             .checked_sub(self.history_capacity)
             .unwrap_or(0);
         if (abs_pos < begin) || (abs_pos > self.history_count) {
@@ -120,10 +121,12 @@ impl Editor {
         let entry = match arg.parse::<isize>() {
             Ok(0) => None,
             Ok(n) if n > 0 => self.get_history_entry((n - 1) as usize),
-            Ok(n) => self.history_count
+            Ok(n) => self
+                .history_count
                 .checked_sub(n.wrapping_abs() as usize)
                 .and_then(|i| self.get_history_entry(i)),
-            Err(_) => self.internal
+            Err(_) => self
+                .internal
                 .get_history_const()
                 .search(&arg, self.history_count - 1, history::Direction::Reverse)
                 .and_then(|idx| self.internal.get_history_const().get(idx)),
@@ -146,7 +149,8 @@ impl Editor {
     }
 
     pub fn enumerate_history_entries(&self) -> EditorEnumerate {
-        let start = self.history_count
+        let start = self
+            .history_count
             .checked_sub(self.history_capacity)
             .unwrap_or(0);
         EditorEnumerate {
@@ -183,7 +187,8 @@ impl<'a> Iterator for EditorEnumerate<'a> {
     type Item = (usize, &'a String);
 
     fn next(&mut self) -> Option<(usize, &'a String)> {
-        let v = self.editor
+        let v = self
+            .editor
             .get_history_entry(self.pos)
             .map(|e| (self.pos, e));
         if v.is_some() {

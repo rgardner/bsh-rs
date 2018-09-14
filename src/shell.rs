@@ -198,7 +198,8 @@ impl Shell {
         if !self.is_interactive() {
             self.last_exit_status = self.job_manager.wait_for_job(job_id)?.unwrap();
         } else if foreground {
-            self.last_exit_status = self.job_manager
+            self.last_exit_status = self
+                .job_manager
                 .put_job_in_foreground(Some(job_id), false /* cont */)?
                 .unwrap();
         } else {

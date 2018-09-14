@@ -69,7 +69,8 @@ fn main() {
 }
 
 fn init_logger(path: &Option<String>) {
-    let log_path = path.clone()
+    let log_path = path
+        .clone()
         .map(PathBuf::from)
         .unwrap_or_else(default_log_path);
 
@@ -83,8 +84,7 @@ fn init_logger(path: &Option<String>) {
                 record.target(),
                 message
             ))
-        })
-        .level(log::LogLevelFilter::Trace)
+        }).level(log::LogLevelFilter::Trace)
         .chain(fern::log_file(log_path).unwrap())
         .apply()
         .unwrap();

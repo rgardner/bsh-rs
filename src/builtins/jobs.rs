@@ -94,7 +94,8 @@ fg: fg [job_spec]
     Status of command placed in foreground or failure if an error occurs.";
 
     fn run(shell: &mut Shell, argv: Vec<String>, _stdout: &mut Write) -> Result<()> {
-        let job_id = argv.get(1)
+        let job_id = argv
+            .get(1)
             .map(|s| s.parse::<u32>())
             .map_or(Ok(None), |v| v.map(Some));
         match job_id {
@@ -127,7 +128,8 @@ bg: bg [<jobspec>...]
                 writeln!(stdout, "{}", e).context(ErrorKind::Io)?;
             }
         } else {
-            let job_ids: Vec<res::Result<JobId, ParseIntError>> = argv.iter()
+            let job_ids: Vec<res::Result<JobId, ParseIntError>> = argv
+                .iter()
                 .skip(1)
                 .map(|s| s.parse::<u32>().map(JobId))
                 .collect();

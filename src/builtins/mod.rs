@@ -74,7 +74,8 @@ pub fn is_builtin<T: AsRef<str>>(argv: &[T]) -> bool {
         KILL_NAME,
         JOBS_NAME,
         UNSET_NAME,
-    ].contains(&(program(argv).as_str()))
+    ]
+        .contains(&(program(argv).as_str()))
 }
 
 /// precondition: command is a builtin.

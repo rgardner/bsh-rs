@@ -18,10 +18,13 @@ cd: cd [dir]
 
     fn run(_shell: &mut Shell, args: Vec<String>, stdout: &mut Write) -> Result<()> {
         let dir = match args.first().map(|x| &x[..]) {
-            None => dirs::home_dir().ok_or_else(|| Error::builtin_command("cd: HOME not set", 1))?,
+            None => {
+                dirs::home_dir().ok_or_else(|| Error::builtin_command("cd: HOME not set", 1))?
+            }
             Some("-") => match env::var_os("OLDPWD") {
                 Some(path) => {
-                    let unicode_path = path.to_str()
+                    let unicode_path = path
+                        .to_str()
                         .ok_or_else(|| Error::builtin_command("invalid Unicode", 1))?;
                     stdout
                         .write_all(unicode_path.as_bytes())

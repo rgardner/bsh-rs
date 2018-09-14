@@ -265,7 +265,8 @@ impl JobManager {
         debug!("putting job [{}] in foreground", job_id);
 
         let _terminal_state = {
-            let job = self.find_job_mut(job_id)
+            let job = self
+                .find_job_mut(job_id)
                 .ok_or_else(|| Error::no_such_job(format!("{}", job_id)))?;
             job.last_running_in_foreground = true;
             let _terminal_state = job.pgid.map(|pgid| TerminalState::new(Pid::from_raw(pgid)));
@@ -299,7 +300,8 @@ impl JobManager {
             .ok_or_else(|| Error::no_such_job("current"))?;
         debug!("putting job [{}] in background", job_id);
         let job_pgid = {
-            let job = self.find_job_mut(job_id)
+            let job = self
+                .find_job_mut(job_id)
                 .ok_or_else(|| Error::no_such_job(format!("{}", job_id)))?;
             job.last_running_in_foreground = false;
             job.pgid
