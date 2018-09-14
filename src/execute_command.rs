@@ -24,7 +24,7 @@ enum Stdin {
 }
 
 #[derive(Debug)]
-enum Stdout {
+enum Output {
     File(File),
     CreatePipe,
     Inherit,
@@ -34,6 +34,8 @@ impl Stdin {
     /// # Panics
     /// Panics if `redirect` is not an input redirect
     fn new(redirect: &ast::Redirect) -> Result<Self> {
+        debug_assert!(is_stdin_redirect(redirect));
+
         match redirect.redirectee {
             ast::Redirectee::FileDescriptor(fd) => unsafe { Ok(File::from_raw_fd(fd).into()) },
             ast::Redirectee::Filename(ref filename) => match redirect.instruction {
@@ -48,10 +50,12 @@ impl Stdin {
     }
 }
 
-impl Stdout {
+impl Output {
     /// # Panics
     /// Panics if `redirect` is not an output redirect
     fn new(redirect: &ast::Redirect) -> Result<Self> {
+        debug_assert!(is_stdout_redirect(redirect) || is_stderr_redirect(redirect));
+
         match redirect.redirectee {
             ast::Redirectee::FileDescriptor(fd) => unsafe { Ok(File::from_raw_fd(fd).into()) },
             ast::Redirectee::Filename(ref filename) => match redirect.instruction {
@@ -61,10 +65,10 @@ impl Stdout {
                         .create(true)
                         .open(filename)
                         .context(ErrorKind::Io)?;
-                    Ok(Stdout::File(file))
+                    Ok(Output::File(file))
                 }
                 ast::RedirectInstruction::Input => {
-                    panic!("Stdout::new called with stdin redirect");
+                    panic!("Output::new called with stdin redirect");
                 }
             },
         }
@@ -77,9 +81,9 @@ impl From<File> for Stdin {
     }
 }
 
-impl From<File> for Stdout {
+impl From<File> for Output {
     fn from(file: File) -> Self {
-        Stdout::File(file)
+        Output::File(file)
     }
 }
 
@@ -93,12 +97,12 @@ impl From<Stdin> for Stdio {
     }
 }
 
-impl From<Stdout> for Stdio {
-    fn from(stdout: Stdout) -> Self {
+impl From<Output> for Stdio {
+    fn from(stdout: Output) -> Self {
         match stdout {
-            Stdout::File(file) => file.into(),
-            Stdout::CreatePipe => Self::piped(),
-            Stdout::Inherit => Self::inherit(),
+            Output::File(file) => file.into(),
+            Output::CreatePipe => Self::piped(),
+            Output::Inherit => Self::inherit(),
         }
     }
 }
@@ -209,7 +213,7 @@ fn _spawn_processes(
     shell: &mut Shell,
     command: &ast::Command,
     stdin: Option<Stdin>,
-    stdout: Option<Stdout>,
+    stdout: Option<Output>,
     pgid: Option<u32>) -> Result<(Vec<Process>, Option<u32>, Option<Stdin>)>
 {
     // restrict scope of borrowing `current` via `{current}` (new scope)
@@ -219,8 +223,9 @@ fn _spawn_processes(
             // simple commands prefer file redirects to piping, following bash's behavior
             let stdin_redirect = get_stdin_redirect(redirects);
             let stdout_redirect = get_stdout_redirect(redirects);
+            let stderr_redirect = get_stderr_redirect(redirects);
 
-            // convert stdin and stdout to Stdin/Stdout and return if either fails
+            // convert stdin and stdout to Stdin/Output and return if either fails
             // i.e. Option<&Redirect> -> Option<Result<Stdin>>
             //                        -> Result<Option<Stdin>>
             //                        -> Option<Stdin>
@@ -231,12 +236,16 @@ fn _spawn_processes(
                 .or(stdin)
                 .unwrap_or(Stdin::Inherit);
             let stdout = stdout_redirect
-                .map(Stdout::new)
+                .map(Output::new)
                 .map_or(Ok(None), |v| v.map(Some))?
                 .or(stdout)
-                .unwrap_or(Stdout::Inherit);
+                .unwrap_or(Output::Inherit);
+            let stderr = stderr_redirect
+                .map(Output::new)
+                .map_or(Ok(None), |v| v.map(Some))?
+                .unwrap_or(Output::Inherit);
 
-            let (result, pgid, output) = run_simple_command(shell, words, stdin, stdout, pgid)?;
+            let (result, pgid, output) = run_simple_command(shell, words, stdin, stdout, stderr, pgid)?;
             Ok((vec![result], pgid, output))
         }
         ast::Command::Connection { ref first, ref second, ref connector } => {
@@ -249,28 +258,29 @@ fn run_simple_command(
     shell: &mut Shell,
     words: &[String],
     stdin: Stdin,
-    stdout: Stdout,
+    stdout: Output,
+    stderr: Output,
     pgid: Option<u32>,
 ) -> Result<(Process, Option<u32>, Option<Stdin>)> {
     if builtins::is_builtin(words) {
         // TODO(rogardn): change Result usage in builtin to only be for rust
         // errors, e.g. builtin::execute shouldn't return a Result
         let (status_code, output) = match stdout {
-            Stdout::File(mut file) => (builtins::run(shell, words, &mut file).0, None),
-            Stdout::CreatePipe => {
+            Output::File(mut file) => (builtins::run(shell, words, &mut file).0, None),
+            Output::CreatePipe => {
                 let (read_end_pipe, mut write_end_pipe) = create_pipe()?;
                 (
                     builtins::run(shell, words, &mut write_end_pipe).0,
                     Some(read_end_pipe.into()),
                 )
             }
-            Stdout::Inherit => (builtins::run(shell, words, &mut io::stdout()).0, None),
+            Output::Inherit => (builtins::run(shell, words, &mut io::stdout()).0, None),
         };
 
         let process = Process::new_builtin(words, status_code);
         Ok((process, pgid, output))
     } else {
-        run_external_command(shell, &words[..], stdin, stdout, pgid)
+        run_external_command(shell, &words[..], stdin, stdout, stderr, pgid)
     }
 }
 
@@ -280,13 +290,13 @@ fn run_connection_command(
     second: &ast::Command,
     connector: &ast::Connector,
     stdin: Option<Stdin>,
-    stdout: Option<Stdout>,
+    stdout: Option<Output>,
     pgid: Option<u32>,
 ) -> Result<(Vec<Process>, Option<u32>, Option<Stdin>)> {
     match *connector {
         ast::Connector::Pipe => {
             let (mut first_result, pgid, pipe) =
-                _spawn_processes(shell, first, stdin, Some(Stdout::CreatePipe), pgid)?;
+                _spawn_processes(shell, first, stdin, Some(Output::CreatePipe), pgid)?;
             let (second_result, pgid, output) =
                 _spawn_processes(shell, second, pipe, stdout, pgid)?;
             first_result.extend(second_result);
@@ -331,13 +341,15 @@ fn run_external_command(
     shell: &Shell,
     words: &[String],
     stdin: Stdin,
-    stdout: Stdout,
+    stdout: Output,
+    stderr: Output,
     pgid: Option<u32>,
 ) -> Result<(Process, Option<u32>, Option<Stdin>)> {
     let mut command = Command::new(&words[0]);
     command.args(words[1..].iter());
     command.stdin(stdin);
     command.stdout(stdout);
+    command.stderr(stderr);
 
     let shell_is_interactive = shell.is_interactive();
     command.before_exec(move || {
@@ -415,16 +427,20 @@ fn get_stdin_redirect(redirects: &[ast::Redirect]) -> Option<&ast::Redirect> {
     redirects
         .iter()
         .rev()
-        .filter(|r| {
-            if (r.instruction != ast::RedirectInstruction::Input) || (r.redirector.is_some()) {
-                return false;
-            }
+        .filter(|r| is_stdin_redirect(r))
+        .nth(0)
+}
 
-            match r.redirectee {
-                ast::Redirectee::Filename(_) => true,
-                _ => false,
-            }
-        }).nth(0)
+fn is_stdin_redirect(redirect: &ast::Redirect) -> bool {
+    if (redirect.instruction != ast::RedirectInstruction::Input) || (redirect.redirector.is_some())
+    {
+        return false;
+    }
+
+    match redirect.redirectee {
+        ast::Redirectee::Filename(_) => true,
+        _ => false,
+    }
 }
 
 /// Gets the last stdout redirect in `redirects`
@@ -432,16 +448,49 @@ fn get_stdout_redirect(redirects: &[ast::Redirect]) -> Option<&ast::Redirect> {
     redirects
         .iter()
         .rev()
-        .filter(|r| {
-            if r.instruction != ast::RedirectInstruction::Output {
-                return false;
-            }
+        .filter(|r| is_stdout_redirect(r))
+        .nth(0)
+}
 
-            match r.redirectee {
-                ast::Redirectee::Filename(_) => true,
-                _ => false,
-            }
-        }).nth(0)
+fn is_stdout_redirect(redirect: &ast::Redirect) -> bool {
+    match redirect.redirector {
+        None | Some(ast::Redirectee::FileDescriptor(1)) => (),
+        _ => return false,
+    }
+
+    if redirect.instruction != ast::RedirectInstruction::Output {
+        return false;
+    }
+
+    match redirect.redirectee {
+        ast::Redirectee::Filename(_) => true,
+        _ => false,
+    }
+}
+
+/// Gets the last stderr redirect in `redirects`
+fn get_stderr_redirect(redirects: &[ast::Redirect]) -> Option<&ast::Redirect> {
+    redirects
+        .iter()
+        .rev()
+        .filter(|r| is_stderr_redirect(r))
+        .nth(0)
+}
+
+fn is_stderr_redirect(redirect: &ast::Redirect) -> bool {
+    match redirect.redirector {
+        Some(ast::Redirectee::FileDescriptor(2)) => (),
+        _ => return false,
+    }
+
+    if redirect.instruction != ast::RedirectInstruction::Output {
+        return false;
+    }
+
+    match redirect.redirectee {
+        ast::Redirectee::Filename(_) => true,
+        _ => false,
+    }
 }
 
 /// Wraps `unistd::pipe()` to return RAII structs instead of raw, owning file descriptors

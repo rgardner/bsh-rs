@@ -6,7 +6,8 @@ extern crate chrono;
 extern crate lazy_static;
 extern crate tempdir;
 
-use std::io;
+use std::fs::File;
+use std::io::{self, Read};
 use std::path::PathBuf;
 
 use assert_cli::Assert;
@@ -41,35 +42,37 @@ fn bsh_assert() -> Assert {
 
 #[test]
 fn test_simple_echo() {
-    let args = ["-c", "echo foo"];
-    let expected_stdout = "foo";
     bsh_assert()
-        .with_args(&args)
+        .with_args(&["-c", "echo foo"])
         .stdout()
-        .is(expected_stdout)
+        .is("foo")
         .unwrap();
 }
 
 #[test]
 fn test_exit_normal_large_negative() {
-    let args = ["-c", "exit 85"];
-    bsh_assert().with_args(&args).exit_status_is(85).unwrap();
+    bsh_assert()
+        .with_args(&["-c", "exit 85"])
+        .exit_status_is(85)
+        .unwrap();
 
-    let args = ["-c", "exit 500"];
-    bsh_assert().with_args(&args).exit_status_is(244).unwrap();
+    bsh_assert()
+        .with_args(&["-c", "exit 500"])
+        .exit_status_is(244)
+        .unwrap();
 
-    let args = ["-c", "exit -500"];
-    bsh_assert().with_args(&args).exit_status_is(12).unwrap();
+    bsh_assert()
+        .with_args(&["-c", "exit -500"])
+        .exit_status_is(12)
+        .unwrap();
 }
 
 #[test]
 fn test_simple_pipeline() {
-    let args = ["-c", "echo needle | grep needle"];
-    let expected_stdout = "needle\n";
     bsh_assert()
-        .with_args(&args)
+        .with_args(&["-c", "echo needle | grep needle"])
         .stdout()
-        .is(expected_stdout)
+        .is("needle\n")
         .unwrap();
 }
 
@@ -77,14 +80,30 @@ fn test_simple_pipeline() {
 fn test_simple_redirects() {
     let temp_dir = generate_temp_directory().unwrap();
     let command = "echo 'test needle, please ignore' >outfile; grep <outfile 'needle'";
-    let args = ["-c", command];
     let expected_stdout = "test needle, please ignore\n";
     bsh_assert()
         .current_dir(temp_dir.path())
-        .with_args(&args)
+        .with_args(&["-c", command])
         .stdout()
         .is(expected_stdout)
         .unwrap();
+}
+
+#[test]
+fn test_stderr_redirect() {
+    let temp_dir = generate_temp_directory().unwrap();
+    let command = r#"python3 -c 'import sys; print("test needle", file=sys.stderr)' 2>errfile"#;
+    bsh_assert()
+        .current_dir(temp_dir.path())
+        .with_args(&["-c", command])
+        .succeeds()
+        .unwrap();
+
+    let mut file = File::open(temp_dir.path().join("errfile")).expect("unable to open errfile");
+    let mut contents = String::new();
+    file.read_to_string(&mut contents)
+        .expect("failed to read errfile");
+    assert_eq!(contents, "test needle\n");
 }
 
 #[test]
