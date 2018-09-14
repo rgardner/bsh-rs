@@ -18,9 +18,9 @@ pub trait BshExitStatusExt {
 impl BshExitStatusExt for ExitStatus {
     /// # Example
     /// ```rust
-    /// # extern crate bsh_rs;
+    /// # extern crate bsh;
     /// # fn main() {
-    /// use bsh_rs::BshExitStatusExt;
+    /// use bsh::BshExitStatusExt;
     /// use std::process::ExitStatus;
     /// assert!(ExitStatus::from_success().success());
     /// # }
@@ -31,9 +31,9 @@ impl BshExitStatusExt for ExitStatus {
 
     /// # Example
     /// ```rust
-    /// # extern crate bsh_rs;
+    /// # extern crate bsh;
     /// # fn main() {
-    /// use bsh_rs::BshExitStatusExt;
+    /// use bsh::BshExitStatusExt;
     /// use std::process::ExitStatus;
     /// assert!(!ExitStatus::from_failure().success());
     /// # }
@@ -44,9 +44,9 @@ impl BshExitStatusExt for ExitStatus {
 
     /// # Example
     /// ```rust
-    /// # extern crate bsh_rs;
+    /// # extern crate bsh;
     /// # fn main() {
-    /// use bsh_rs::BshExitStatusExt;
+    /// use bsh::BshExitStatusExt;
     /// use std::process::ExitStatus;
     /// assert!(ExitStatus::from_status(0).success());
     /// assert!(!ExitStatus::from_status(1).success());
