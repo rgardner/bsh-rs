@@ -7,9 +7,9 @@ impl BuiltinCommand for Help {
     const NAME: &'static str = builtins::HELP_NAME;
 
     const HELP: &'static str = "\
-HELP: HELP [command ...]
-    Display HELPful information about builtin commands. If COMMAND is specified,
-    gives detailed HELP on all commands matching COMMAND, otherwise a list of the
+help: help [command ...]
+    Display helpful information about builtin commands. If COMMAND is specified,
+    gives detailed help on all commands matching COMMAND, otherwise a list of the
     builtins is printed.";
 
     fn run(_shell: &mut Shell, args: Vec<String>, stdout: &mut Write) -> Result<()> {

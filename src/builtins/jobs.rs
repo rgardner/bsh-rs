@@ -22,7 +22,7 @@ impl builtins::BuiltinCommand for Jobs {
     const NAME: &'static str = builtins::JOBS_NAME;
 
     const HELP: &'static str = "\
-Usage: jobs [options] [<jobspec>...]
+jobs: jobs [options] [<jobspec>...]
 
 Display status of jobs.
 
