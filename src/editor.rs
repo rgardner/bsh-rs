@@ -4,14 +4,44 @@ use std::path::Path;
 use std::str;
 
 use failure::{Fail, ResultExt};
-use rustyline::completion::FilenameCompleter;
 use rustyline::error::ReadlineError;
-use rustyline::{self, history, CompletionType, Config};
+use rustyline::{
+    self,
+    completion::{Completer, FilenameCompleter, Pair},
+    highlight::Highlighter,
+    hint::Hinter,
+    history, CompletionType, Config, Helper,
+};
 
 use errors::{Error, ErrorKind, Result};
 
+struct EditorHelper(FilenameCompleter);
+
+impl Completer for EditorHelper {
+    type Candidate = Pair;
+
+    fn complete(
+        &self,
+        line: &str,
+        pos: usize,
+    ) -> ::std::result::Result<(usize, Vec<Pair>), ReadlineError> {
+        self.0.complete(line, pos)
+    }
+}
+
+impl Hinter for EditorHelper {
+    fn hint(&self, _line: &str, _pos: usize) -> Option<String> {
+        // default implementation for now: no hint is available
+        None
+    }
+}
+
+impl Highlighter for EditorHelper {}
+
+impl Helper for EditorHelper {}
+
 pub struct Editor {
-    internal: rustyline::Editor<(FilenameCompleter)>,
+    internal: rustyline::Editor<EditorHelper>,
     /// The total number of history items ever saved
     history_count: usize,
     history_capacity: usize,
@@ -26,7 +56,7 @@ impl Editor {
             .build();
 
         let mut internal = rustyline::Editor::with_config(config);
-        internal.set_completer(Some(FilenameCompleter::new()));
+        internal.set_helper(Some(EditorHelper(FilenameCompleter::new())));
 
         Editor {
             internal,
@@ -87,14 +117,14 @@ impl Editor {
             return None;
         }
 
-        self.internal.get_history_const().get(abs_pos - begin)
+        self.internal.history().get(abs_pos - begin)
     }
 
     /// Set maximum number of remembered history entries.
     ///
     /// If `size` > current max size, retain last `size` entries.
     pub fn set_history_max_size(&mut self, size: usize) {
-        self.internal.get_history().set_max_len(size);
+        self.internal.history_mut().set_max_len(size);
         self.history_capacity = size;
     }
 
@@ -127,9 +157,9 @@ impl Editor {
                 .and_then(|i| self.get_history_entry(i)),
             Err(_) => self
                 .internal
-                .get_history_const()
+                .history()
                 .search(&arg, self.history_count - 1, history::Direction::Reverse)
-                .and_then(|idx| self.internal.get_history_const().get(idx)),
+                .and_then(|idx| self.internal.history().get(idx)),
         };
 
         match entry {
@@ -222,7 +252,7 @@ mod tests {
     fn init_with_capacity() {
         let capacity = 10;
         let state = Editor::with_capacity(capacity);
-        assert!(state.internal.get_history_const().is_empty());
+        assert!(state.internal.history().is_empty());
         assert_eq!(state.history_count, 0);
         assert_eq!(state.history_capacity, capacity);
     }
@@ -232,7 +262,7 @@ mod tests {
         let capacity = 10;
         let mut state = alloc_history_state(capacity, 5);
         state.clear_history();
-        assert!(state.internal.get_history_const().is_empty());
+        assert!(state.internal.history().is_empty());
         assert_eq!(state.history_count, 0);
         assert_eq!(state.history_capacity, capacity);
     }
@@ -243,10 +273,10 @@ mod tests {
 
         let item = "dup";
         state.add_history_entry(item);
-        assert_eq!(state.internal.get_history_const().len(), 1);
+        assert_eq!(state.internal.history().len(), 1);
 
         state.add_history_entry(item);
-        assert_eq!(state.internal.get_history_const().len(), 1);
+        assert_eq!(state.internal.history().len(), 1);
     }
 
     #[test]
