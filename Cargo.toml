@@ -2,10 +2,10 @@
 authors = ["Bob Gardner <bob.hn.gardner@gmail.com>"]
 build = "build.rs"
 description = "Command line shell"
+license = "MIT or Apache-2.0"
 name = "bsh"
 readme = "README.md"
 version = "0.1.0"
-license = "MIT or Apache-2.0"
 
 [[bin]]
 name = "bsh"
@@ -41,7 +41,7 @@ assert_cli = "0.6.2"
 chrono = "0.4.0"
 lazy_static = "1.0.0"
 rand = "0.3.15"
-tempdir = "0.3.5"
+tempfile = "3.0.4"
 
 [features]
 default = []

@@ -4,7 +4,7 @@ extern crate assert_cli;
 extern crate chrono;
 #[macro_use]
 extern crate lazy_static;
-extern crate tempdir;
+extern crate tempfile;
 
 use std::fs::File;
 use std::io::{self, Read};
@@ -12,7 +12,7 @@ use std::path::PathBuf;
 
 use assert_cli::Assert;
 use chrono::{DateTime, Local};
-use tempdir::TempDir;
+use tempfile::TempDir;
 
 lazy_static! {
     static ref LOG_FILE_NAME: String = {
@@ -134,5 +134,5 @@ fn generate_temp_directory() -> io::Result<TempDir> {
     // Because of limitation in `assert_cli`, temporary directory must be
     // subdirectory of directory containing Cargo.toml
     let root: PathBuf = [env!("CARGO_MANIFEST_DIR"), "tests"].iter().collect();
-    TempDir::new_in(root, "temp")
+    tempfile::tempdir_in(root)
 }
