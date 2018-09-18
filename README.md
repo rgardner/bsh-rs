@@ -1,6 +1,4 @@
 # bsh-rs
-[![Build Status](https://magnum.travis-ci.com/rgardner/bsh-rs.svg?token=PKiUsiwCCXnqdp7dRvmq&branch=master)](https://magnum.travis-ci.com/rgardner/bsh-rs)
-
 This is the [Rust](https://www.rust-lang.org/) version of my [bsh
 shell program](https://github.com/rgardner/bsh).
 
