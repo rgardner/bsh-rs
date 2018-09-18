@@ -5,6 +5,7 @@ description = "Command line shell"
 name = "bsh"
 readme = "README.md"
 version = "0.1.0"
+license = "MIT or Apache-2.0"
 
 [[bin]]
 name = "bsh"
