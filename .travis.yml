@@ -13,8 +13,8 @@ before_script:
   - rustup component add rustfmt-preview
 script:
   - set -e
-  - cargo fmt --all -- --check
   - cargo build --verbose
+  - cargo fmt --all -- --check # precondition: built grammar first
   - cargo clippy
   - cargo test --verbose
   - cargo test --release --verbose
