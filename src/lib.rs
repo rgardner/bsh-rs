@@ -27,9 +27,6 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 
-#[cfg(test)]
-extern crate rand;
-
 pub use errors::{Error, ErrorKind, Result};
 pub use shell::{Shell, ShellConfig};
 pub use util::BshExitStatusExt;
