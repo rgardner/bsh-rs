@@ -15,7 +15,7 @@ script:
   - set -e
   - cargo build --verbose
   - cargo fmt --all -- --check # precondition: built grammar first
-  - cargo clippy
+  - cargo clippy --all-targets
   - cargo test --verbose
   - cargo test --release --verbose
   - set +e

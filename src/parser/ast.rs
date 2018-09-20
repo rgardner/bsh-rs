@@ -83,7 +83,7 @@ mod tests {
     use super::*;
     use parser::grammar::CommandParser;
 
-    fn simple_command(words: Vec<&str>) -> Command {
+    fn simple_command(words: &[&str]) -> Command {
         Command::Simple {
             words: words.iter().map(|s| s.to_string()).collect(),
             redirects: vec![],
@@ -134,19 +134,19 @@ mod tests {
             CommandParser::new()
                 .parse("echo bob")
                 .expect("'echo bob' should be valid"),
-            simple_command(vec!["echo", "bob"])
+            simple_command(&["echo", "bob"])
         );
         assert_eq!(
             CommandParser::new()
                 .parse("ls ~/1code")
                 .expect("'ls ~/1code' should be valid"),
-            simple_command(vec!["ls", "~/1code"])
+            simple_command(&["ls", "~/1code"])
         );
         assert_eq!(
             CommandParser::new()
                 .parse("echo 5")
                 .expect("'echo 5' should be valid"),
-            simple_command(vec!["echo", "5"])
+            simple_command(&["echo", "5"])
         );
     }
 
@@ -184,7 +184,7 @@ mod tests {
                 .expect("'echo bob >out' should be valid"),
             Command::Simple {
                 words: vec!["echo".into(), "bob".into()],
-                redirects: vec![output_filename_redirection("out".into())],
+                redirects: vec![output_filename_redirection("out")],
                 background: false,
             }
         );
@@ -194,7 +194,7 @@ mod tests {
                 .expect("'echo bob > out' should be valid"),
             Command::Simple {
                 words: vec!["echo".into(), "bob".into()],
-                redirects: vec![output_filename_redirection("out".into())],
+                redirects: vec![output_filename_redirection("out")],
                 background: false,
             }
         );
@@ -204,7 +204,7 @@ mod tests {
                 .expect("'echo bob 1>out' should be valid"),
             Command::Simple {
                 words: vec!["echo".into(), "bob".into()],
-                redirects: vec![fd_to_file_redirection(1, "out".into())],
+                redirects: vec![fd_to_file_redirection(1, "out")],
                 background: false,
             }
         );
@@ -214,7 +214,7 @@ mod tests {
                 .expect("'echo bob 1>out' should be valid"),
             Command::Simple {
                 words: vec!["echo".into(), "bob".into()],
-                redirects: vec![fd_to_file_redirection(1, "out".into())],
+                redirects: vec![fd_to_file_redirection(1, "out")],
                 background: false,
             }
         );
@@ -254,10 +254,7 @@ mod tests {
                 .expect("'>out echo <in bob' should be valid",),
             Command::Simple {
                 words: vec!["echo".into(), "bob".into()],
-                redirects: vec![
-                    output_filename_redirection("out".into()),
-                    input_redirection("in".into()),
-                ],
+                redirects: vec![output_filename_redirection("out"), input_redirection("in"),],
                 background: false,
             }
         );
@@ -271,10 +268,7 @@ mod tests {
                 .expect("'<in1 <in2' should be valid"),
             Command::Simple {
                 words: vec![],
-                redirects: vec![
-                    input_redirection("in1".into()),
-                    input_redirection("in2".into()),
-                ],
+                redirects: vec![input_redirection("in1"), input_redirection("in2"),],
                 background: false,
             }
         );
@@ -285,8 +279,8 @@ mod tests {
             Command::Simple {
                 words: vec![],
                 redirects: vec![
-                    output_filename_redirection("out1".into()),
-                    output_filename_redirection("out2".into()),
+                    output_filename_redirection("out1"),
+                    output_filename_redirection("out2"),
                 ],
                 background: false,
             }
@@ -300,8 +294,8 @@ mod tests {
                 .parse("cmd1 | cmd2")
                 .expect("'cmd1 | cmd2' should be valid"),
             Command::Connection {
-                first: Box::new(simple_command(vec!["cmd1".into()])),
-                second: Box::new(simple_command(vec!["cmd2".into()])),
+                first: Box::new(simple_command(&["cmd1"])),
+                second: Box::new(simple_command(&["cmd2"])),
                 connector: Connector::Pipe,
             }
         );
@@ -310,8 +304,8 @@ mod tests {
                 .parse("cmd1 ; cmd2")
                 .expect("'cmd1 ; cmd2' should be valid"),
             Command::Connection {
-                first: Box::new(simple_command(vec!["cmd1".into()])),
-                second: Box::new(simple_command(vec!["cmd2".into()])),
+                first: Box::new(simple_command(&["cmd1"])),
+                second: Box::new(simple_command(&["cmd2"])),
                 connector: Connector::Semicolon,
             }
         );
@@ -322,12 +316,12 @@ mod tests {
             Command::Connection {
                 first: Box::new(Command::Simple {
                     words: vec!["cmd1".into()],
-                    redirects: vec![input_redirection("in".into())],
+                    redirects: vec![input_redirection("in")],
                     background: false,
                 }),
                 second: Box::new(Command::Simple {
                     words: vec!["cmd2".into()],
-                    redirects: vec![output_filename_redirection("out".into())],
+                    redirects: vec![output_filename_redirection("out")],
                     background: false,
                 }),
                 connector: Connector::Pipe,
@@ -342,10 +336,10 @@ mod tests {
                 .parse("cmd1 | cmd2 | cmd3",)
                 .expect("'cmd1 | cmd2 | cmd3' should be valid",),
             Command::Connection {
-                first: Box::new(simple_command(vec!["cmd1".into()])),
+                first: Box::new(simple_command(&["cmd1"])),
                 second: Box::new(Command::Connection {
-                    first: Box::new(simple_command(vec!["cmd2".into()])),
-                    second: Box::new(simple_command(vec!["cmd3".into()])),
+                    first: Box::new(simple_command(&["cmd2"])),
+                    second: Box::new(simple_command(&["cmd3"])),
                     connector: Connector::Pipe,
                 }),
                 connector: Connector::Pipe,
@@ -356,10 +350,10 @@ mod tests {
                 .parse("cmd1 | cmd2 ; cmd3",)
                 .expect("'cmd1 | cmd2 ; cmd3' should be valid",),
             Command::Connection {
-                first: Box::new(simple_command(vec!["cmd1".into()])),
+                first: Box::new(simple_command(&["cmd1"])),
                 second: Box::new(Command::Connection {
-                    first: Box::new(simple_command(vec!["cmd2".into()])),
-                    second: Box::new(simple_command(vec!["cmd3".into()])),
+                    first: Box::new(simple_command(&["cmd2"])),
+                    second: Box::new(simple_command(&["cmd3"])),
                     connector: Connector::Semicolon,
                 }),
                 connector: Connector::Pipe,
@@ -385,7 +379,7 @@ mod tests {
                     redirects: vec![],
                     background: true,
                 }),
-                second: Box::new(simple_command(vec!["cmd2"])),
+                second: Box::new(simple_command(&["cmd2"])),
                 connector: Connector::Pipe,
             }
         );
@@ -401,10 +395,7 @@ mod tests {
                 .expect(r#">''out' 'echo' <in 'arg' should be valid"#,),
             Command::Simple {
                 words: vec!["echo".into(), "arg".into()],
-                redirects: vec![
-                    output_filename_redirection("out".into()),
-                    input_redirection("in".into()),
-                ],
+                redirects: vec![output_filename_redirection("out"), input_redirection("in"),],
                 background: false,
             }
         );
@@ -415,7 +406,7 @@ mod tests {
                 .expect(r#"'>'out 1' echo 'arg arg arg'' should be valid"#),
             Command::Simple {
                 words: vec!["echo".into(), "arg arg arg".into()],
-                redirects: vec![output_filename_redirection("out 1".into())],
+                redirects: vec![output_filename_redirection("out 1")],
                 background: false,
             }
         );
@@ -426,10 +417,7 @@ mod tests {
                 .expect(r#"'>"out" "echo" <in "arg"' should ve valid"#),
             Command::Simple {
                 words: vec!["echo".into(), "arg".into()],
-                redirects: vec![
-                    output_filename_redirection("out".into()),
-                    input_redirection("in".into()),
-                ],
+                redirects: vec![output_filename_redirection("out"), input_redirection("in"),],
                 background: false,
             }
         );
@@ -444,28 +432,28 @@ mod tests {
             CommandParser::new()
                 .parse(r#"echo '"arg"'"#)
                 .expect(r#"'echo '"arg"' should be valid"#),
-            simple_command(vec!["echo".into(), r#""arg""#.into()])
+            simple_command(&["echo", r#""arg""#])
         );
 
         assert_eq!(
             CommandParser::new()
                 .parse(r#"echo "'arg'""#)
                 .expect(r#"'echo "'arg'"' should be valid"#),
-            simple_command(vec!["echo".into(), "'arg'".into()])
+            simple_command(&["echo", "'arg'"])
         );
 
         assert_eq!(
             CommandParser::new()
                 .parse(r#"echo '"arg"'"#)
                 .expect(r#"'echo '"arg"'' should be valid"#),
-            simple_command(vec!["echo".into(), r#""arg""#.into()])
+            simple_command(&["echo", r#""arg""#])
         );
 
         assert_eq!(
             CommandParser::new()
                 .parse(r#"echo "arg'""#)
                 .expect(r#"'echo "arg'""' should be valid"#),
-            simple_command(vec!["echo".into(), r#"arg'"#.into()])
+            simple_command(&["echo", r#"arg'"#])
         );
     }
 
@@ -475,7 +463,7 @@ mod tests {
             CommandParser::new()
                 .parse(r#"echo '& ; echo |'"#,)
                 .expect(r#"'echo '& ; echo |'' should be valid"#,),
-            simple_command(vec!["echo".into(), r#"& ; echo |"#.into()])
+            simple_command(&["echo", r#"& ; echo |"#])
         );
     }
 }
