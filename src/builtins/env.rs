@@ -70,19 +70,17 @@ unset: unset [name ...]
 #[cfg(test)]
 mod tests {
     use super::*;
-    use builtins::BuiltinCommand;
-    use rand::{thread_rng, Rng};
-    use shell::Shell;
+
     use std::env;
     use std::io;
 
-    fn generate_unique_env_key() -> String {
-        loop {
-            let key = thread_rng().gen_ascii_chars().take(10).collect();
-            if let Err(env::VarError::NotPresent) = env::var(&key) {
-                return key;
-            }
-        }
+    use builtins::BuiltinCommand;
+    use shell::Shell;
+
+    macro_rules! generate_unique_env_key {
+        () => {
+            format!("key-line{}", line!())
+        };
     }
 
     #[test]
@@ -92,7 +90,7 @@ mod tests {
         assert!(Declare::run(&mut shell, vec!["".into()], &mut io::sink()).is_err());
         assert!(Declare::run(&mut shell, vec!["=FOO".into()], &mut io::sink()).is_err());
 
-        let key = generate_unique_env_key();
+        let key = generate_unique_env_key!();
         let value = "bar";
         assert!(
             Declare::run(
@@ -108,7 +106,7 @@ mod tests {
     fn declare_assignment() {
         let mut shell = Shell::new(Default::default()).unwrap();
 
-        let key = generate_unique_env_key();
+        let key = generate_unique_env_key!();
         assert!(Declare::run(&mut shell, vec![key.clone()], &mut io::sink()).is_ok());
         assert_eq!(&env::var(&key).unwrap(), "");
 
@@ -137,8 +135,8 @@ mod tests {
     fn declare_multiple_assignments() {
         let mut shell = Shell::new(Default::default()).unwrap();
 
-        let key1 = generate_unique_env_key();
-        let key2 = generate_unique_env_key();
+        let key1 = generate_unique_env_key!();
+        let key2 = generate_unique_env_key!();
         let value = "baz";
         assert!(
             Declare::run(
@@ -154,7 +152,7 @@ mod tests {
     #[test]
     fn unset_invalid_identifier() {
         let mut shell = Shell::new(Default::default()).unwrap();
-        let key = generate_unique_env_key();
+        let key = generate_unique_env_key!();
         assert!(Declare::run(&mut shell, vec![key.clone()], &mut io::sink()).is_ok());
         assert!(
             Unset::run(
@@ -169,8 +167,8 @@ mod tests {
     #[test]
     fn unset_multiple_assignments() {
         let mut shell = Shell::new(Default::default()).unwrap();
-        let key1 = generate_unique_env_key();
-        let key2 = generate_unique_env_key();
+        let key1 = generate_unique_env_key!();
+        let key2 = generate_unique_env_key!();
         assert!(
             Declare::run(
                 &mut shell,
