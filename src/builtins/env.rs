@@ -75,7 +75,7 @@ mod tests {
     use std::io;
 
     use builtins::BuiltinCommand;
-    use shell::Shell;
+    use shell::{Shell, ShellConfig};
 
     macro_rules! generate_unique_env_key {
         () => {
@@ -85,7 +85,7 @@ mod tests {
 
     #[test]
     fn declare_invalid_identifier() {
-        let mut shell = Shell::new(Default::default()).unwrap();
+        let mut shell = Shell::new(ShellConfig::noninteractive()).unwrap();
 
         assert!(Declare::run(&mut shell, vec!["".into()], &mut io::sink()).is_err());
         assert!(Declare::run(&mut shell, vec!["=FOO".into()], &mut io::sink()).is_err());
@@ -104,7 +104,7 @@ mod tests {
 
     #[test]
     fn declare_assignment() {
-        let mut shell = Shell::new(Default::default()).unwrap();
+        let mut shell = Shell::new(ShellConfig::noninteractive()).unwrap();
 
         let key = generate_unique_env_key!();
         assert!(Declare::run(&mut shell, vec![key.clone()], &mut io::sink()).is_ok());
@@ -133,7 +133,7 @@ mod tests {
 
     #[test]
     fn declare_multiple_assignments() {
-        let mut shell = Shell::new(Default::default()).unwrap();
+        let mut shell = Shell::new(ShellConfig::noninteractive()).unwrap();
 
         let key1 = generate_unique_env_key!();
         let key2 = generate_unique_env_key!();
@@ -151,7 +151,7 @@ mod tests {
 
     #[test]
     fn unset_invalid_identifier() {
-        let mut shell = Shell::new(Default::default()).unwrap();
+        let mut shell = Shell::new(ShellConfig::noninteractive()).unwrap();
         let key = generate_unique_env_key!();
         assert!(Declare::run(&mut shell, vec![key.clone()], &mut io::sink()).is_ok());
         assert!(
@@ -166,7 +166,7 @@ mod tests {
 
     #[test]
     fn unset_multiple_assignments() {
-        let mut shell = Shell::new(Default::default()).unwrap();
+        let mut shell = Shell::new(ShellConfig::noninteractive()).unwrap();
         let key1 = generate_unique_env_key!();
         let key2 = generate_unique_env_key!();
         assert!(
