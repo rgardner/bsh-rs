@@ -1,7 +1,7 @@
 #!/bin/sh
 
-# warn, but do not block commit for clippy warnings
-cargo clippy || true
+# sanity-check the changes and ensure grammar.rs is built for rustfmt
+cargo check
 
 # warn and block commit for rustfmt formatting changes
 cargo fmt --all -- --check
