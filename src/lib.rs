@@ -12,8 +12,6 @@
 )]
 #![cfg_attr(feature = "clippy", feature(plugin))]
 #![cfg_attr(feature = "clippy", plugin(clippy))]
-// necessary for `error-chain`
-#![recursion_limit = "1024"]
 
 extern crate dirs;
 extern crate docopt;
@@ -26,9 +24,6 @@ extern crate rustyline;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
-
-#[cfg(test)]
-extern crate rand;
 
 pub use errors::{Error, ErrorKind, Result};
 pub use shell::{Shell, ShellConfig};

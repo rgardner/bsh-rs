@@ -8,14 +8,8 @@ rust:
 matrix:
   allow_failures:
     - rust: nightly
+  fast_finish: true
 before_script:
   - rustup component add clippy-preview
   - rustup component add rustfmt-preview
-script:
-  - set -e
-  - cargo fmt --all -- --check
-  - cargo build --verbose
-  - cargo clippy
-  - cargo test --verbose
-  - cargo test --release --verbose
-  - set +e
+script: ci/script.sh
