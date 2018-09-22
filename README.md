@@ -1,5 +1,5 @@
 # bsh-rs
-[![Build Status](https://travis-ci.org/rgardner/bsh-rs.svg?branch=master)](https://travis-ci.org/rgardner/bsh-rs)
+[![Build Status](https://travis-ci.com/rgardner/bsh-rs.svg?branch=master)](https://travis-ci.com/rgardner/bsh-rs)
 
 This is the [Rust](https://www.rust-lang.org/) version of my [bsh
 shell program](https://github.com/rgardner/bsh).
