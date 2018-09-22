@@ -35,7 +35,7 @@ branch = "implement-libc-signal"
 git = "https://github.com/rgardner/nix"
 
 [dev-dependencies]
-assert_cli = "0.6.2"
+assert_cli = "0.6.3"
 chrono = "0.4.0"
 lazy_static = "1.0.0"
 tempfile = "3.0.4"

@@ -2,4 +2,5 @@ target
 *.bk
 
 src/parser/grammar.rs
-test-*.log
+
+log/*.log

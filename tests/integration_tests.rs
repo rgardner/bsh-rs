@@ -6,6 +6,7 @@ extern crate chrono;
 extern crate lazy_static;
 extern crate tempfile;
 
+use std::ffi::OsStr;
 use std::fs::File;
 use std::io::{self, Read};
 use std::path::PathBuf;
@@ -15,10 +16,16 @@ use chrono::{DateTime, Local};
 use tempfile::TempDir;
 
 lazy_static! {
-    static ref LOG_FILE_NAME: String = {
+    static ref LOG_FILE_NAME: PathBuf = {
         let local: DateTime<Local> = Local::now();
         let log_name = local.format("%F.%H-%M-%S");
-        format!("test-{}.log", log_name)
+        [
+            env!("CARGO_MANIFEST_DIR"),
+            "log",
+            &format!("test-{}.log", log_name),
+        ]
+            .iter()
+            .collect()
     };
 }
 
@@ -37,7 +44,7 @@ impl AssertExt for Assert {
 }
 
 fn bsh_assert() -> Assert {
-    Assert::cargo_binary("bsh").with_args(&["--log", &LOG_FILE_NAME])
+    Assert::cargo_binary("bsh").with_args(&[OsStr::new("--log"), LOG_FILE_NAME.as_os_str()])
 }
 
 #[test]
