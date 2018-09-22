@@ -4,3 +4,7 @@ target
 src/parser/grammar.rs
 
 log/*.log
+
+# code coverage
+*.gcda
+*.gcno
