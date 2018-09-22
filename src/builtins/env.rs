@@ -104,9 +104,7 @@ mod tests {
         let mut shell = Shell::new(ShellConfig::noninteractive()).unwrap();
 
         assert!(Declare::run(&mut shell, vec!["".into()], &mut io::sink()).is_err());
-        debug!("1: `declare`");
         assert!(Declare::run(&mut shell, vec!["=FOO".into()], &mut io::sink()).is_err());
-        debug!("2: `declare =FOO`");
 
         let key = generate_unique_env_key!();
         let value = "bar";
@@ -118,8 +116,6 @@ mod tests {
             ).is_err()
         );
         assert_eq!(env::var(key).unwrap(), value);
-        debug!("3: `declare =baz test-3=bar =baz");
-        assert!(false);
     }
 
     #[test]
