@@ -84,7 +84,7 @@ fn init_logger(path: &Option<String>) {
                 record.target(),
                 message
             ))
-        }).level(log::LogLevelFilter::Trace)
+        }).level(log::LevelFilter::Debug)
         .chain(fern::log_file(log_path).unwrap())
         .apply()
         .unwrap();

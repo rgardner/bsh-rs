@@ -73,9 +73,24 @@ mod tests {
 
     use std::env;
     use std::io;
+    use std::sync::Once;
+
+    use env_logger;
+    use log::LevelFilter;
 
     use builtins::BuiltinCommand;
     use shell::{Shell, ShellConfig};
+
+    static LOG_INIT: Once = Once::new();
+
+    fn set_up() {
+        LOG_INIT.call_once(|| {
+            let env = env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, "debug");
+            env_logger::Builder::from_env(env)
+                .filter_module(module_path!(), LevelFilter::Debug)
+                .init();
+        });
+    }
 
     macro_rules! generate_unique_env_key {
         () => {
@@ -85,10 +100,13 @@ mod tests {
 
     #[test]
     fn declare_invalid_identifier() {
+        set_up();
         let mut shell = Shell::new(ShellConfig::noninteractive()).unwrap();
 
         assert!(Declare::run(&mut shell, vec!["".into()], &mut io::sink()).is_err());
+        debug!("1: `declare`");
         assert!(Declare::run(&mut shell, vec!["=FOO".into()], &mut io::sink()).is_err());
+        debug!("2: `declare =FOO`");
 
         let key = generate_unique_env_key!();
         let value = "bar";
@@ -100,10 +118,13 @@ mod tests {
             ).is_err()
         );
         assert_eq!(env::var(key).unwrap(), value);
+        debug!("3: `declare =baz test-3=bar =baz");
+        assert!(false);
     }
 
     #[test]
     fn declare_assignment() {
+        set_up();
         let mut shell = Shell::new(ShellConfig::noninteractive()).unwrap();
 
         let key = generate_unique_env_key!();
@@ -133,6 +154,7 @@ mod tests {
 
     #[test]
     fn declare_multiple_assignments() {
+        set_up();
         let mut shell = Shell::new(ShellConfig::noninteractive()).unwrap();
 
         let key1 = generate_unique_env_key!();
@@ -151,6 +173,7 @@ mod tests {
 
     #[test]
     fn unset_invalid_identifier() {
+        set_up();
         let mut shell = Shell::new(ShellConfig::noninteractive()).unwrap();
         let key = generate_unique_env_key!();
         assert!(Declare::run(&mut shell, vec![key.clone()], &mut io::sink()).is_ok());
@@ -166,6 +189,7 @@ mod tests {
 
     #[test]
     fn unset_multiple_assignments() {
+        set_up();
         let mut shell = Shell::new(ShellConfig::noninteractive()).unwrap();
         let key1 = generate_unique_env_key!();
         let key2 = generate_unique_env_key!();
