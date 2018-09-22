@@ -37,7 +37,6 @@ git = "https://github.com/rgardner/nix"
 [dev-dependencies]
 assert_cli = "0.6.2"
 chrono = "0.4.0"
-env_logger = "0.5.13"
 lazy_static = "1.0.0"
 tempfile = "3.0.4"
 
