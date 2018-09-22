@@ -12,8 +12,6 @@
 )]
 #![cfg_attr(feature = "clippy", feature(plugin))]
 #![cfg_attr(feature = "clippy", plugin(clippy))]
-// necessary for `error-chain`
-#![recursion_limit = "1024"]
 
 extern crate dirs;
 extern crate docopt;

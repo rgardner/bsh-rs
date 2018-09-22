@@ -79,7 +79,7 @@ mod tests {
 
     macro_rules! generate_unique_env_key {
         () => {
-            format!("key-line{}-column{}", line!(), column!())
+            format!("KEY_LINE{}_COLUMN{}", line!(), column!())
         };
     }
 
