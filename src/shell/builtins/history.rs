@@ -15,17 +15,17 @@ history: history [-c] [-s size] [n]
     the history list to be cleared by deleting all of the entries.
     The `-s' option sets the size of the history list.";
 
-    fn run(shell: &mut Shell, args: Vec<String>, stdout: &mut Write) -> Result<()> {
+    fn run<T: AsRef<str>>(shell: &mut Shell, args: &[T], stdout: &mut Write) -> Result<()> {
         if args.is_empty() {
             write!(stdout, "{}", shell.editor).context(ErrorKind::Io)?;
             return Ok(());
         }
 
-        match &**args.first().unwrap() {
+        match args.first().unwrap().as_ref() {
             "-c" => shell.editor.clear_history(),
             "-s" => {
                 if let Some(s) = args.get(2) {
-                    if let Ok(n) = s.parse::<usize>() {
+                    if let Ok(n) = s.as_ref().parse::<usize>() {
                         shell.editor.set_history_max_size(n);
                     }
                 }

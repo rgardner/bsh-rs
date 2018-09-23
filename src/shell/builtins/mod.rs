@@ -3,6 +3,8 @@
 //! This module includes the implementations of common shell builtin commands.
 //! Where possible the commands conform to their standard Bash counterparts.
 
+use std::iter;
+
 use docopt::Docopt;
 use failure::Fail;
 use serde;
@@ -59,10 +61,10 @@ pub trait BuiltinCommand {
         Self::HELP.lines().nth(0).unwrap().to_owned()
     }
     /// Runs the command with the given arguments in the `shell` environment.
-    fn run(shell: &mut Shell, args: Vec<String>, stdout: &mut Write) -> Result<()>;
+    fn run<T: AsRef<str>>(shell: &mut Shell, args: &[T], stdout: &mut Write) -> Result<()>;
 }
 
-pub fn is_builtin<T: AsRef<str>>(argv: &[T]) -> bool {
+pub fn is_builtin<T: AsRef<str>>(program: T) -> bool {
     [
         BG_NAME,
         CD_NAME,
@@ -75,29 +77,34 @@ pub fn is_builtin<T: AsRef<str>>(argv: &[T]) -> bool {
         JOBS_NAME,
         UNSET_NAME,
     ]
-        .contains(&(program(argv).as_str()))
+        .contains(&program.as_ref())
 }
 
 /// precondition: command is a builtin.
 /// Returns (`exit_status_code`, `builtin_result`)
-pub fn run<T: AsRef<str>>(
+pub fn run<S1, S2>(
     shell: &mut Shell,
-    argv: &[T],
+    program: S1,
+    args: &[S2],
     stdout: &mut Write,
-) -> (ExitStatus, Result<()>) {
-    debug_assert!(is_builtin(argv));
+) -> (ExitStatus, Result<()>)
+where
+    S1: AsRef<str>,
+    S2: AsRef<str>,
+{
+    debug_assert!(is_builtin(&program));
 
-    let result = match &*program(argv) {
-        BG_NAME => Bg::run(shell, get_argv(argv), stdout),
-        CD_NAME => Cd::run(shell, args(argv), stdout),
-        DECLARE_NAME => Declare::run(shell, args(argv), stdout),
-        EXIT_NAME => Exit::run(shell, args(argv), stdout),
-        FG_NAME => Fg::run(shell, get_argv(argv), stdout),
-        HELP_NAME => Help::run(shell, args(argv), stdout),
-        HISTORY_NAME => History::run(shell, args(argv), stdout),
-        JOBS_NAME => Jobs::run(shell, get_argv(argv), stdout),
-        KILL_NAME => Kill::run(shell, args(argv), stdout),
-        UNSET_NAME => Unset::run(shell, args(argv), stdout),
+    let result = match program.as_ref() {
+        BG_NAME => Bg::run(shell, args, stdout),
+        CD_NAME => Cd::run(shell, args, stdout),
+        DECLARE_NAME => Declare::run(shell, args, stdout),
+        EXIT_NAME => Exit::run(shell, args, stdout),
+        FG_NAME => Fg::run(shell, args, stdout),
+        HELP_NAME => Help::run(shell, args, stdout),
+        HISTORY_NAME => History::run(shell, args, stdout),
+        JOBS_NAME => Jobs::run(shell, args, stdout),
+        KILL_NAME => Kill::run(shell, args, stdout),
+        UNSET_NAME => Unset::run(shell, args, stdout),
         _ => unreachable!(),
     };
 
@@ -118,25 +125,15 @@ fn get_builtin_exit_status(result: &Result<()>) -> ExitStatus {
     ExitStatus::from_status(status)
 }
 
-fn program<T: AsRef<str>>(argv: &[T]) -> String {
-    argv[0].as_ref().to_string()
-}
-
-fn get_argv<T: AsRef<str>>(argv: &[T]) -> Vec<String> {
-    argv.iter().map(|s| s.as_ref().to_string()).collect()
-}
-
-fn args<T: AsRef<str>>(argv: &[T]) -> Vec<String> {
-    get_argv(argv)[1..].to_vec()
-}
-
-pub fn parse_args<'a, 'de: 'a, D>(usage: &str, argv: &[String]) -> Result<D>
+pub fn parse_args<'a, 'de: 'a, D, S, I>(usage: &str, program: S, args: I) -> Result<D>
 where
     D: serde::Deserialize<'de>,
+    I: IntoIterator<Item = S>,
+    S: AsRef<str>,
 {
     Docopt::new(usage)
         .unwrap()
-        .argv(argv)
+        .argv(iter::once(program).chain(args))
         .deserialize()
         .map_err(|e| e.context(ErrorKind::Docopt).into())
 }

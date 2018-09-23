@@ -183,8 +183,8 @@ impl Shell {
 
     /// Runs a job.
     fn execute_command(&mut self, command: &mut Command) -> Result<()> {
-        let (processes, pgid, foreground) = match spawn_processes(self, &command.inner) {
-            Ok((processes, pgid, foreground)) => Ok((processes, pgid, foreground)),
+        let process_group = match spawn_processes(self, &command.inner) {
+            Ok(process_group) => Ok(process_group),
             Err(e) => {
                 if let ErrorKind::CommandNotFound(ref command) = *e.kind() {
                     eprintln!("bsh: {}: command not found", command);
@@ -196,7 +196,8 @@ impl Shell {
             }
         }?;
 
-        let job_id = self.job_manager.create_job(&command.input, pgid, processes);
+        let foreground = process_group.foreground;
+        let job_id = self.job_manager.create_job(&command.input, process_group);
         if !self.is_interactive() {
             self.last_exit_status = self.job_manager.wait_for_job(job_id)?.unwrap();
         } else if foreground {

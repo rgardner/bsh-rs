@@ -11,7 +11,7 @@ use nix::sys::wait::{self, WaitPidFlag, WaitStatus};
 use nix::unistd::{self, Pid};
 
 use errors::{Error, ErrorKind, Result};
-use shell::execute_command::{Process, ProcessStatus};
+use shell::execute_command::{Process, ProcessGroup, ProcessStatus};
 use util::{self, BshExitStatusExt};
 
 pub fn initialize_job_control() -> Result<()> {
@@ -215,13 +215,13 @@ pub struct JobManager {
 }
 
 impl JobManager {
-    pub fn create_job(&mut self, input: &str, pgid: Option<u32>, processes: Vec<Process>) -> JobId {
+    pub fn create_job(&mut self, input: &str, process_group: ProcessGroup) -> JobId {
         let job_id = self.get_next_job_id();
         self.jobs.push(Job::new(
             job_id,
             input,
-            pgid.map(|pgid| pgid as libc::pid_t),
-            processes,
+            process_group.id.map(|pgid| pgid as libc::pid_t),
+            process_group.processes,
         ));
         job_id
     }

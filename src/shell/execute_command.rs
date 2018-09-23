@@ -1,6 +1,8 @@
+use std::ffi::OsStr;
 use std::fmt;
 use std::fs::{File, OpenOptions};
 use std::io;
+use std::iter;
 use std::os::unix::io::FromRawFd;
 use std::os::unix::process::CommandExt;
 use std::process::{ChildStdout, Command, ExitStatus, Stdio};
@@ -133,18 +135,32 @@ impl fmt::Display for ProcessStatus {
 }
 
 impl Process {
-    pub fn new_builtin(argv: &[String], status_code: ExitStatus) -> Process {
+    pub fn new_builtin<S1, S2>(program: S1, args: &[S2], status_code: ExitStatus) -> Process
+    where
+        S1: AsRef<str>,
+        S2: AsRef<str>,
+    {
         Process {
-            argv: argv.to_vec(),
+            argv: iter::once(program)
+                .map(|p| p.as_ref().to_string())
+                .chain(args.iter().map(|arg| arg.as_ref().to_string()))
+                .collect(),
             status: ProcessStatus::Completed,
             status_code: Some(status_code),
             ..Default::default()
         }
     }
 
-    pub fn new_external(argv: &[String], id: u32) -> Process {
+    pub fn new_external<S1, S2>(program: S1, args: &[S2], id: u32) -> Process
+    where
+        S1: AsRef<str>,
+        S2: AsRef<str>,
+    {
         Process {
-            argv: argv.to_vec(),
+            argv: iter::once(&program)
+                .map(|p| p.as_ref().to_string())
+                .chain(args.iter().map(|arg| arg.as_ref().to_string()))
+                .collect(),
             id: Some(id),
             ..Default::default()
         }
@@ -196,14 +212,21 @@ impl Default for ProcessStatus {
     }
 }
 
+pub struct ProcessGroup {
+    pub id: Option<u32>,
+    pub processes: Vec<Process>,
+    pub foreground: bool,
+}
+
 /// Spawn processes for each `command`, returning processes, the process group, and a `bool`
 /// representing whether the processes are running in the foreground.
-pub fn spawn_processes(
-    shell: &mut Shell,
-    command: &ast::Command,
-) -> Result<(Vec<Process>, Option<u32>, bool)> {
+pub fn spawn_processes(shell: &mut Shell, command: &ast::Command) -> Result<ProcessGroup> {
     let (processes, pgid, _) = _spawn_processes(shell, command, None, None, None)?;
-    Ok((processes, pgid, true))
+    Ok(ProcessGroup {
+        id: pgid,
+        processes,
+        foreground: true,
+    })
 }
 
 /// note: rustfmt formatting makes function less readable
@@ -253,33 +276,37 @@ fn _spawn_processes(
     }
 }
 
-fn run_simple_command(
+fn run_simple_command<T: AsRef<str>>(
     shell: &mut Shell,
-    words: &[String],
+    words: &[T],
     stdin: Stdin,
     stdout: Output,
     stderr: Output,
     pgid: Option<u32>,
 ) -> Result<(Process, Option<u32>, Option<Stdin>)> {
-    if builtins::is_builtin(words) {
+    let (program, args) = words.split_first().unwrap();
+    if builtins::is_builtin(program) {
         // TODO(rogardn): change Result usage in builtin to only be for rust
         // errors, e.g. builtin::execute shouldn't return a Result
         let (status_code, output) = match stdout {
-            Output::File(mut file) => (builtins::run(shell, words, &mut file).0, None),
+            Output::File(mut file) => (builtins::run(shell, program, args, &mut file).0, None),
             Output::CreatePipe => {
                 let (read_end_pipe, mut write_end_pipe) = create_pipe()?;
                 (
-                    builtins::run(shell, words, &mut write_end_pipe).0,
+                    builtins::run(shell, program, args, &mut write_end_pipe).0,
                     Some(read_end_pipe.into()),
                 )
             }
-            Output::Inherit => (builtins::run(shell, words, &mut io::stdout()).0, None),
+            Output::Inherit => (
+                builtins::run(shell, program, args, &mut io::stdout()).0,
+                None,
+            ),
         };
 
-        let process = Process::new_builtin(words, status_code);
+        let process = Process::new_builtin(program, &args, status_code);
         Ok((process, pgid, output))
     } else {
-        run_external_command(shell, &words[..], stdin, stdout, stderr, pgid)
+        run_external_command(shell, program, &args, stdin, stdout, stderr, pgid)
     }
 }
 
@@ -336,16 +363,21 @@ fn run_connection_command(
     }
 }
 
-fn run_external_command(
+fn run_external_command<S1, S2>(
     shell: &Shell,
-    words: &[String],
+    program: S1,
+    args: &[S2],
     stdin: Stdin,
     stdout: Output,
     stderr: Output,
     pgid: Option<u32>,
-) -> Result<(Process, Option<u32>, Option<Stdin>)> {
-    let mut command = Command::new(&words[0]);
-    command.args(words[1..].iter());
+) -> Result<(Process, Option<u32>, Option<Stdin>)>
+where
+    S1: AsRef<str>,
+    S2: AsRef<str>,
+{
+    let mut command = Command::new(OsStr::new(program.as_ref()));
+    command.args(args.iter().map(AsRef::as_ref).map(OsStr::new));
     command.stdin(stdin);
     command.stdout(stdout);
     command.stderr(stderr);
@@ -395,7 +427,7 @@ fn run_external_command(
             }
 
             if e.kind() == io::ErrorKind::NotFound {
-                return Err(Error::command_not_found(&words[0]));
+                return Err(Error::command_not_found(program));
             } else {
                 return Err(e.context(ErrorKind::Io).into());
             }
@@ -415,7 +447,7 @@ fn run_external_command(
     );
 
     Ok((
-        Process::new_external(words, child.id()),
+        Process::new_external(program, args, child.id()),
         Some(pgid),
         child.stdout.map(Stdin::Child),
     ))

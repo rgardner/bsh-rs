@@ -15,8 +15,8 @@ cd: cd [dir]
     If DIR is '-', then the current directory will be the variable $OLDPWD,
     which is the last working directory.";
 
-    fn run(_shell: &mut Shell, args: Vec<String>, stdout: &mut Write) -> Result<()> {
-        let dir = match args.first().map(|x| &x[..]) {
+    fn run<T: AsRef<str>>(_shell: &mut Shell, args: &[T], stdout: &mut Write) -> Result<()> {
+        let dir = match args.first().map(|arg| arg.as_ref()) {
             None => {
                 dirs::home_dir().ok_or_else(|| Error::builtin_command("cd: HOME not set", 1))?
             }
