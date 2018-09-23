@@ -1,7 +1,7 @@
 target
 *.bk
 
-src/parser/grammar.rs
+src/core/parser/grammar.rs
 
 log/*.log
 

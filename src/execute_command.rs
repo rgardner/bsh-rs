@@ -11,8 +11,8 @@ use nix::sys::signal::{self, SigHandler, Signal};
 use nix::unistd::{self, Pid};
 
 use builtins;
+use core::parser::ast;
 use errors::{Error, ErrorKind, Result};
-use parser::ast;
 use shell::Shell;
 use util::{self, BshExitStatusExt};
 

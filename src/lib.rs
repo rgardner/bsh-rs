@@ -43,6 +43,7 @@ macro_rules! log_if_err {
 }
 
 mod builtins;
+mod core;
 mod editor;
 #[allow(missing_docs)]
 pub mod errors;
@@ -50,6 +51,5 @@ pub mod errors;
 mod execute_command;
 #[allow(unsafe_code)]
 mod job_control;
-mod parser;
 pub mod shell;
 mod util;

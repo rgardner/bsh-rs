@@ -14,11 +14,11 @@ use dirs;
 use failure::ResultExt;
 use nix::unistd;
 
+use core::parser::{ast, Command};
 use editor::Editor;
 use errors::{ErrorKind, Result};
 use execute_command::spawn_processes;
 use job_control::{self, Job, JobId, JobManager};
-use parser::{ast, Command};
 use util::{self, BshExitStatusExt};
 
 const HISTORY_FILE_NAME: &str = ".bsh_history";
