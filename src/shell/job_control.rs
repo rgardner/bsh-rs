@@ -11,7 +11,7 @@ use nix::sys::wait::{self, WaitPidFlag, WaitStatus};
 use nix::unistd::{self, Pid};
 
 use errors::{Error, ErrorKind, Result};
-use execute_command::{Process, ProcessStatus};
+use shell::execute_command::{Process, ProcessStatus};
 use util::{self, BshExitStatusExt};
 
 pub fn initialize_job_control() -> Result<()> {

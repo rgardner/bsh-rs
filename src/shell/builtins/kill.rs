@@ -1,7 +1,6 @@
 use std::process::Command;
 
-use builtins;
-use builtins::prelude::*;
+use shell::builtins::{self, prelude::*};
 
 pub struct Kill;
 

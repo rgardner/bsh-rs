@@ -10,10 +10,9 @@ use nix::libc;
 use nix::sys::signal::{self, SigHandler, Signal};
 use nix::unistd::{self, Pid};
 
-use builtins;
 use core::parser::ast;
 use errors::{Error, ErrorKind, Result};
-use shell::Shell;
+use shell::{builtins, shell::Shell};
 use util::{self, BshExitStatusExt};
 
 #[derive(Debug)]

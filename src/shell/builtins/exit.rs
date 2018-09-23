@@ -1,7 +1,6 @@
 use std::process::ExitStatus;
 
-use builtins;
-use builtins::prelude::*;
+use shell::builtins::{self, prelude::*};
 
 pub struct Exit;
 

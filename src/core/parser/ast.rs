@@ -81,7 +81,7 @@ pub enum SimpleCommandPart {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use parser::grammar::CommandParser;
+    use core::parser::grammar::CommandParser;
 
     fn simple_command(words: &[&str]) -> Command {
         Command::Simple {

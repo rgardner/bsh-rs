@@ -1,7 +1,6 @@
 use std::env;
 
-use builtins;
-use builtins::prelude::*;
+use shell::builtins::{self, prelude::*};
 
 pub struct Declare;
 
@@ -74,8 +73,10 @@ mod tests {
     use std::env;
     use std::io;
 
-    use builtins::BuiltinCommand;
-    use shell::{Shell, ShellConfig};
+    use shell::{
+        builtins::BuiltinCommand,
+        shell::{Shell, ShellConfig},
+    };
 
     macro_rules! generate_unique_env_key {
         () => {
