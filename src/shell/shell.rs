@@ -14,7 +14,10 @@ use dirs;
 use failure::ResultExt;
 use nix::unistd;
 
-use core::parser::{ast, Command};
+use core::{
+    intermediate_representation as ir,
+    parser::{ast, Command},
+};
 use errors::{ErrorKind, Result};
 use shell::{
     editor::Editor,
@@ -139,7 +142,8 @@ impl Shell {
         }?;
 
         expand_variables(&mut command.inner);
-        self.execute_command(&mut command)?;
+        let mut command_group = ir::Interpreter::parse(command);
+        self.execute_command(&mut command_group)?;
 
         Ok(())
     }
@@ -182,8 +186,8 @@ impl Shell {
     }
 
     /// Runs a job.
-    fn execute_command(&mut self, command: &mut Command) -> Result<()> {
-        let process_group = match spawn_processes(self, &command.inner) {
+    fn execute_command(&mut self, command_group: &mut ir::CommandGroup) -> Result<()> {
+        let process_group = match spawn_processes(self, &command_group) {
             Ok(process_group) => Ok(process_group),
             Err(e) => {
                 if let ErrorKind::CommandNotFound(ref command) = *e.kind() {
@@ -197,7 +201,9 @@ impl Shell {
         }?;
 
         let foreground = process_group.foreground;
-        let job_id = self.job_manager.create_job(&command.input, process_group);
+        let job_id = self
+            .job_manager
+            .create_job(&command_group.input, process_group);
         if !self.is_interactive() {
             self.last_exit_status = self.job_manager.wait_for_job(job_id)?.unwrap();
         } else if foreground {
