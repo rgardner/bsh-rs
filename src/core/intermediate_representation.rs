@@ -1,27 +1,5 @@
 use core::parser::{self, ast};
 
-mod visit {
-    use core::parser::ast::*;
-
-    pub trait Visitor<T> {
-        fn visit_simple_command<S: AsRef<str>>(
-            &mut self,
-            words: &[S],
-            redirects: &[Redirect],
-            background: bool,
-        ) -> T;
-        fn visit_connection_command(
-            &mut self,
-            first: &Command,
-            second: &Command,
-            connector: Connector,
-        ) -> T;
-        fn visit_command(&mut self, command: &Command) -> T;
-    }
-}
-
-use core::intermediate_representation::visit::Visitor;
-
 #[derive(Clone, Debug, PartialEq)]
 pub enum Stdio {
     Inherit,
@@ -89,9 +67,7 @@ impl Interpreter {
             background: interpreter.background,
         }
     }
-}
 
-impl Visitor<Command> for Interpreter {
     fn visit_simple_command<S: AsRef<str>>(
         &mut self,
         words: &[S],

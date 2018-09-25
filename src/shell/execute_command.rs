@@ -19,16 +19,16 @@ use util::{self, BshExitStatusExt};
 
 #[derive(Debug)]
 enum Stdin {
-    Child(ChildStdout),
-    File(File),
     Inherit,
+    File(File),
+    Child(ChildStdout),
 }
 
 #[derive(Debug)]
 enum Output {
+    Inherit,
     File(File),
     CreatePipe,
-    Inherit,
 }
 
 impl Stdin {
@@ -78,9 +78,9 @@ impl From<File> for Output {
 impl From<Stdin> for Stdio {
     fn from(stdin: Stdin) -> Self {
         match stdin {
+            Stdin::Inherit => Self::inherit(),
             Stdin::File(file) => file.into(),
             Stdin::Child(child) => child.into(),
-            Stdin::Inherit => Self::inherit(),
         }
     }
 }
@@ -88,9 +88,9 @@ impl From<Stdin> for Stdio {
 impl From<Output> for Stdio {
     fn from(stdout: Output) -> Self {
         match stdout {
+            Output::Inherit => Self::inherit(),
             Output::File(file) => file.into(),
             Output::CreatePipe => Self::piped(),
-            Output::Inherit => Self::inherit(),
         }
     }
 }
@@ -219,28 +219,34 @@ pub fn spawn_processes(
     })
 }
 
-/// note: rustfmt formatting makes function less readable
-#[cfg_attr(rustfmt, rustfmt_skip)]
 fn _spawn_processes(
     shell: &mut Shell,
     command: &ir::Command,
     stdin: Option<Stdin>,
     stdout: Option<Output>,
-    pgid: Option<u32>) -> Result<(Vec<Process>, Option<u32>, Option<Stdin>)>
-{
-    // restrict scope of borrowing `current` via `{current}` (new scope)
-    // solves E0506 rustc error, "cannot assign to `current` because it is borrowed"
+    pgid: Option<u32>,
+) -> Result<(Vec<Process>, Option<u32>, Option<Stdin>)> {
     match command {
         ir::Command::Simple(simple_command) => {
             let stdin = Stdin::new(&simple_command.stdin, stdin)?;
             let stdout = Output::new(&simple_command.stdout, stdout)?;
             let stderr = Output::new(&simple_command.stderr, None /*pipe*/)?;
-            let (result, pgid, output) = run_simple_command(shell, &simple_command.program, &simple_command.args, stdin, stdout, stderr, pgid)?;
+            let (result, pgid, output) = run_simple_command(
+                shell,
+                &simple_command.program,
+                &simple_command.args,
+                stdin,
+                stdout,
+                stderr,
+                pgid,
+            )?;
             Ok((vec![result], pgid, output))
         }
-        ir::Command::Connection { ref first, ref second, connector } => {
-            run_connection_command(shell, first, second, *connector, stdin, stdout, pgid)
-        }
+        ir::Command::Connection {
+            ref first,
+            ref second,
+            connector,
+        } => run_connection_command(shell, first, second, *connector, stdin, stdout, pgid),
     }
 }
 
@@ -258,25 +264,7 @@ where
     S2: AsRef<str>,
 {
     if builtins::is_builtin(&program) {
-        // TODO(rogardn): change Result usage in builtin to only be for rust
-        // errors, e.g. builtin::execute shouldn't return a Result
-        let (status_code, output) = match stdout {
-            Output::File(mut file) => (builtins::run(shell, &program, args, &mut file).0, None),
-            Output::CreatePipe => {
-                let (read_end_pipe, mut write_end_pipe) = create_pipe()?;
-                (
-                    builtins::run(shell, &program, args, &mut write_end_pipe).0,
-                    Some(read_end_pipe.into()),
-                )
-            }
-            Output::Inherit => (
-                builtins::run(shell, &program, args, &mut io::stdout()).0,
-                None,
-            ),
-        };
-
-        let process = Process::new_builtin(&program, &args, status_code);
-        Ok((process, pgid, output))
+        run_builtin_command(shell, program, &args, stdout, pgid)
     } else {
         run_external_command(shell, program, &args, stdin, stdout, stderr, pgid)
     }
@@ -333,6 +321,38 @@ fn run_connection_command(
             Ok((first_result, pgid, output))
         }
     }
+}
+
+fn run_builtin_command<S1, S2>(
+    shell: &mut Shell,
+    program: S1,
+    args: &[S2],
+    stdout: Output,
+    pgid: Option<u32>,
+) -> Result<(Process, Option<u32>, Option<Stdin>)>
+where
+    S1: AsRef<str>,
+    S2: AsRef<str>,
+{
+    // TODO(rogardn): change Result usage in builtin to only be for rust
+    // errors, e.g. builtin::execute shouldn't return a Result
+    let (status_code, output) = match stdout {
+        Output::File(mut file) => (builtins::run(shell, &program, args, &mut file).0, None),
+        Output::CreatePipe => {
+            let (read_end_pipe, mut write_end_pipe) = create_pipe()?;
+            (
+                builtins::run(shell, &program, args, &mut write_end_pipe).0,
+                Some(read_end_pipe.into()),
+            )
+        }
+        Output::Inherit => (
+            builtins::run(shell, &program, args, &mut io::stdout()).0,
+            None,
+        ),
+    };
+
+    let process = Process::new_builtin(&program, &args, status_code);
+    Ok((process, pgid, output))
 }
 
 fn run_external_command<S1, S2>(
