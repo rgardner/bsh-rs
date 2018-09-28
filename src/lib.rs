@@ -30,6 +30,16 @@ pub use shell::shell::{Shell, ShellConfig};
 pub use util::BshExitStatusExt;
 
 macro_rules! log_if_err {
+    ($result:expr) => {{
+        if let Err(e) = $result {
+            error!("{}", e);
+        }
+    }};
+    ($result:expr, $fmt:expr, $($arg:tt)*) => {{
+        if let Err(e) = $result {
+            error!(concat!($fmt, ": {}"), $($arg)*, e);
+        }
+    }};
     ($result:expr, $fmt:expr) => {{
         if let Err(e) = $result {
             error!(concat!($fmt, ": {}"), e);

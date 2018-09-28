@@ -3,7 +3,7 @@ use std::fmt;
 use std::fs::{File, OpenOptions};
 use std::io;
 use std::iter;
-use std::os::unix::io::FromRawFd;
+use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
 use std::os::unix::process::CommandExt;
 use std::process::{ChildStdout, Command, ExitStatus, Stdio};
 
@@ -66,6 +66,16 @@ impl Output {
 impl From<File> for Stdin {
     fn from(file: File) -> Self {
         Stdin::File(file)
+    }
+}
+
+impl AsRawFd for Stdin {
+    fn as_raw_fd(&self) -> RawFd {
+        match self {
+            Stdin::Inherit => libc::STDIN_FILENO,
+            Stdin::File(f) => f.as_raw_fd(),
+            Stdin::Child(child) => child.as_raw_fd(),
+        }
     }
 }
 
@@ -370,11 +380,18 @@ where
 {
     let mut command = Command::new(OsStr::new(program.as_ref()));
     command.args(args.iter().map(AsRef::as_ref).map(OsStr::new));
-    command.stdin(stdin);
+
+    // Configure stdout and stderr (e.g. pipe, redirect). Do not configure
+    // stdin, as we need to do that manually in before_exec *after* we have
+    // set the terminal control device to the job's process group. If we were
+    // to configure stdin here, then stdin would be changed before our code
+    // executes in before_exec, so if the child is not the first process in the
+    // pipeline, its stdin would not be a tty and tcsetpgrp would tell us so.
     command.stdout(stdout);
     command.stderr(stderr);
 
     let shell_is_interactive = shell.is_interactive();
+    let shell_terminal = util::get_terminal();
     command.before_exec(move || {
         if shell_is_interactive {
             // Put process into process group
@@ -383,13 +400,19 @@ where
 
             // setpgid(2) failing represents programmer error, e.g.
             // 1) invalid pid or pgid
-            unistd::setpgid(pid, pgid).unwrap();
+            unistd::setpgid(pid, pgid).expect("setpgid failed");
 
+            // Set the terminal control device in both parent process (see job
+            // manager) and child process to avoid race conditions
             // tcsetpgrp(3) failing represents programmer error, e.g.
             // 1) invalid fd or pgid
             // 2) not a tty
+            //   - Are you configuring stdin using Command::stdin? If so, then
+            //     stdin will not be a TTY if this process isn't first in the
+            //     pipeline, as Command::stdin configures stdin *before*
+            //     before_exec runs.
             // 3) incorrect permissions
-            unistd::tcsetpgrp(util::get_terminal(), pgid).unwrap();
+            unistd::tcsetpgrp(shell_terminal, pgid).expect("tcsetpgrp failed");
 
             // Reset job control signal handling back to default
             unsafe {
@@ -397,14 +420,30 @@ where
                 // 1) signal argument is not a valid signal number
                 // 2) an attempt is made to supply a signal handler for a
                 //    signal that cannot have a custom signal handler
-                signal::signal(Signal::SIGINT, SigHandler::SigDfl).unwrap();
-                signal::signal(Signal::SIGQUIT, SigHandler::SigDfl).unwrap();
-                signal::signal(Signal::SIGTSTP, SigHandler::SigDfl).unwrap();
-                signal::signal(Signal::SIGTTIN, SigHandler::SigDfl).unwrap();
-                signal::signal(Signal::SIGTTOU, SigHandler::SigDfl).unwrap();
-                signal::signal(Signal::SIGCHLD, SigHandler::SigDfl).unwrap();
+                signal::signal(Signal::SIGINT, SigHandler::SigDfl)
+                    .expect("failed to set SIGINT signal handler");
+                signal::signal(Signal::SIGQUIT, SigHandler::SigDfl)
+                    .expect("failed to set SIGQUIT signal handler");
+                signal::signal(Signal::SIGTSTP, SigHandler::SigDfl)
+                    .expect("failed to set SIGTSTP signal handler");
+                signal::signal(Signal::SIGTTIN, SigHandler::SigDfl)
+                    .expect("failed to set SIGTTIN signal handler");
+                signal::signal(Signal::SIGTTOU, SigHandler::SigDfl)
+                    .expect("failed to set SIGTTOU signal handler");
+                signal::signal(Signal::SIGCHLD, SigHandler::SigDfl)
+                    .expect("failed to set SIGCHLD signal handler");
             }
         }
+
+        // See comment at the top of this function on why we are configuring
+        // this manually (hint: it's because tcsetpgrp needs the original stdin
+        // and Command::stdin will change stdin *before* before_exec runs).
+        let stdin = stdin.as_raw_fd();
+        if stdin != libc::STDIN_FILENO {
+            unistd::dup2(stdin, libc::STDIN_FILENO).expect("failed to dup stdin");
+            unistd::close(stdin).expect("failed to close stdin");
+        }
+
         Ok(())
     });
 
