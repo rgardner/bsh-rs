@@ -93,7 +93,7 @@ impl Editor {
         }
     }
 
-    pub fn save_history<P: AsRef<Path> + ?Sized>(&mut self, path: &P) -> Result<()> {
+    pub fn save_history<P: AsRef<Path> + ?Sized>(&self, path: &P) -> Result<()> {
         self.internal
             .save_history(path)
             .context(ErrorKind::Readline)?;
