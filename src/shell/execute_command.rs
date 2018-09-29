@@ -1,8 +1,6 @@
 use std::ffi::OsStr;
-use std::fmt;
 use std::fs::{File, OpenOptions};
 use std::io;
-use std::iter;
 use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
 use std::os::unix::process::CommandExt;
 use std::process::{ChildStdout, Command, ExitStatus, Stdio};
@@ -12,7 +10,11 @@ use nix::libc;
 use nix::sys::signal::{self, SigHandler, Signal};
 use nix::unistd::{self, Pid};
 
-use core::{intermediate_representation as ir, parser::ast};
+use core::{
+    intermediate_representation as ir,
+    job::{Process, ProcessGroup, ProcessId, ProcessStatus},
+    parser::ast,
+};
 use errors::{Error, ErrorKind, Result};
 use shell::{builtins, shell::Shell};
 use util::{self, BshExitStatusExt};
@@ -105,114 +107,20 @@ impl From<Output> for Stdio {
     }
 }
 
-#[derive(Clone, Debug, Default)]
-pub struct Process {
-    argv: Vec<String>,
-    /// `id` is None when the process hasn't launched or the command is a Shell builtin
-    id: Option<u32>,
-    status: ProcessStatus,
-    status_code: Option<ExitStatus>,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum ProcessStatus {
-    Running,
-    Stopped,
-    Completed,
-}
-
-impl fmt::Display for ProcessStatus {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            ProcessStatus::Running => write!(f, "Running"),
-            ProcessStatus::Stopped => write!(f, "Stopped"),
-            ProcessStatus::Completed => write!(f, "Completed"),
-        }
+/// # Panics
+/// Panics if job is in an invalid state
+pub fn wait(process: Process) -> Result<(Process, ExitStatus)> {
+    if let ProcessStatus::Completed = process.status() {
+        let status_code = process
+            .status_code()
+            .expect("invalid status code for completed process");
+        Ok((process, status_code))
+    } else if let Some(pid) = process.id() {
+        let status_code = wait_for_process(pid.into())?;
+        Ok((process.mark_exited(status_code), status_code))
+    } else {
+        panic!("process status is not 'Completed' and pid is not set");
     }
-}
-
-impl Process {
-    pub fn new_builtin<S1, S2>(program: S1, args: &[S2], status_code: ExitStatus) -> Process
-    where
-        S1: AsRef<str>,
-        S2: AsRef<str>,
-    {
-        Process {
-            argv: iter::once(program)
-                .map(|p| p.as_ref().to_string())
-                .chain(args.iter().map(|arg| arg.as_ref().to_string()))
-                .collect(),
-            status: ProcessStatus::Completed,
-            status_code: Some(status_code),
-            ..Default::default()
-        }
-    }
-
-    pub fn new_external<S1, S2>(program: S1, args: &[S2], id: u32) -> Process
-    where
-        S1: AsRef<str>,
-        S2: AsRef<str>,
-    {
-        Process {
-            argv: iter::once(&program)
-                .map(|p| p.as_ref().to_string())
-                .chain(args.iter().map(|arg| arg.as_ref().to_string()))
-                .collect(),
-            id: Some(id),
-            ..Default::default()
-        }
-    }
-
-    pub fn argv(&self) -> String {
-        self.argv[..].join(" ")
-    }
-
-    pub fn id(&self) -> Option<u32> {
-        self.id
-    }
-
-    pub fn status(&self) -> ProcessStatus {
-        self.status
-    }
-
-    pub fn set_status(&mut self, status: ProcessStatus) {
-        self.status = status
-    }
-
-    pub fn status_code(&self) -> Option<ExitStatus> {
-        self.status_code
-    }
-
-    pub fn set_status_code(&mut self, status_code: ExitStatus) {
-        self.status_code = Some(status_code);
-    }
-
-    /// # Panics
-    /// Panics if job is in an invalid state
-    pub fn wait(&mut self) -> Result<ExitStatus> {
-        if let ProcessStatus::Completed = self.status {
-            Ok(self.status_code.unwrap())
-        } else if let Some(pid) = self.id {
-            let status_code = wait_for_process(pid)?;
-            self.status_code = Some(status_code);
-            self.status = ProcessStatus::Completed;
-            Ok(status_code)
-        } else {
-            panic!("process status is not 'Completed' and pid is not set");
-        }
-    }
-}
-
-impl Default for ProcessStatus {
-    fn default() -> Self {
-        ProcessStatus::Running
-    }
-}
-
-pub struct ProcessGroup {
-    pub id: Option<u32>,
-    pub processes: Vec<Process>,
-    pub foreground: bool,
 }
 
 /// Spawn processes for each `command`, returning processes, the process group, and a `bool`
@@ -300,7 +208,10 @@ fn run_connection_command(
         }
         ast::Connector::Semicolon => {
             let (mut first_result, _, _) = _spawn_processes(shell, first, stdin, None, pgid)?;
-            first_result.last_mut().unwrap().wait()?;
+            let last_process_index = first_result.len() - 1;
+            let last_process = first_result.swap_remove(last_process_index);
+            let (process, _) = wait(last_process)?;
+            first_result.push(process);
             let (second_result, pgid, output) =
                 _spawn_processes(shell, second, None, stdout, None)?;
             first_result.extend(second_result);
@@ -308,7 +219,11 @@ fn run_connection_command(
         }
         ast::Connector::And => {
             let (mut first_result, _, _) = _spawn_processes(shell, first, stdin, None, pgid)?;
-            let (pgid, output) = if first_result.last_mut().unwrap().wait()?.success() {
+            let last_process_index = first_result.len() - 1;
+            let last_process = first_result.swap_remove(last_process_index);
+            let (last_process, last_process_status_code) = wait(last_process)?;
+            first_result.push(last_process);
+            let (pgid, output) = if last_process_status_code.success() {
                 let (second_result, pgid, output) =
                     _spawn_processes(shell, second, None, stdout, None)?;
                 first_result.extend(second_result);
@@ -320,7 +235,11 @@ fn run_connection_command(
         }
         ast::Connector::Or => {
             let (mut first_result, _, _) = _spawn_processes(shell, first, stdin, None, pgid)?;
-            let (pgid, output) = if !first_result.last_mut().unwrap().wait()?.success() {
+            let last_process_index = first_result.len() - 1;
+            let last_process = first_result.swap_remove(last_process_index);
+            let (last_process, last_process_status_code) = wait(last_process)?;
+            first_result.push(last_process);
+            let (pgid, output) = if !last_process_status_code.success() {
                 let (second_result, pgid, output) =
                     _spawn_processes(shell, second, None, stdout, None)?;
                 first_result.extend(second_result);
@@ -478,7 +397,7 @@ where
     );
 
     Ok((
-        Process::new_external(program, args, child.id()),
+        Process::new_external(program, args, child.id().into()),
         Some(pgid),
         child.stdout.map(Stdin::Child),
     ))
@@ -502,11 +421,11 @@ fn create_pipe() -> Result<(File, File)> {
     }
 }
 
-fn wait_for_process(pid: u32) -> Result<ExitStatus> {
+fn wait_for_process(pid: ProcessId) -> Result<ExitStatus> {
     use nix::sys::wait::{self, WaitStatus};
     use nix::unistd::Pid;
 
-    let pid = Pid::from_raw(pid as i32);
+    let pid: Pid = pid.into();
     let wait_status = wait::waitpid(pid, None).context(ErrorKind::Nix)?;
     match wait_status {
         WaitStatus::Exited(_, status) => Ok(ExitStatus::from_status(status)),

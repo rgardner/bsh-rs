@@ -16,13 +16,14 @@ use nix::unistd;
 
 use core::{
     intermediate_representation as ir,
+    job::{Job, JobId},
     parser::{ast, Command},
 };
 use errors::{ErrorKind, Result};
 use shell::{
     editor::Editor,
     execute_command::spawn_processes,
-    job_control::{self, Job, JobId, JobManager},
+    job_control::{self, JobManager},
 };
 use util::{self, BshExitStatusExt};
 

@@ -10,9 +10,9 @@ use nix::sys::termios::{self, Termios};
 use nix::sys::wait::{self, WaitPidFlag, WaitStatus};
 use nix::unistd::{self, Pid};
 
+use core::job::{Job, JobId, ProcessGroup};
 use errors::{Error, ErrorKind, Result};
-use shell::execute_command::{Process, ProcessGroup, ProcessStatus};
-use util::{self, BshExitStatusExt};
+use util;
 
 pub fn initialize_job_control() -> Result<()> {
     let shell_terminal = util::get_terminal();
@@ -49,162 +49,6 @@ pub fn initialize_job_control() -> Result<()> {
     log_if_err!(temp_result, "failed to grab control of terminal");
 
     Ok(())
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct JobId(pub u32);
-
-impl fmt::Display for JobId {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-#[derive(Clone)]
-pub struct Job {
-    id: JobId,
-    input: String,
-    pgid: Option<libc::pid_t>,
-    processes: Vec<Process>,
-    last_status_code: Option<ExitStatus>,
-    last_running_in_foreground: bool,
-    notified_stopped_job: bool,
-    tmodes: Option<Termios>,
-}
-
-impl Job {
-    fn new(id: JobId, input: &str, pgid: Option<libc::pid_t>, processes: Vec<Process>) -> Job {
-        // Initialize last_status_code if possible; this prevents a completed
-        // job from having a None last_status_code if all processes have
-        // already completed (e.g. 'false && echo foo')
-        let last_status_code = processes
-            .iter()
-            .rev()
-            .filter(|p| p.status_code().is_some())
-            .nth(0)
-            .map(|p| p.status_code().unwrap());
-
-        Job {
-            id,
-            input: input.to_string(),
-            pgid,
-            processes,
-            last_status_code,
-            last_running_in_foreground: true,
-            notified_stopped_job: false,
-            tmodes: termios::tcgetattr(util::get_terminal()).ok(),
-        }
-    }
-
-    pub fn id(&self) -> JobId {
-        self.id
-    }
-
-    pub fn input(&self) -> String {
-        self.input.clone()
-    }
-
-    pub fn status(&self) -> ProcessStatus {
-        if self.is_stopped() {
-            ProcessStatus::Stopped
-        } else if self.is_completed() {
-            ProcessStatus::Completed
-        } else {
-            ProcessStatus::Running
-        }
-    }
-
-    pub fn processes(&self) -> &Vec<Process> {
-        &self.processes
-    }
-
-    fn last_status_code(&self) -> Option<ExitStatus> {
-        self.last_status_code
-    }
-
-    fn is_stopped(&self) -> bool {
-        self.processes
-            .iter()
-            .all(|p| p.status() == ProcessStatus::Stopped)
-    }
-
-    fn is_completed(&self) -> bool {
-        self.processes
-            .iter()
-            .all(|p| p.status() == ProcessStatus::Completed)
-    }
-
-    fn mark_exited(&mut self, pid: Pid, status_code: i32) {
-        let status_code = {
-            let process = self.find_process_mut(pid);
-            process.set_status(ProcessStatus::Completed);
-            let status_code = ExitStatus::from_status(status_code);
-            process.set_status_code(status_code);
-            status_code
-        };
-        self.last_status_code = Some(status_code);
-    }
-
-    fn mark_stopped(&mut self, pid: Pid, signal: Signal) {
-        let status_code = {
-            let process = self.find_process_mut(pid);
-            process.set_status(ProcessStatus::Stopped);
-            get_status_code_for_signal(signal)
-        };
-        self.last_status_code = Some(status_code);
-    }
-
-    fn mark_signaled(&mut self, pid: Pid, signal: Signal) {
-        let status_code = {
-            let process = self.find_process_mut(pid);
-            process.set_status(ProcessStatus::Completed);
-            let status_code = get_status_code_for_signal(signal);
-            process.set_status_code(status_code);
-            status_code
-        };
-        self.last_status_code = Some(status_code);
-    }
-
-    fn has_process(&self, pid: Pid) -> bool {
-        self.processes.iter().any(|p| {
-            p.id()
-                .map(|other| Pid::from_raw(other as i32) == pid)
-                .unwrap_or(false)
-        })
-    }
-
-    /// # Panics
-    /// Panics if process not found.
-    fn find_process_mut(&mut self, pid: Pid) -> &mut Process {
-        for process in &mut self.processes {
-            if let Some(other_pid) = process.id() {
-                if Pid::from_raw(other_pid as i32) == pid {
-                    return process;
-                }
-            }
-        }
-
-        panic!("Process not found");
-    }
-}
-
-fn get_status_code_for_signal(signal: Signal) -> ExitStatus {
-    // TODO: decide if ExitStatus should preserve signal and status
-    // separately or if should combine together
-    let status_code = 128 + (signal as i32);
-    ExitStatus::from_status(status_code)
-}
-
-impl fmt::Debug for Job {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "id: {}\tinput: {}", self.id, self.input)
-    }
-}
-
-impl fmt::Display for Job {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "[{}] {}\t{}", self.id, self.status(), self.input)
-    }
 }
 
 #[derive(Default)]
@@ -249,8 +93,8 @@ impl JobManager {
             }
         }
 
-        let job = self.find_job(job_id);
-        let last_status_code = job.last_status_code();
+        let job_index = self.find_job(job_id).expect("job not found");
+        let last_status_code = self.jobs[job_index].last_status_code();
         Ok(last_status_code)
     }
 
@@ -265,15 +109,23 @@ impl JobManager {
         debug!("putting job [{}] in foreground", job_id);
 
         let _terminal_state = {
-            let job = self
-                .find_job_mut(job_id)
+            let job_index = self
+                .find_job(job_id)
                 .ok_or_else(|| Error::no_such_job(format!("{}", job_id)))?;
-            job.last_running_in_foreground = true;
-            let _terminal_state = job.pgid.map(|pgid| TerminalState::new(Pid::from_raw(pgid)));
+            let job = self
+                .jobs
+                .swap_remove(job_index)
+                .set_last_running_in_foreground(true);
+            let job_pgid = job.pgid();
+            let job_tmodes = job.tmodes().clone();
+            self.jobs.push(job);
+            let last_job_index = self.jobs.len() - 1;
+            self.jobs.swap(job_index, last_job_index);
+            let _terminal_state = job_pgid.map(|pgid| TerminalState::new(Pid::from_raw(pgid)));
 
             // Send the job a continue signal if necessary
             if cont {
-                if let Some(ref tmodes) = job.tmodes {
+                if let Some(ref tmodes) = job_tmodes {
                     let temp_result = termios::tcsetattr(
                         util::get_terminal(),
                         termios::SetArg::TCSADRAIN,
@@ -282,10 +134,10 @@ impl JobManager {
                     log_if_err!(
                         temp_result,
                         "error setting terminal configuration for job ({})",
-                        job.id
+                        job_id
                     );
                 }
-                if let Some(ref pgid) = job.pgid {
+                if let Some(ref pgid) = job_pgid {
                     signal::kill(Pid::from_raw(-pgid), Signal::SIGCONT).context(ErrorKind::Nix)?;
                 }
             }
@@ -299,12 +151,20 @@ impl JobManager {
             .or(self.current_job)
             .ok_or_else(|| Error::no_such_job("current"))?;
         debug!("putting job [{}] in background", job_id);
+
         let job_pgid = {
-            let job = self
-                .find_job_mut(job_id)
+            let job_index = self
+                .find_job(job_id)
                 .ok_or_else(|| Error::no_such_job(format!("{}", job_id)))?;
-            job.last_running_in_foreground = false;
-            job.pgid
+            let job = self
+                .jobs
+                .swap_remove(job_index)
+                .set_last_running_in_foreground(false);
+            let job_pgid = job.pgid();
+            self.jobs.push(job);
+            let last_job_index = self.jobs.len() - 1;
+            self.jobs.swap(job_index, last_job_index);
+            job_pgid
         };
 
         if cont {
@@ -318,19 +178,15 @@ impl JobManager {
     }
 
     pub fn kill_job(&mut self, job_id: JobId) -> Result<Option<Job>> {
-        let index = self.jobs.iter().position(|j| j.id == job_id);
-        if index.is_none() {
-            return Ok(None);
-        }
-
-        {
-            let job = &self.jobs[index.unwrap()];
-            if let Some(pgid) = job.pgid {
+        if let Some(job_index) = self.find_job(job_id) {
+            if let Some(pgid) = self.jobs[job_index].pgid() {
                 signal::kill(Pid::from_raw(-pgid), Signal::SIGKILL).context(ErrorKind::Nix)?;
             }
-        }
 
-        Ok(Some(self.jobs.remove(index.unwrap())))
+            Ok(Some(self.jobs.remove(job_index)))
+        } else {
+            return Ok(None);
+        }
     }
 
     /// Checks for processes that have status information available, without
@@ -359,12 +215,12 @@ impl JobManager {
             if job.is_completed() {
                 // Unnecessary to notify if the job was last running in the
                 // foreground, because the user will have noticed it completed.
-                if !job.last_running_in_foreground {
+                if !job.last_running_in_foreground() {
                     println!("{}", job);
                 }
-            } else if job.is_stopped() && !job.notified_stopped_job {
+            } else if job.is_stopped() && !job.notified_stopped_job() {
                 println!("{}", job);
-                job.notified_stopped_job = true;
+                *job = job.clone().set_notified_stopped_job(true)
             }
         }
 
@@ -381,22 +237,37 @@ impl JobManager {
         match *wait_status {
             WaitStatus::Exited(pid, status_code) => {
                 debug!("{} exited with {}.", pid, status_code);
-                let job = self.find_job_with_process_mut(pid);
-                job.mark_exited(pid, status_code);
+                let job_index = self.find_job_with_process(pid).expect("unable to find job");
+                let job = self
+                    .jobs
+                    .swap_remove(job_index)
+                    .mark_exited(pid.into(), status_code);
+                self.jobs.push(job);
+                let last_job_index = self.jobs.len() - 1;
+                self.jobs.swap(job_index, last_job_index);
             }
             WaitStatus::Signaled(pid, signal, ..) => {
                 debug!("{} terminated by signal {:?}.", pid, signal);
-                let job = self.find_job_with_process_mut(pid);
-                job.mark_signaled(pid, signal);
+                let job_index = self.find_job_with_process(pid).expect("unable to find job");
+                let job = self
+                    .jobs
+                    .swap_remove(job_index)
+                    .mark_signaled(pid.into(), signal);
+                self.jobs.push(job);
+                let last_job_index = self.jobs.len() - 1;
+                self.jobs.swap(job_index, last_job_index);
             }
             WaitStatus::Stopped(pid, signal) => {
                 debug!("{} was signaled to stop {:?}.", pid, signal);
-                let job_id = {
-                    let job = self.find_job_with_process_mut(pid);
-                    job.mark_stopped(pid, signal);
-                    job.last_running_in_foreground = false;
-                    job.id
-                };
+                let job_index = self.find_job_with_process(pid).expect("unable to find job");
+                let job = self
+                    .jobs
+                    .swap_remove(job_index)
+                    .mark_stopped(pid.into(), signal);
+                let job_id = job.id();
+                self.jobs.push(job);
+                let last_job_index = self.jobs.len() - 1;
+                self.jobs.swap(job_index, last_job_index);
                 self.current_job = Some(job_id);
             }
             WaitStatus::StillAlive => panic!("mark_process_status called with StillAlive"),
@@ -407,32 +278,23 @@ impl JobManager {
     /// # Panics
     /// Panics if job is not found
     fn job_is_stopped(&self, job_id: JobId) -> bool {
-        self.find_job(job_id).is_stopped()
+        let job_index = self.find_job(job_id).expect("job not found");
+        self.jobs[job_index].is_stopped()
     }
 
     /// # Panics
     /// Panics if job is not found
     fn job_is_completed(&self, job_id: JobId) -> bool {
-        self.find_job(job_id).is_completed()
+        let job_index = self.find_job(job_id).expect("job not found");
+        self.jobs[job_index].is_completed()
     }
 
-    /// # Panics
-    /// Panics if job is not found
-    fn find_job(&self, job_id: JobId) -> &Job {
-        self.jobs.iter().find(|job| job.id == job_id).unwrap()
+    fn find_job(&self, job_id: JobId) -> Option<usize> {
+        self.jobs.iter().position(|job| job.id() == job_id)
     }
 
-    /// # Panics
-    /// Panics if job is not found
-    fn find_job_mut(&mut self, job_id: JobId) -> Option<&mut Job> {
-        self.jobs.iter_mut().find(|job| job.id == job_id)
-    }
-
-    fn find_job_with_process_mut(&mut self, pid: Pid) -> &mut Job {
-        self.jobs
-            .iter_mut()
-            .find(|job| job.has_process(pid))
-            .unwrap()
+    fn find_job_with_process(&self, pid: Pid) -> Option<usize> {
+        self.jobs.iter().position(|job| job.has_process(pid.into()))
     }
 }
 
