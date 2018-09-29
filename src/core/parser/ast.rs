@@ -78,6 +78,28 @@ pub enum SimpleCommandPart {
     Redirect(Redirect),
 }
 
+pub mod visit {
+    use super::*;
+
+    pub trait Visitor<T> {
+        fn visit_simple_command<S: AsRef<str>>(
+            &mut self,
+            words: &[S],
+            redirects: &[Redirect],
+            background: bool,
+        ) -> T;
+
+        fn visit_connection_command(
+            &mut self,
+            first: &Command,
+            second: &Command,
+            connector: Connector,
+        ) -> T;
+
+        fn visit_command(&mut self, command: &Command) -> T;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -1,4 +1,7 @@
-use core::parser::{self, ast};
+use core::parser::{
+    self,
+    ast::{self, visit::Visitor},
+};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Stdio {
@@ -53,21 +56,7 @@ pub struct Interpreter {
     background: bool,
 }
 
-impl Interpreter {
-    fn new() -> Interpreter {
-        Interpreter { background: false }
-    }
-
-    pub fn parse(input: parser::Command) -> CommandGroup {
-        let mut interpreter = Interpreter::new();
-        let command = interpreter.visit_command(&input.inner);
-        CommandGroup {
-            input: input.input,
-            command,
-            background: interpreter.background,
-        }
-    }
-
+impl Visitor<Command> for Interpreter {
     fn visit_simple_command<S: AsRef<str>>(
         &mut self,
         words: &[S],
@@ -122,6 +111,22 @@ impl Interpreter {
                 ref second,
                 connector,
             } => self.visit_connection_command(first, second, *connector),
+        }
+    }
+}
+
+impl Interpreter {
+    fn new() -> Interpreter {
+        Interpreter { background: false }
+    }
+
+    pub fn parse(input: parser::Command) -> CommandGroup {
+        let mut interpreter = Interpreter::new();
+        let command = interpreter.visit_command(&input.inner);
+        CommandGroup {
+            input: input.input,
+            command,
+            background: interpreter.background,
         }
     }
 }

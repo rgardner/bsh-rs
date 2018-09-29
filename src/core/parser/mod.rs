@@ -17,7 +17,14 @@ pub struct Command {
 }
 
 impl Command {
-    pub fn parse(input: &str) -> Result<Command> {
+    pub fn new(input: &str, inner: ast::Command) -> Self {
+        Self {
+            input: input.to_string(),
+            inner,
+        }
+    }
+
+    pub fn parse(input: &str) -> Result<Self> {
         let result = CommandParser::new()
             .parse(input)
             .map_err(|_| Error::syntax(input))
