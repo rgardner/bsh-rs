@@ -3,6 +3,25 @@ use std::os::unix::prelude::*;
 use std::os::unix::process::ExitStatusExt;
 use std::process::ExitStatus;
 
+pub trait VecExt<T> {
+    /// Replace element at `index` with the result of the closure.
+    fn update<F>(&mut self, index: usize, f: F)
+    where
+        F: Fn(T) -> T;
+}
+
+impl<T> VecExt<T> for Vec<T> {
+    fn update<F>(&mut self, index: usize, f: F)
+    where
+        F: Fn(T) -> T,
+    {
+        let entry = self.swap_remove(index);
+        self.push(f(entry));
+        let last_index = self.len() - 1;
+        self.swap(index, last_index);
+    }
+}
+
 /// BSH Utility Extensions for `ExitStatus`
 pub trait BshExitStatusExt {
     /// Create an ExitStatus to indicate *successful* program execution.
@@ -16,7 +35,7 @@ pub trait BshExitStatusExt {
 }
 
 impl BshExitStatusExt for ExitStatus {
-    /// # Example
+    /// # Examples
     /// ```rust
     /// # extern crate bsh;
     /// # fn main() {
@@ -29,7 +48,7 @@ impl BshExitStatusExt for ExitStatus {
         ExitStatus::from_status(0)
     }
 
-    /// # Example
+    /// # Examples
     /// ```rust
     /// # extern crate bsh;
     /// # fn main() {
@@ -42,7 +61,7 @@ impl BshExitStatusExt for ExitStatus {
         ExitStatus::from_status(1)
     }
 
-    /// # Example
+    /// # Examples
     /// ```rust
     /// # extern crate bsh;
     /// # fn main() {
@@ -59,4 +78,16 @@ impl BshExitStatusExt for ExitStatus {
 
 pub fn get_terminal() -> RawFd {
     io::stdin().as_raw_fd()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_vec_update() {
+        let mut primes = vec![1, 2, 3];
+        primes.update(0, |p| p * 2);
+        assert_eq!(primes, vec![2, 2, 3]);
+    }
 }

@@ -12,7 +12,7 @@ use nix::unistd::{self, Pid};
 
 use core::job::{Job, JobId, ProcessGroup};
 use errors::{Error, ErrorKind, Result};
-use util;
+use util::{self, VecExt};
 
 pub fn initialize_job_control() -> Result<()> {
     let shell_terminal = util::get_terminal();
@@ -112,15 +112,10 @@ impl JobManager {
             let job_index = self
                 .find_job(job_id)
                 .ok_or_else(|| Error::no_such_job(format!("{}", job_id)))?;
-            let job = self
-                .jobs
-                .swap_remove(job_index)
-                .set_last_running_in_foreground(true);
-            let job_pgid = job.pgid();
-            let job_tmodes = job.tmodes().clone();
-            self.jobs.push(job);
-            let last_job_index = self.jobs.len() - 1;
-            self.jobs.swap(job_index, last_job_index);
+            self.jobs
+                .update(job_index, |j| j.set_last_running_in_foreground(true));
+            let job_pgid = self.jobs[job_index].pgid();
+            let job_tmodes = self.jobs[job_index].tmodes().clone();
             let _terminal_state = job_pgid.map(|pgid| TerminalState::new(Pid::from_raw(pgid)));
 
             // Send the job a continue signal if necessary
@@ -156,15 +151,9 @@ impl JobManager {
             let job_index = self
                 .find_job(job_id)
                 .ok_or_else(|| Error::no_such_job(format!("{}", job_id)))?;
-            let job = self
-                .jobs
-                .swap_remove(job_index)
-                .set_last_running_in_foreground(false);
-            let job_pgid = job.pgid();
-            self.jobs.push(job);
-            let last_job_index = self.jobs.len() - 1;
-            self.jobs.swap(job_index, last_job_index);
-            job_pgid
+            self.jobs
+                .update(job_index, |j| j.set_last_running_in_foreground(false));
+            self.jobs[job_index].pgid()
         };
 
         if cont {
@@ -238,37 +227,21 @@ impl JobManager {
             WaitStatus::Exited(pid, status_code) => {
                 debug!("{} exited with {}.", pid, status_code);
                 let job_index = self.find_job_with_process(pid).expect("unable to find job");
-                let job = self
-                    .jobs
-                    .swap_remove(job_index)
-                    .mark_exited(pid.into(), status_code);
-                self.jobs.push(job);
-                let last_job_index = self.jobs.len() - 1;
-                self.jobs.swap(job_index, last_job_index);
+                self.jobs
+                    .update(job_index, |job| job.mark_exited(pid.into(), status_code));
             }
             WaitStatus::Signaled(pid, signal, ..) => {
                 debug!("{} terminated by signal {:?}.", pid, signal);
                 let job_index = self.find_job_with_process(pid).expect("unable to find job");
-                let job = self
-                    .jobs
-                    .swap_remove(job_index)
-                    .mark_signaled(pid.into(), signal);
-                self.jobs.push(job);
-                let last_job_index = self.jobs.len() - 1;
-                self.jobs.swap(job_index, last_job_index);
+                self.jobs
+                    .update(job_index, |job| job.mark_signaled(pid.into(), signal));
             }
             WaitStatus::Stopped(pid, signal) => {
                 debug!("{} was signaled to stop {:?}.", pid, signal);
                 let job_index = self.find_job_with_process(pid).expect("unable to find job");
-                let job = self
-                    .jobs
-                    .swap_remove(job_index)
-                    .mark_stopped(pid.into(), signal);
-                let job_id = job.id();
-                self.jobs.push(job);
-                let last_job_index = self.jobs.len() - 1;
-                self.jobs.swap(job_index, last_job_index);
-                self.current_job = Some(job_id);
+                self.jobs
+                    .update(job_index, |job| job.mark_stopped(pid.into(), signal));
+                self.current_job = Some(self.jobs[job_index].id());
             }
             WaitStatus::StillAlive => panic!("mark_process_status called with StillAlive"),
             _ => (),

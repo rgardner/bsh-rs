@@ -9,7 +9,7 @@ use nix::{
     unistd::Pid,
 };
 
-use util::{self, BshExitStatusExt};
+use util::{self, BshExitStatusExt, VecExt};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ProcessId(u32);
@@ -262,13 +262,8 @@ impl Job {
     pub fn mark_exited(mut self, pid: ProcessId, status_code: i32) -> Self {
         let process_index = self.find_process(pid).expect("process not found");
         let status_code = ExitStatus::from_status(status_code);
-        let process = self
-            .processes
-            .swap_remove(process_index)
-            .mark_exited(status_code);
-        self.processes.push(process);
-        let last_process_index = self.processes.len() - 1;
-        self.processes.swap(process_index, last_process_index);
+        self.processes
+            .update(process_index, |p| p.mark_exited(status_code));
         Self {
             last_status_code: Some(status_code),
             ..self
@@ -277,10 +272,7 @@ impl Job {
 
     pub fn mark_stopped(mut self, pid: ProcessId, signal: Signal) -> Self {
         let process_index = self.find_process(pid).expect("process not found");
-        let process = self.processes.swap_remove(process_index).mark_stopped();
-        self.processes.push(process);
-        let last_process_index = self.processes.len() - 1;
-        self.processes.swap(process_index, last_process_index);
+        self.processes.update(process_index, |p| p.mark_stopped());
         Self {
             last_status_code: Some(get_status_code_for_signal(signal)),
             ..self
@@ -290,13 +282,8 @@ impl Job {
     pub fn mark_signaled(mut self, pid: ProcessId, signal: Signal) -> Self {
         let process_index = self.find_process(pid).expect("process not found");
         let status_code = get_status_code_for_signal(signal);
-        let process = self
-            .processes
-            .swap_remove(process_index)
-            .mark_exited(status_code);
-        self.processes.push(process);
-        let last_process_index = self.processes.len() - 1;
-        self.processes.swap(process_index, last_process_index);
+        self.processes
+            .update(process_index, |p| p.mark_exited(status_code));
         Self {
             last_status_code: Some(get_status_code_for_signal(signal)),
             ..self
