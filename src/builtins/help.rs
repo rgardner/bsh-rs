@@ -1,5 +1,4 @@
-use builtins::prelude::*;
-use builtins::{self, dirs, env, exit, history, jobs, kill, BuiltinCommand};
+use builtins::{self, dirs, env, exit, history, jobs, kill, prelude::*, BuiltinCommand};
 
 pub struct Help;
 
@@ -12,13 +11,13 @@ help: help [command ...]
     gives detailed help on all commands matching COMMAND, otherwise a list of the
     builtins is printed.";
 
-    fn run(_shell: &mut Shell, args: Vec<String>, stdout: &mut Write) -> Result<()> {
+    fn run<T: AsRef<str>>(_shell: &mut Shell, args: &[T], stdout: &mut Write) -> Result<()> {
         if args.is_empty() {
             print_all_usage_strings(stdout)?;
         } else {
             let mut all_invalid = true;
-            for arg in &args {
-                let msg = match arg.as_str() {
+            for arg in args {
+                let msg = match arg.as_ref() {
                     builtins::BG_NAME => Some(jobs::Bg::HELP),
                     builtins::CD_NAME => Some(dirs::Cd::HELP),
                     builtins::DECLARE_NAME => Some(env::Declare::HELP),
@@ -39,7 +38,7 @@ help: help [command ...]
             if all_invalid {
                 let cmd = args.last().unwrap();
                 return Err(Error::builtin_command(
-                    format!("help: no help topics match {}", cmd),
+                    format!("help: no help topics match {}", cmd.as_ref()),
                     1,
                 ));
             }

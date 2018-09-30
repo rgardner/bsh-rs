@@ -4,7 +4,7 @@ pub enum Redirectee {
     Filename(String),
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum RedirectInstruction {
     Output,
     Input,
@@ -17,7 +17,7 @@ pub struct Redirect {
     pub redirectee: Redirectee,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Connector {
     Pipe,
     Semicolon,
@@ -78,10 +78,32 @@ pub enum SimpleCommandPart {
     Redirect(Redirect),
 }
 
+pub mod visit {
+    use super::*;
+
+    pub trait Visitor<T> {
+        fn visit_simple_command<S: AsRef<str>>(
+            &mut self,
+            words: &[S],
+            redirects: &[Redirect],
+            background: bool,
+        ) -> T;
+
+        fn visit_connection_command(
+            &mut self,
+            first: &Command,
+            second: &Command,
+            connector: Connector,
+        ) -> T;
+
+        fn visit_command(&mut self, command: &Command) -> T;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use parser::grammar::CommandParser;
+    use core::parser::grammar::CommandParser;
 
     fn simple_command(words: &[&str]) -> Command {
         Command::Simple {
@@ -325,6 +347,42 @@ mod tests {
                     background: false,
                 }),
                 connector: Connector::Pipe,
+            }
+        );
+        assert_eq!(
+            CommandParser::new()
+                .parse("cmd1 && cmd2")
+                .expect("'cmd1 && cmd2' should be valid"),
+            Command::Connection {
+                first: Box::new(Command::Simple {
+                    words: vec!["cmd1".into()],
+                    redirects: vec![],
+                    background: false,
+                }),
+                second: Box::new(Command::Simple {
+                    words: vec!["cmd2".into()],
+                    redirects: vec![],
+                    background: false,
+                }),
+                connector: Connector::And
+            }
+        );
+        assert_eq!(
+            CommandParser::new()
+                .parse("cmd1 || cmd2")
+                .expect("'cmd1 || cmd2' should be valid"),
+            Command::Connection {
+                first: Box::new(Command::Simple {
+                    words: vec!["cmd1".into()],
+                    redirects: vec![],
+                    background: false,
+                }),
+                second: Box::new(Command::Simple {
+                    words: vec!["cmd2".into()],
+                    redirects: vec![],
+                    background: false,
+                }),
+                connector: Connector::Or
             }
         );
     }

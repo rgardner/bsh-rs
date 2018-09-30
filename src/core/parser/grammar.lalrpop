@@ -1,5 +1,6 @@
-use parser::ast;
 use std::str::FromStr;
+
+use core::parser::ast;
 
 grammar;
 

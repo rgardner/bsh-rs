@@ -6,7 +6,6 @@
 use std::env;
 use std::fmt;
 use std::fs::File;
-use std::ops::DerefMut;
 use std::path::{Path, PathBuf};
 use std::process::{self, ExitStatus};
 
@@ -14,11 +13,16 @@ use dirs;
 use failure::ResultExt;
 use nix::unistd;
 
+use core::{
+    intermediate_representation as ir,
+    job::{Job, JobId},
+    parser::Command,
+    variable_expansion,
+};
 use editor::Editor;
 use errors::{ErrorKind, Result};
 use execute_command::spawn_processes;
-use job_control::{self, Job, JobId, JobManager};
-use parser::{ast, Command};
+use job_control::{self, JobManager};
 use util::{self, BshExitStatusExt};
 
 const HISTORY_FILE_NAME: &str = ".bsh_history";
@@ -123,7 +127,7 @@ impl Shell {
             self.editor.add_history_entry(input);
         }
 
-        let mut command = match Command::parse(input) {
+        let command = match Command::parse(input) {
             Ok(command) => Ok(command),
             Err(e) => {
                 if let ErrorKind::Syntax(ref line) = *e.kind() {
@@ -136,8 +140,10 @@ impl Shell {
             }
         }?;
 
-        expand_variables(&mut command.inner);
-        self.execute_command(&mut command)?;
+        let inner_command =
+            variable_expansion::expand_variables(&command.inner, dirs::home_dir(), env::vars());
+        let mut command_group = ir::Interpreter::parse(Command::new(&command.input, inner_command));
+        self.execute_command(&mut command_group)?;
 
         Ok(())
     }
@@ -180,9 +186,9 @@ impl Shell {
     }
 
     /// Runs a job.
-    fn execute_command(&mut self, command: &mut Command) -> Result<()> {
-        let (processes, pgid, foreground) = match spawn_processes(self, &command.inner) {
-            Ok((processes, pgid, foreground)) => Ok((processes, pgid, foreground)),
+    fn execute_command(&mut self, command_group: &mut ir::CommandGroup) -> Result<()> {
+        let process_group = match spawn_processes(self, &command_group) {
+            Ok(process_group) => Ok(process_group),
             Err(e) => {
                 if let ErrorKind::CommandNotFound(ref command) = *e.kind() {
                     eprintln!("bsh: {}: command not found", command);
@@ -194,7 +200,10 @@ impl Shell {
             }
         }?;
 
-        let job_id = self.job_manager.create_job(&command.input, pgid, processes);
+        let foreground = process_group.foreground;
+        let job_id = self
+            .job_manager
+            .create_job(&command_group.input, process_group);
         if !self.is_interactive() {
             self.last_exit_status = self.job_manager.wait_for_job(job_id)?.unwrap();
         } else if foreground {
@@ -344,60 +353,4 @@ fn isatty() -> bool {
     let temp_result = unistd::isatty(util::get_terminal());
     log_if_err!(temp_result, "unistd::isatty");
     temp_result.unwrap_or(false)
-}
-
-// Variable Expansion Functions
-
-/// Expands shell and environment variables in command parts.
-fn expand_variables(command: &mut ast::Command) {
-    match *command {
-        ast::Command::Simple {
-            ref mut words,
-            ref mut redirects,
-            ..
-        } => {
-            expand_variables_simple_command(words, redirects.as_mut_slice());
-        }
-        ast::Command::Connection {
-            ref mut first,
-            ref mut second,
-            ..
-        } => {
-            match *first.deref_mut() {
-                ast::Command::Simple {
-                    ref mut words,
-                    ref mut redirects,
-                    ..
-                } => {
-                    expand_variables_simple_command(words, redirects.as_mut_slice());
-                }
-                _ => unreachable!(),
-            };
-            expand_variables(&mut **second)
-        }
-    }
-}
-
-fn expand_variables_simple_command(words: &mut Vec<String>, redirects: &mut [ast::Redirect]) {
-    for word in words.iter_mut() {
-        *word = expand_variables_word(word);
-    }
-    for redirect in redirects.iter_mut() {
-        if let Some(ast::Redirectee::Filename(ref mut filename)) = redirect.redirector {
-            *filename = expand_variables_word(filename);
-        }
-        if let ast::Redirectee::Filename(ref mut filename) = redirect.redirectee {
-            *filename = expand_variables_word(filename);
-        }
-    }
-}
-
-fn expand_variables_word(s: &str) -> String {
-    let expansion = match s {
-        "~" => dirs::home_dir().map(|p| p.to_string_lossy().into_owned()),
-        s if s.starts_with('$') => env::var(s[1..].to_string()).ok(),
-        _ => Some(s.to_string()),
-    };
-
-    expansion.unwrap_or_else(|| "".to_string())
 }

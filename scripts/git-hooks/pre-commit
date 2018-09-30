@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # sanity-check the changes and ensure grammar.rs is built for rustfmt
-cargo check
+cargo check --all-targets
 
 # warn and block commit for rustfmt formatting changes
 cargo fmt --all -- --check

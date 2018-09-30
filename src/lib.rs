@@ -10,8 +10,6 @@
     unused_import_braces,
     unused_qualifications
 )]
-#![cfg_attr(feature = "clippy", feature(plugin))]
-#![cfg_attr(feature = "clippy", plugin(clippy))]
 
 extern crate dirs;
 extern crate docopt;
@@ -30,6 +28,11 @@ pub use shell::{Shell, ShellConfig};
 pub use util::BshExitStatusExt;
 
 macro_rules! log_if_err {
+    ($result:expr) => {{
+        if let Err(e) = $result {
+            error!("{}", e);
+        }
+    }};
     ($result:expr, $fmt:expr) => {{
         if let Err(e) = $result {
             error!(concat!($fmt, ": {}"), e);
@@ -43,6 +46,7 @@ macro_rules! log_if_err {
 }
 
 mod builtins;
+mod core;
 mod editor;
 #[allow(missing_docs)]
 pub mod errors;
@@ -50,6 +54,5 @@ pub mod errors;
 mod execute_command;
 #[allow(unsafe_code)]
 mod job_control;
-mod parser;
-pub mod shell;
+mod shell;
 mod util;

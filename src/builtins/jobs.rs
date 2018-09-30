@@ -3,9 +3,8 @@ use std::result as res;
 
 use failure::ResultExt;
 
-use builtins;
-use builtins::prelude::*;
-use job_control::JobId;
+use builtins::{self, prelude::*};
+use core::job::JobId;
 
 pub struct Jobs;
 
@@ -38,8 +37,8 @@ Options:
 Exit Status:
 Returns success unless an invalid option is given or an error occurs.";
 
-    fn run(shell: &mut Shell, argv: Vec<String>, stdout: &mut Write) -> Result<()> {
-        let args: JobsArgs = parse_args(Self::HELP, &argv)?;
+    fn run<T: AsRef<str>>(shell: &mut Shell, args: &[T], stdout: &mut Write) -> Result<()> {
+        let args: JobsArgs = parse_args(Self::HELP, Self::NAME, args.iter().map(AsRef::as_ref))?;
         debug!("{:?}", args);
 
         for job in &shell.get_jobs() {
@@ -93,10 +92,10 @@ fg: fg [job_spec]
     Exit Status:
     Status of command placed in foreground or failure if an error occurs.";
 
-    fn run(shell: &mut Shell, argv: Vec<String>, _stdout: &mut Write) -> Result<()> {
-        let job_id = argv
-            .get(1)
-            .map(|s| s.parse::<u32>())
+    fn run<T: AsRef<str>>(shell: &mut Shell, args: &[T], _stdout: &mut Write) -> Result<()> {
+        let job_id = args
+            .first()
+            .map(|s| s.as_ref().parse::<u32>())
             .map_or(Ok(None), |v| v.map(Some));
         match job_id {
             Ok(job_id) => shell.put_job_in_foreground(job_id.map(JobId))?,
@@ -122,16 +121,15 @@ bg: bg [<jobspec>...]
     Exit Status:
     Returns success unless job control is not enabled or an error occurs.";
 
-    fn run(shell: &mut Shell, argv: Vec<String>, stdout: &mut Write) -> Result<()> {
-        if argv.len() == 1 {
+    fn run<T: AsRef<str>>(shell: &mut Shell, args: &[T], stdout: &mut Write) -> Result<()> {
+        if args.is_empty() {
             if let Err(e) = shell.put_job_in_background(None) {
                 writeln!(stdout, "{}", e).context(ErrorKind::Io)?;
             }
         } else {
-            let job_ids: Vec<res::Result<JobId, ParseIntError>> = argv
+            let job_ids: Vec<res::Result<JobId, ParseIntError>> = args
                 .iter()
-                .skip(1)
-                .map(|s| s.parse::<u32>().map(JobId))
+                .map(|s| s.as_ref().parse::<u32>().map(JobId))
                 .collect();
 
             for job_id in &job_ids {

@@ -1,6 +1,3 @@
-#![cfg_attr(feature = "clippy", feature(plugin))]
-#![cfg_attr(feature = "clippy", plugin(clippy))]
-
 extern crate bsh;
 extern crate dirs;
 extern crate docopt;
@@ -85,6 +82,7 @@ fn init_logger(path: &Option<String>) {
                 message
             ))
         }).level(log::LevelFilter::Debug)
+        .level_for("rustyline", log::LevelFilter::Info)
         .chain(fern::log_file(log_path).unwrap())
         .apply()
         .unwrap();
