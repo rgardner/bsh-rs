@@ -1,7 +1,5 @@
-use shell::{
-    builtins::{self, prelude::*},
-    editor::Editor,
-};
+use builtins::{self, prelude::*};
+use editor::Editor;
 
 pub struct History;
 

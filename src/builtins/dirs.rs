@@ -1,8 +1,8 @@
 use std::env;
 use std::path::Path;
 
+use builtins::{self, prelude::*};
 use dirs;
-use shell::builtins::{self, prelude::*};
 
 pub struct Cd;
 

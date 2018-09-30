@@ -19,12 +19,10 @@ use core::{
     parser::Command,
     variable_expansion,
 };
+use editor::Editor;
 use errors::{ErrorKind, Result};
-use shell::{
-    editor::Editor,
-    execute_command::spawn_processes,
-    job_control::{self, JobManager},
-};
+use execute_command::spawn_processes;
+use job_control::{self, JobManager};
 use util::{self, BshExitStatusExt};
 
 const HISTORY_FILE_NAME: &str = ".bsh_history";

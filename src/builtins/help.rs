@@ -1,4 +1,4 @@
-use shell::builtins::{self, dirs, env, exit, history, jobs, kill, prelude::*, BuiltinCommand};
+use builtins::{self, dirs, env, exit, history, jobs, kill, prelude::*, BuiltinCommand};
 
 pub struct Help;
 

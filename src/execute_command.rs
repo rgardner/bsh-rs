@@ -10,13 +10,14 @@ use nix::libc;
 use nix::sys::signal::{self, SigHandler, Signal};
 use nix::unistd::{self, Pid};
 
+use builtins;
 use core::{
     intermediate_representation as ir,
     job::{Process, ProcessGroup, ProcessId, ProcessStatus},
     parser::ast,
 };
 use errors::{Error, ErrorKind, Result};
-use shell::{builtins, shell::Shell};
+use shell::Shell;
 use util::{self, BshExitStatusExt};
 
 #[derive(Debug)]
