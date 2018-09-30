@@ -1,18 +1,21 @@
 //! Integration Tests
 
-extern crate assert_cli;
+extern crate assert_cmd;
 extern crate chrono;
 #[macro_use]
 extern crate lazy_static;
+extern crate predicates;
 extern crate tempfile;
 
 use std::ffi::OsStr;
 use std::fs::File;
 use std::io::{self, Read};
 use std::path::PathBuf;
+use std::process::Command;
 
-use assert_cli::Assert;
+use assert_cmd::prelude::*;
 use chrono::{DateTime, Local};
+use predicates::prelude::*;
 use tempfile::TempDir;
 
 lazy_static! {
@@ -29,58 +32,53 @@ lazy_static! {
     };
 }
 
-trait AssertExt {
-    fn exit_status_is(self, exit_status: i32) -> Self;
-}
-
-impl AssertExt for Assert {
-    fn exit_status_is(self, exit_status: i32) -> Self {
-        if exit_status == 0 {
-            self.succeeds()
-        } else {
-            self.fails_with(exit_status)
-        }
-    }
-}
-
-fn bsh_assert() -> Assert {
-    Assert::cargo_binary("bsh").with_args(&[OsStr::new("--log"), LOG_FILE_NAME.as_os_str()])
-}
-
 #[test]
 fn test_simple_echo() {
-    bsh_assert()
-        .with_args(&["-c", "echo foo"])
-        .stdout()
-        .is("foo")
-        .unwrap();
+    Command::cargo_bin("bsh")
+        .unwrap()
+        .args(&[OsStr::new("--log"), LOG_FILE_NAME.as_os_str()])
+        .args(&["-c", "echo foo"])
+        .unwrap()
+        .assert()
+        .stdout(predicates::str::similar("foo\n").from_utf8());
 }
 
 #[test]
 fn test_exit_normal_large_negative() {
-    bsh_assert()
-        .with_args(&["-c", "exit 85"])
-        .exit_status_is(85)
-        .unwrap();
+    let err = Command::cargo_bin("bsh")
+        .unwrap()
+        .args(&[OsStr::new("--log"), LOG_FILE_NAME.as_os_str()])
+        .args(&["-c", "exit 85"])
+        .unwrap_err();
+    let output = err.as_output().unwrap();
+    output.clone().assert().code(predicate::eq(85));
 
-    bsh_assert()
-        .with_args(&["-c", "exit 500"])
-        .exit_status_is(244)
-        .unwrap();
+    let err = Command::cargo_bin("bsh")
+        .unwrap()
+        .args(&[OsStr::new("--log"), LOG_FILE_NAME.as_os_str()])
+        .args(&["-c", "exit 500"])
+        .unwrap_err();
+    let output = err.as_output().unwrap();
+    output.clone().assert().code(predicate::eq(244));
 
-    bsh_assert()
-        .with_args(&["-c", "exit -500"])
-        .exit_status_is(12)
-        .unwrap();
+    let err = Command::cargo_bin("bsh")
+        .unwrap()
+        .args(&[OsStr::new("--log"), LOG_FILE_NAME.as_os_str()])
+        .args(&["-c", "exit -500"])
+        .unwrap_err();
+    let output = err.as_output().unwrap();
+    output.clone().assert().code(predicate::eq(12));
 }
 
 #[test]
 fn test_simple_pipeline() {
-    bsh_assert()
-        .with_args(&["-c", "echo needle | grep needle"])
-        .stdout()
-        .is("needle\n")
-        .unwrap();
+    Command::cargo_bin("bsh")
+        .unwrap()
+        .args(&[OsStr::new("--log"), LOG_FILE_NAME.as_os_str()])
+        .args(&["-c", "echo needle | grep needle"])
+        .unwrap()
+        .assert()
+        .stdout(predicates::str::similar("needle\n").from_utf8());
 }
 
 #[test]
@@ -88,23 +86,28 @@ fn test_simple_redirects() {
     let temp_dir = generate_temp_directory().unwrap();
     let command = "echo 'test needle, please ignore' >outfile; grep <outfile 'needle'";
     let expected_stdout = "test needle, please ignore\n";
-    bsh_assert()
+    Command::cargo_bin("bsh")
+        .unwrap()
+        .args(&[OsStr::new("--log"), LOG_FILE_NAME.as_os_str()])
         .current_dir(temp_dir.path())
-        .with_args(&["-c", command])
-        .stdout()
-        .is(expected_stdout)
-        .unwrap();
+        .args(&["-c", command])
+        .unwrap()
+        .assert()
+        .stdout(predicates::str::similar(expected_stdout).from_utf8());
 }
 
 #[test]
 fn test_stderr_redirect() {
     let temp_dir = generate_temp_directory().unwrap();
     let command = r#"python3 -c 'import sys; print("test needle", file=sys.stderr)' 2>errfile"#;
-    bsh_assert()
+    Command::cargo_bin("bsh")
+        .unwrap()
+        .args(&[OsStr::new("--log"), LOG_FILE_NAME.as_os_str()])
         .current_dir(temp_dir.path())
-        .with_args(&["-c", command])
-        .succeeds()
-        .unwrap();
+        .args(&["-c", command])
+        .unwrap()
+        .assert()
+        .success();
 
     let mut file = File::open(temp_dir.path().join("errfile")).expect("unable to open errfile");
     let mut contents = String::new();
@@ -117,24 +120,35 @@ fn test_stderr_redirect() {
 fn test_command_not_found() {
     let args = ["-c", "foo"];
     let expected_stderr = "bsh: foo: command not found\n";
-    bsh_assert()
-        .with_args(&args)
-        .stderr()
-        .is(expected_stderr)
-        .exit_status_is(127)
-        .unwrap();
+    let err = Command::cargo_bin("bsh")
+        .unwrap()
+        .args(&[OsStr::new("--log"), LOG_FILE_NAME.as_os_str()])
+        .args(&args)
+        .unwrap_err();
+    let output = err.as_output().unwrap();
+    output
+        .clone()
+        .assert()
+        .stderr(predicates::str::similar(expected_stderr).from_utf8())
+        .code(predicate::eq(127));
 }
 
 #[test]
 fn test_syntax_error() {
     let args = ["-c", ";"];
     let expected_stderr = "bsh: syntax error near: ;\n";
-    bsh_assert()
-        .with_args(&args)
-        .stderr()
-        .is(expected_stderr)
-        .exit_status_is(2)
-        .unwrap();
+    let err = Command::cargo_bin("bsh")
+        .unwrap()
+        .args(&[OsStr::new("--log"), LOG_FILE_NAME.as_os_str()])
+        .args(&args)
+        .unwrap_err();
+
+    let output = err.as_output().unwrap();
+    output
+        .clone()
+        .assert()
+        .stderr(predicates::str::similar(expected_stderr).from_utf8())
+        .code(predicate::eq(2));
 }
 
 fn generate_temp_directory() -> io::Result<TempDir> {
