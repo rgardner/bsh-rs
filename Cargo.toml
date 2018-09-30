@@ -26,10 +26,6 @@ rustyline = "2.1.0"
 serde = "1.0.18"
 serde_derive = "1.0.18"
 
-[dependencies.clippy]
-optional = true
-version = "*"
-
 [dependencies.nix]
 branch = "implement-libc-signal"
 git = "https://github.com/rgardner/nix"
@@ -39,6 +35,3 @@ assert_cli = "0.6.3"
 chrono = "0.4.0"
 lazy_static = "1.0.0"
 tempfile = "3.0.4"
-
-[features]
-default = []

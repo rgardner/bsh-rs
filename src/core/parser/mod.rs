@@ -5,7 +5,6 @@ use errors::{Error, Result};
 
 pub mod ast;
 #[allow(dead_code, unused_qualifications)]
-#[cfg_attr(feature = "clippy", allow(clippy))]
 #[cfg_attr(feature = "cargo-clippy", allow(clippy))]
 #[cfg_attr(rustfmt, rustfmt_skip)]
 mod grammar;

@@ -10,8 +10,6 @@
     unused_import_braces,
     unused_qualifications
 )]
-#![cfg_attr(feature = "clippy", feature(plugin))]
-#![cfg_attr(feature = "clippy", plugin(clippy))]
 
 extern crate dirs;
 extern crate docopt;
