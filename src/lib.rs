@@ -33,11 +33,6 @@ macro_rules! log_if_err {
             error!("{}", e);
         }
     }};
-    ($result:expr, $fmt:expr, $($arg:tt)*) => {{
-        if let Err(e) = $result {
-            error!(concat!($fmt, ": {}"), $($arg)*, e);
-        }
-    }};
     ($result:expr, $fmt:expr) => {{
         if let Err(e) = $result {
             error!(concat!($fmt, ": {}"), e);
