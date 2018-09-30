@@ -1,15 +1,47 @@
-use std::env;
-
-use dirs;
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
 use core::parser::ast::{visit::Visitor, Command, Connector, Redirect, Redirectee};
 
-pub fn expand_variables(command: &Command) -> Command {
-    let mut variable_expander = VariableExpander;
+pub fn expand_variables<I, P, K, V>(command: &Command, home_dir: Option<P>, vars: I) -> Command
+where
+    P: AsRef<Path>,
+    I: IntoIterator<Item = (K, V)>,
+    K: AsRef<str>,
+    V: AsRef<str>,
+{
+    let mut variable_expander = VariableExpander::new(home_dir, vars);
     variable_expander.visit_command(command)
 }
 
-struct VariableExpander;
+struct VariableExpander {
+    home_dir: Option<PathBuf>,
+    vars: HashMap<String, String>,
+}
+
+impl VariableExpander {
+    fn new<P, I, K, V>(home_dir: Option<P>, vars: I) -> Self
+    where
+        P: AsRef<Path>,
+        I: IntoIterator<Item = (K, V)>,
+        K: AsRef<str>,
+        V: AsRef<str>,
+    {
+        Self {
+            home_dir: home_dir.map(|p| p.as_ref().to_path_buf()),
+            vars: vars
+                .into_iter()
+                .map(|(k, v)| (k.as_ref().to_string(), v.as_ref().to_string()))
+                .collect(),
+        }
+    }
+
+    fn expand_variables_word(&self, s: &str) -> String {
+        expand_variables_word(s, &self.home_dir, &self.vars)
+    }
+}
 
 impl Visitor<Command> for VariableExpander {
     fn visit_simple_command<S: AsRef<str>>(
@@ -21,21 +53,21 @@ impl Visitor<Command> for VariableExpander {
         Command::Simple {
             words: words
                 .iter()
-                .map(|w| expand_variables_word(w.as_ref()))
+                .map(|w| self.expand_variables_word(w.as_ref()))
                 .collect(),
             redirects: redirects
                 .iter()
                 .map(|r| Redirect {
                     redirector: match r.redirector {
                         Some(Redirectee::Filename(ref filename)) => {
-                            Some(Redirectee::Filename(expand_variables_word(filename)))
+                            Some(Redirectee::Filename(self.expand_variables_word(filename)))
                         }
                         ref other => other.clone(),
                     },
                     instruction: r.instruction,
                     redirectee: match r.redirectee {
                         Redirectee::Filename(ref filename) => {
-                            Redirectee::Filename(expand_variables_word(filename))
+                            Redirectee::Filename(self.expand_variables_word(filename))
                         }
                         ref other => other.clone(),
                     },
@@ -74,12 +106,16 @@ impl Visitor<Command> for VariableExpander {
 }
 
 /// Expands shell and environment variables in command parts.
-fn expand_variables_word(s: &str) -> String {
-    // TODO: extract dirs and var to function parameters
+fn expand_variables_word<P>(s: &str, home_dir: &Option<P>, vars: &HashMap<String, String>) -> String
+where
+    P: AsRef<Path>,
+{
     // TODO: expand tilde in any part of the word
     let expansion = match s {
-        "~" => dirs::home_dir().map(|p| p.to_string_lossy().into_owned()),
-        s if s.starts_with('$') => env::var(s[1..].to_string()).ok(),
+        "~" => home_dir
+            .as_ref()
+            .map(|p| p.as_ref().to_string_lossy().into_owned()),
+        s if s.starts_with('$') => vars.get(&s[1..].to_string()).cloned(),
         _ => Some(s.to_string()),
     };
 
@@ -89,6 +125,8 @@ fn expand_variables_word(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use std::iter;
 
     use core::parser::ast::{Command, RedirectInstruction, Redirectee};
 
@@ -100,9 +138,6 @@ mod tests {
 
     #[test]
     fn test_home_dir_expansion() {
-        let expected_home_dir = dirs::home_dir()
-            .map(|p| p.to_string_lossy().to_string())
-            .expect("home dir not set");
         let command = Command::Simple {
             words: vec!["cmd1".to_string(), "~".to_string()],
             redirects: vec![Redirect {
@@ -113,8 +148,13 @@ mod tests {
             background: false,
         };
 
+        let expected_home_dir = "MockHomeDir".to_string();
         assert_eq!(
-            expand_variables(&command),
+            expand_variables(
+                &command,
+                Some(&expected_home_dir),
+                iter::empty::<(String, String)>()
+            ),
             Command::Simple {
                 words: vec!["cmd1".to_string(), expected_home_dir.clone()],
                 redirects: vec![Redirect {
@@ -131,7 +171,6 @@ mod tests {
     fn test_env_var_expansion() {
         let key = generate_unique_env_key!();
         let value = "test".to_string();
-        env::set_var(&key, &value);
         let command = Command::Simple {
             words: vec!["cmd1".to_string(), format!("${}", key)],
             redirects: vec![Redirect {
@@ -142,8 +181,13 @@ mod tests {
             background: false,
         };
 
+        let vars = [(key, value.clone())];
         assert_eq!(
-            expand_variables(&command),
+            expand_variables(
+                &command,
+                None::<PathBuf>,
+                vars.iter().map(|&(ref key, ref value)| (key, value))
+            ),
             Command::Simple {
                 words: vec!["cmd1".to_string(), value.clone()],
                 redirects: vec![Redirect {

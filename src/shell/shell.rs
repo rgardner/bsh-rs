@@ -142,7 +142,8 @@ impl Shell {
             }
         }?;
 
-        let inner_command = variable_expansion::expand_variables(&command.inner);
+        let inner_command =
+            variable_expansion::expand_variables(&command.inner, dirs::home_dir(), env::vars());
         let mut command_group = ir::Interpreter::parse(Command::new(&command.input, inner_command));
         self.execute_command(&mut command_group)?;
 
