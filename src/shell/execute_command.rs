@@ -116,7 +116,7 @@ pub fn wait(process: Process) -> Result<(Process, ExitStatus)> {
             .expect("invalid status code for completed process");
         Ok((process, status_code))
     } else if let Some(pid) = process.id() {
-        let status_code = wait_for_process(pid.into())?;
+        let status_code = wait_for_process(pid)?;
         Ok((process.mark_exited(status_code), status_code))
     } else {
         panic!("process status is not 'Completed' and pid is not set");
