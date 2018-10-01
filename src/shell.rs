@@ -11,7 +11,6 @@ use std::process::{self, ExitStatus};
 
 use dirs;
 use failure::ResultExt;
-use nix::unistd;
 
 use core::{
     intermediate_representation as ir,
@@ -52,7 +51,7 @@ impl Shell {
             job_manager: Default::default(),
             last_exit_status: ExitStatus::from_success(),
             config,
-            is_interactive: isatty(),
+            is_interactive: util::isatty(),
         };
 
         if shell.is_interactive {
@@ -347,10 +346,4 @@ impl Default for ShellConfig {
             display_messages: false,
         }
     }
-}
-
-fn isatty() -> bool {
-    let temp_result = unistd::isatty(util::get_terminal());
-    log_if_err!(temp_result, "unistd::isatty");
-    temp_result.unwrap_or(false)
 }

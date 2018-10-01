@@ -3,6 +3,10 @@ use std::os::unix::prelude::*;
 use std::os::unix::process::ExitStatusExt;
 use std::process::ExitStatus;
 
+pub use self::unix::isatty;
+
+pub mod unix;
+
 pub trait VecExt<T> {
     /// Replace element at `index` with the result of the closure.
     fn update<F>(&mut self, index: usize, f: F)
