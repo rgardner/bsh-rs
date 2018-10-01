@@ -15,6 +15,7 @@ extern crate dirs;
 extern crate docopt;
 extern crate failure;
 extern crate lalrpop_util;
+extern crate libc;
 #[macro_use]
 extern crate log;
 extern crate nix;

@@ -6,7 +6,7 @@ use std::os::unix::process::CommandExt;
 use std::process::{ChildStdout, Command, ExitStatus, Stdio};
 
 use failure::{Fail, ResultExt};
-use nix::libc;
+use libc;
 use nix::sys::signal::{self, SigHandler, Signal};
 use nix::unistd::{self, Pid};
 

@@ -2,9 +2,9 @@ use std::fmt;
 use std::process::ExitStatus;
 
 use failure::{Fail, ResultExt};
+use libc;
 use nix;
 use nix::errno::Errno;
-use nix::libc;
 use nix::sys::signal::{self, SigHandler, Signal};
 use nix::sys::termios::{self, Termios};
 use nix::sys::wait::{self, WaitPidFlag, WaitStatus};

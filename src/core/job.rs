@@ -1,7 +1,7 @@
 use std::{fmt, iter, process::ExitStatus};
 
+use libc;
 use nix::{
-    libc,
     sys::{
         signal::Signal,
         termios::{self, Termios},
