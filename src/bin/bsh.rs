@@ -4,7 +4,6 @@ extern crate docopt;
 #[macro_use]
 extern crate log;
 extern crate fern;
-extern crate nix;
 #[macro_use]
 extern crate serde_derive;
 
@@ -14,7 +13,6 @@ use std::process::{self, ExitStatus};
 use bsh::errors::*;
 use bsh::{BshExitStatusExt, Shell, ShellConfig};
 use docopt::Docopt;
-use nix::unistd::Pid;
 
 const COMMAND_HISTORY_CAPACITY: usize = 10;
 const LOG_FILE_NAME: &str = ".bsh_log";
@@ -71,7 +69,7 @@ fn init_logger(path: &Option<String>) {
         .map(PathBuf::from)
         .unwrap_or_else(default_log_path);
 
-    let pid = Pid::this();
+    let pid = process::id();
     fern::Dispatch::new()
         .format(move |out, message, record| {
             out.finish(format_args!(
