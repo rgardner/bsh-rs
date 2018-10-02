@@ -27,7 +27,7 @@ pub mod prelude {
 
     pub use super::parse_args;
     pub use errors::{Error, ErrorKind, Result};
-    pub use shell::unix::Shell;
+    pub use shell::Shell;
     pub use util::BshExitStatusExt;
 }
 

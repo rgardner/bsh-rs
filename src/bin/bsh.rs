@@ -7,11 +7,11 @@ extern crate fern;
 #[macro_use]
 extern crate serde_derive;
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{self, ExitStatus};
 
 use bsh::errors::*;
-use bsh::{BshExitStatusExt, Shell, ShellConfig};
+use bsh::{create_shell, BshExitStatusExt, Shell, ShellConfig};
 use docopt::Docopt;
 
 const COMMAND_HISTORY_CAPACITY: usize = 10;
@@ -92,22 +92,22 @@ fn default_log_path() -> PathBuf {
 
 fn execute_from_command_string_or_file(args: &Args) -> ! {
     let shell_config = ShellConfig::noninteractive();
-    let mut shell = Shell::new(shell_config).unwrap_or_else(|e| display_error_and_exit(&e));
+    let mut shell = create_shell(shell_config).unwrap_or_else(|e| display_error_and_exit(&e));
 
     let result = if let Some(ref command) = args.arg_command {
         shell.execute_command_string(command)
     } else if let Some(ref file_path) = args.arg_file {
-        shell.execute_commands_from_file(&file_path)
+        shell.execute_commands_from_file(&Path::new(file_path))
     } else {
         unreachable!();
     };
 
-    exit(result, &mut shell);
+    exit(result, &mut *shell);
 }
 
 fn execute_from_stdin() -> ! {
     let shell_config = ShellConfig::interactive(COMMAND_HISTORY_CAPACITY);
-    let mut shell = Shell::new(shell_config).unwrap_or_else(|e| display_error_and_exit(&e));
+    let mut shell = create_shell(shell_config).unwrap_or_else(|e| display_error_and_exit(&e));
     shell.execute_from_stdin();
     shell.exit(None)
 }

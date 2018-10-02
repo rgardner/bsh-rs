@@ -1,7 +1,6 @@
-//! Bsh - Shell Module
-//!
-//! The Shell itself is responsible for managing background jobs and for
-//! maintaining an editor of previous commands.
+//! The JobControlShell can run command groups in the foreground and background,
+//! in addition to the normal shell abilities such as managing the command
+//! history.
 
 use std::env;
 use std::fmt;
@@ -22,14 +21,14 @@ use editor::Editor;
 use errors::{ErrorKind, Result};
 use execute_command::spawn_processes;
 use job_control::{self, JobManager};
+use shell::{Shell, ShellConfig};
 use util::{self, BshExitStatusExt};
 
 const HISTORY_FILE_NAME: &str = ".bsh_history";
 const SYNTAX_ERROR_EXIT_STATUS: i32 = 2;
 const COMMAND_NOT_FOUND_EXIT_STATUS: i32 = 127;
 
-/// Bsh Shell
-pub struct Shell {
+pub struct JobControlShell {
     /// Responsible for readline and history.
     pub editor: Editor,
     history_file: Option<PathBuf>,
@@ -42,10 +41,10 @@ pub struct Shell {
     is_interactive: bool,
 }
 
-impl Shell {
-    /// Constructs a new Shell to manage running jobs and command history.
-    pub fn new(config: ShellConfig) -> Result<Shell> {
-        let mut shell = Shell {
+impl JobControlShell {
+    /// Constructs a new JobControlShell to manage running jobs and command history.
+    pub fn new(config: ShellConfig) -> Result<Self> {
+        let mut shell = Self {
             editor: Editor::with_capacity(config.command_history_capacity),
             history_file: None,
             job_manager: Default::default(),
@@ -96,7 +95,7 @@ impl Shell {
 
     /// Custom prompt to output to the user.
     /// Returns `None` when end of file is reached.
-    pub fn prompt(&mut self) -> Result<Option<String>> {
+    fn prompt(&mut self) -> Result<Option<String>> {
         let cwd = env::current_dir().unwrap();
         let home = dirs::home_dir().unwrap();
         let rel = match cwd.strip_prefix(&home) {
@@ -285,65 +284,63 @@ impl Shell {
     }
 }
 
-impl fmt::Debug for Shell {
+impl Shell for JobControlShell {
+    fn execute_command_string(&mut self, input: &str) -> Result<()> {
+        Self::execute_command_string(self, input)
+    }
+
+    fn execute_commands_from_file(&mut self, path: &Path) -> Result<()> {
+        Self::execute_commands_from_file(self, path)
+    }
+
+    fn execute_from_stdin(&mut self) {
+        Self::execute_from_stdin(self)
+    }
+
+    fn exit(&mut self, n: Option<ExitStatus>) -> ! {
+        Self::exit(self, n)
+    }
+
+    fn is_interactive(&self) -> bool {
+        Self::is_interactive(self)
+    }
+
+    fn editor(&self) -> &Editor {
+        &self.editor
+    }
+
+    fn editor_mut(&mut self) -> &mut Editor {
+        &mut self.editor
+    }
+
+    fn get_jobs(&self) -> Vec<Job> {
+        Self::get_jobs(self)
+    }
+
+    fn has_background_jobs(&self) -> bool {
+        Self::has_background_jobs(self)
+    }
+
+    fn put_job_in_foreground(&mut self, job_id: Option<JobId>) -> Result<Option<ExitStatus>> {
+        Self::put_job_in_foreground(self, job_id)
+    }
+
+    fn put_job_in_background(&mut self, job_id: Option<JobId>) -> Result<()> {
+        Self::put_job_in_background(self, job_id)
+    }
+
+    fn kill_background_job(&mut self, job_id: u32) -> Result<Option<Job>> {
+        Self::kill_background_job(self, job_id)
+    }
+}
+
+impl fmt::Debug for JobControlShell {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:?} jobs\n{:?}", self.job_manager, self.editor)
     }
 }
 
-/// Policy object to control a Shell's behavior
-#[derive(Debug, Copy, Clone)]
-pub struct ShellConfig {
-    /// Determines if new command entries will be added to the shell's command history.
-    ///
-    /// Note: This is checked before the other command history config fields.
-    enable_command_history: bool,
-
-    /// Number of entries to store in the shell's command history
-    command_history_capacity: usize,
-
-    /// Determines if job control (fg and bg) is supported.
-    enable_job_control: bool,
-
-    /// Determines if some messages (e.g. "exit") should be displayed.
-    display_messages: bool,
-}
-
-impl ShellConfig {
-    /// Creates an interactive shell, e.g. command history, job control
-    ///
-    /// # Complete List
-    /// - Command History is enabled
-    /// - Job Control is enabled
-    /// - Some additional messages are displayed
-    pub fn interactive(command_history_capacity: usize) -> ShellConfig {
-        ShellConfig {
-            enable_command_history: true,
-            command_history_capacity,
-            enable_job_control: true,
-            display_messages: true,
-        }
-    }
-
-    /// Creates a noninteractive shell, e.g. no command history, no job control
-    ///
-    /// # Complete List
-    /// - Command History is disabled. Commands are not saved and history expansions are not
-    ///   performed. The history builtin command is not affected by this option.
-    /// - Job Control is disabled.
-    /// - Fewer messages are displayed
-    pub fn noninteractive() -> ShellConfig {
-        Default::default()
-    }
-}
-
-impl Default for ShellConfig {
-    fn default() -> ShellConfig {
-        ShellConfig {
-            enable_command_history: false,
-            command_history_capacity: 0,
-            enable_job_control: false,
-            display_messages: false,
-        }
-    }
+pub fn create_shell(config: ShellConfig) -> Result<Box<dyn Shell>> {
+    let shell = JobControlShell::new(config)?;
+    Ok(Box::new(shell))
 }

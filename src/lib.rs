@@ -25,7 +25,7 @@ extern crate serde;
 extern crate serde_derive;
 
 pub use errors::{Error, ErrorKind, Result};
-pub use shell::unix::{Shell, ShellConfig};
+pub use shell::{create_shell, Shell, ShellConfig};
 pub use util::BshExitStatusExt;
 
 macro_rules! log_if_err {
@@ -55,5 +55,7 @@ pub mod errors;
 mod execute_command;
 #[allow(unsafe_code)]
 mod job_control;
+// TODO: remove this once the dust has settled
+#[allow(missing_docs)]
 mod shell;
 mod util;
