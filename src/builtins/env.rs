@@ -75,7 +75,7 @@ mod tests {
     use std::io;
 
     use builtins::BuiltinCommand;
-    use shell::{Shell, ShellConfig};
+    use shell::unix::{Shell, ShellConfig};
 
     macro_rules! generate_unique_env_key {
         () => {

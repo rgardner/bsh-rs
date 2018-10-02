@@ -25,7 +25,7 @@ extern crate serde;
 extern crate serde_derive;
 
 pub use errors::{Error, ErrorKind, Result};
-pub use shell::{Shell, ShellConfig};
+pub use shell::unix::{Shell, ShellConfig};
 pub use util::BshExitStatusExt;
 
 macro_rules! log_if_err {

@@ -17,7 +17,7 @@ use core::{
     parser::ast,
 };
 use errors::{Error, ErrorKind, Result};
-use shell::Shell;
+use shell::unix::Shell;
 use util::{self, BshExitStatusExt};
 
 #[derive(Debug)]
