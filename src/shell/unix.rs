@@ -11,6 +11,7 @@ use std::process::{self, ExitStatus};
 use dirs;
 use failure::ResultExt;
 
+use super::{COMMAND_NOT_FOUND_EXIT_STATUS, HISTORY_FILE_NAME, SYNTAX_ERROR_EXIT_STATUS};
 use core::{
     intermediate_representation as ir,
     job::{Job, JobId},
@@ -24,13 +25,9 @@ use job_control::{self, JobManager};
 use shell::{Shell, ShellConfig};
 use util::{self, BshExitStatusExt};
 
-const HISTORY_FILE_NAME: &str = ".bsh_history";
-const SYNTAX_ERROR_EXIT_STATUS: i32 = 2;
-const COMMAND_NOT_FOUND_EXIT_STATUS: i32 = 127;
-
 pub struct JobControlShell {
     /// Responsible for readline and history.
-    pub editor: Editor,
+    editor: Editor,
     history_file: Option<PathBuf>,
     job_manager: JobManager,
     /// Exit status of last command executed.
