@@ -53,8 +53,6 @@ mod editor;
 pub mod errors;
 #[allow(unsafe_code)]
 mod execute_command;
-#[allow(unsafe_code)]
-mod job_control;
 // TODO: remove this once the dust has settled
 #[allow(missing_docs)]
 mod shell;

@@ -4,7 +4,7 @@ use std::result as res;
 use failure::ResultExt;
 
 use builtins::{self, prelude::*};
-use core::job::JobId;
+use shell::JobId;
 
 pub struct Jobs;
 
@@ -41,7 +41,7 @@ Returns success unless an invalid option is given or an error occurs.";
         let args: JobsArgs = parse_args(Self::HELP, Self::NAME, args.iter().map(AsRef::as_ref))?;
         debug!("{:?}", args);
 
-        for job in &shell.get_jobs() {
+        for job in shell.get_jobs() {
             let processes = job.processes();
             if args.flag_l {
                 if let Some(first) = processes.first() {
@@ -68,7 +68,7 @@ Returns success unless an invalid option is given or an error occurs.";
                     writeln!(stdout, "{:?}", process.id()).context(ErrorKind::Io)?;
                 }
             } else {
-                writeln!(stdout, "{}", job).context(ErrorKind::Io)?;
+                writeln!(stdout, "{}", job.display()).context(ErrorKind::Io)?;
             }
         }
 

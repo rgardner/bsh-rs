@@ -1,5 +1,5 @@
 use std::{
-    env,
+    env, fmt,
     fs::File,
     path::{Path, PathBuf},
     process::{self, ExitStatus},
@@ -8,14 +8,10 @@ use std::{
 use dirs;
 use failure::ResultExt;
 
-use core::{
-    intermediate_representation as ir,
-    job::{Job, JobId},
-    parser::Command,
-    variable_expansion,
-};
+use core::{intermediate_representation as ir, parser::Command, variable_expansion};
 use editor::Editor;
 use errors::{Error, ErrorKind, Result};
+use execute_command::Process;
 use util::{self, BshExitStatusExt};
 
 const HISTORY_FILE_NAME: &str = ".bsh_history";
@@ -25,23 +21,60 @@ const COMMAND_NOT_FOUND_EXIT_STATUS: i32 = 127;
 #[cfg(unix)]
 pub use self::unix::create_shell;
 #[cfg(unix)]
+#[allow(unsafe_code)]
 pub mod unix;
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct JobId(pub u32);
+
+pub trait Job {
+    fn id(&self) -> JobId;
+    fn input(&self) -> String;
+    fn display(&self) -> String;
+    fn processes(&self) -> &Vec<Box<Process>>;
+}
+
 pub trait Shell {
+    /// Runs a job from a command string.
     fn execute_command_string(&mut self, input: &str) -> Result<()>;
+
+    /// Runs a bsh script from a file.
     fn execute_commands_from_file(&mut self, path: &Path) -> Result<()>;
+
+    /// Runs jobs from stdin until EOF is received.
     fn execute_from_stdin(&mut self);
+
+    /// Exit the shell.
+    ///
+    /// Valid exit codes are between 0 and 255. Like bash and its descendents, it automatically
+    /// converts exit codes to a u8 such that positive n becomes n & 256 and negative n becomes
+    /// (256 + n) % 256.
+    ///
+    /// Exit the shell with a status of n. If n is None, then the exit status is that of the last
+    /// command executed.
     fn exit(&mut self, n: Option<ExitStatus>) -> !;
 
     fn is_interactive(&self) -> bool;
+    fn is_job_control_enabled(&self) -> bool;
     fn editor(&self) -> &Editor;
     fn editor_mut(&mut self) -> &mut Editor;
 
-    fn get_jobs(&self) -> Vec<Job>;
+    /// Returns the shell's jobs (running and stopped).
+    fn get_jobs(&self) -> Vec<&Job>;
+
+    /// Returns `true` if the shell has background jobs.
     fn has_background_jobs(&self) -> bool;
+
+    /// Starts the specified job or the current one.
     fn put_job_in_foreground(&mut self, job_id: Option<JobId>) -> Result<Option<ExitStatus>>;
+
+    /// Puts the specified job in the background, or the current one.
     fn put_job_in_background(&mut self, job_id: Option<JobId>) -> Result<()>;
-    fn kill_background_job(&mut self, job_id: u32) -> Result<Option<Job>>;
+
+    /// Kills a child with the corresponding job id.
+    ///
+    /// Returns `true` if a corresponding job exists; `false`, otherwise.
+    fn kill_background_job(&mut self, job_id: u32) -> Result<Option<&Job>>;
 }
 
 /// Policy object to control a Shell's behavior
@@ -98,6 +131,12 @@ impl Default for ShellConfig {
             enable_job_control: false,
             display_messages: false,
         }
+    }
+}
+
+impl fmt::Display for JobId {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 
@@ -244,6 +283,10 @@ impl Shell for SimpleShell {
         self.is_interactive
     }
 
+    fn is_job_control_enabled(&self) -> bool {
+        false
+    }
+
     fn editor(&self) -> &Editor {
         &self.editor
     }
@@ -252,8 +295,8 @@ impl Shell for SimpleShell {
         &mut self.editor
     }
 
-    fn get_jobs(&self) -> Vec<Job> {
-        Vec::new()
+    fn get_jobs(&self) -> Vec<&Job> {
+        vec![]
     }
 
     fn has_background_jobs(&self) -> bool {
@@ -268,7 +311,7 @@ impl Shell for SimpleShell {
         Err(Error::no_job_control())
     }
 
-    fn kill_background_job(&mut self, job_id: u32) -> Result<Option<Job>> {
+    fn kill_background_job(&mut self, job_id: u32) -> Result<Option<&Job>> {
         // For compatibility with bash, return "no such job" instead of "no job
         // control"
         Err(Error::no_such_job(job_id.to_string()))
