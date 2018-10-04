@@ -1,10 +1,6 @@
-use std::io;
-use std::os::unix::prelude::*;
-use std::os::unix::process::ExitStatusExt;
 use std::process::ExitStatus;
 
-pub use self::unix::isatty;
-
+#[cfg(unix)]
 pub mod unix;
 
 pub trait VecExt<T> {
@@ -75,13 +71,27 @@ impl BshExitStatusExt for ExitStatus {
     /// assert!(!ExitStatus::from_status(1).success());
     /// # }
     /// ```
+    #[cfg(unix)]
     fn from_status(code: i32) -> Self {
+        use std::os::unix::process::ExitStatusExt;
         ExitStatus::from_raw(code << 8)
     }
-}
 
-pub fn get_terminal() -> RawFd {
-    io::stdin().as_raw_fd()
+    /// # Examples
+    /// ```rust
+    /// # extern crate bsh;
+    /// # fn main() {
+    /// use bsh::BshExitStatusExt;
+    /// use std::process::ExitStatus;
+    /// assert!(ExitStatus::from_status(0).success());
+    /// assert!(!ExitStatus::from_status(1).success());
+    /// # }
+    /// ```
+    #[cfg(windows)]
+    fn from_status(code: i32) -> Self {
+        use std::os::windows::process::ExitStatusExt;
+        ExitStatus::from_raw((code as u32) << 8)
+    }
 }
 
 #[cfg(test)]

@@ -1,7 +1,5 @@
-use nix::unistd;
+use std::{io, os::unix::prelude::*};
 
-pub fn isatty() -> bool {
-    let temp_result = unistd::isatty(super::get_terminal());
-    log_if_err!(temp_result, "unistd::isatty");
-    temp_result.unwrap_or(false)
+pub fn get_terminal() -> RawFd {
+    io::stdin().as_raw_fd()
 }

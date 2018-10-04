@@ -11,6 +11,9 @@
     unused_qualifications
 )]
 
+extern crate atty;
+#[macro_use]
+extern crate cfg_if;
 extern crate dirs;
 extern crate docopt;
 extern crate failure;
@@ -18,6 +21,7 @@ extern crate lalrpop_util;
 extern crate libc;
 #[macro_use]
 extern crate log;
+#[cfg(unix)]
 extern crate nix;
 extern crate rustyline;
 extern crate serde;

@@ -8,6 +8,7 @@ use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::process::{self, ExitStatus};
 
+use atty::{self, Stream};
 use dirs;
 use failure::ResultExt;
 use libc;
@@ -51,7 +52,7 @@ impl JobControlShell {
             job_manager: Default::default(),
             last_exit_status: ExitStatus::from_success(),
             config,
-            is_interactive: util::isatty(),
+            is_interactive: atty::is(Stream::Stdin),
         };
 
         if shell.is_interactive {
@@ -293,7 +294,7 @@ pub fn create_shell(config: ShellConfig) -> Result<Box<dyn Shell>> {
 }
 
 fn initialize_job_control() -> Result<()> {
-    let shell_terminal = util::get_terminal();
+    let shell_terminal = util::unix::get_terminal();
 
     // Loop until the shell is in the foreground
     loop {
@@ -322,7 +323,7 @@ fn initialize_job_control() -> Result<()> {
     unistd::setpgid(shell_pgid, shell_pgid).context(ErrorKind::Nix)?;
 
     // Grab control of the terminal and save default terminal attributes
-    let shell_terminal = util::get_terminal();
+    let shell_terminal = util::unix::get_terminal();
     let temp_result = unistd::tcsetpgrp(shell_terminal, shell_pgid);
     log_if_err!(temp_result, "failed to grab control of terminal");
 
@@ -416,7 +417,7 @@ impl JobManager {
             if cont {
                 if let Some(ref tmodes) = job_tmodes {
                     let temp_result = termios::tcsetattr(
-                        util::get_terminal(),
+                        util::unix::get_terminal(),
                         termios::SetArg::TCSADRAIN,
                         tmodes,
                     );
@@ -573,13 +574,14 @@ impl JobImpl {
             last_status_code,
             last_running_in_foreground: true,
             notified_stopped_job: false,
-            tmodes: termios::tcgetattr(util::get_terminal()).ok(),
+            tmodes: termios::tcgetattr(util::unix::get_terminal()).ok(),
         }
     }
 
     fn pgid(&self) -> Option<libc::pid_t> {
         self.pgid
     }
+
     fn last_status_code(&self) -> Option<ExitStatus> {
         self.last_status_code
     }
@@ -688,7 +690,7 @@ struct TerminalState {
 impl TerminalState {
     fn new(new_pgid: Pid) -> TerminalState {
         debug!("setting terminal process group to job's process group");
-        let shell_terminal = util::get_terminal();
+        let shell_terminal = util::unix::get_terminal();
         unistd::tcsetpgrp(shell_terminal, new_pgid).unwrap();
         TerminalState {
             prev_pgid: unistd::getpgrp(),
@@ -700,7 +702,7 @@ impl TerminalState {
 impl Drop for TerminalState {
     fn drop(&mut self) {
         debug!("putting shell back into foreground and restoring shell's terminal modes");
-        let shell_terminal = util::get_terminal();
+        let shell_terminal = util::unix::get_terminal();
         unistd::tcsetpgrp(shell_terminal, self.prev_pgid).unwrap();
         if let Some(ref prev_tmodes) = self.prev_tmodes {
             let temp_result =

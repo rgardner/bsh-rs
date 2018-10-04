@@ -3,18 +3,16 @@ use std::fmt;
 use std::fs::{File, OpenOptions};
 use std::io;
 use std::iter;
+#[cfg(unix)]
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::process::{Child, ChildStdout, Command, ExitStatus, Stdio};
 
 use failure::{Fail, ResultExt};
-use libc;
-use nix::unistd::Pid;
 
 use builtins;
 use core::{intermediate_representation as ir, parser::ast};
 use errors::{Error, ErrorKind, Result};
 use shell::Shell;
-use util;
 
 #[derive(Debug)]
 pub enum Stdin {
@@ -51,7 +49,7 @@ impl Stdin {
     fn new(redirect: &ir::Stdio, pipe: Option<Stdin>) -> Result<Self> {
         match (redirect, pipe) {
             (ir::Stdio::FileDescriptor(0), _) => Ok(Stdin::Inherit),
-            (ir::Stdio::FileDescriptor(fd), _) => unimplemented!(),
+            (ir::Stdio::FileDescriptor(_fd), _) => unimplemented!(),
             (ir::Stdio::Filename(filename), _) => Ok(Stdin::File(
                 File::open(filename).with_context(|_| ErrorKind::Io)?,
             )),
@@ -84,7 +82,7 @@ impl Output {
     #[cfg(windows)]
     fn new(redirect: &ir::Stdio, pipe: Option<Output>) -> Result<Self> {
         match (redirect, pipe) {
-            (ir::Stdio::FileDescriptor(fd), _) => unimplemented!(),
+            (ir::Stdio::FileDescriptor(_fd), _) => unimplemented!(),
             (ir::Stdio::Filename(filename), _) => Ok(Output::File(
                 OpenOptions::new()
                     .write(true)
@@ -107,6 +105,8 @@ impl From<File> for Stdin {
 #[cfg(unix)]
 impl AsRawFd for Stdin {
     fn as_raw_fd(&self) -> RawFd {
+        use libc;
+
         match self {
             Stdin::Inherit => libc::STDIN_FILENO,
             Stdin::File(f) => f.as_raw_fd(),
@@ -318,24 +318,6 @@ impl From<u32> for ProcessId {
     }
 }
 
-impl From<libc::pid_t> for ProcessId {
-    fn from(value: libc::pid_t) -> Self {
-        ProcessId(value as u32)
-    }
-}
-
-impl From<Pid> for ProcessId {
-    fn from(value: Pid) -> Self {
-        libc::pid_t::from(value).into()
-    }
-}
-
-impl From<ProcessId> for Pid {
-    fn from(value: ProcessId) -> Self {
-        Pid::from_raw(value.0 as i32)
-    }
-}
-
 impl fmt::Display for ProcessStatus {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
@@ -514,6 +496,7 @@ where
     ))
 }
 
+#[cfg(unix)]
 fn run_external_command<S1, S2>(
     shell: &Shell,
     program: S1,
@@ -527,100 +510,93 @@ where
     S1: AsRef<str>,
     S2: AsRef<str>,
 {
+    use std::os::unix::process::CommandExt;
+
+    use libc;
+    use nix::{
+        sys::signal::{self, SigHandler, Signal},
+        unistd::{self, Pid},
+    };
+
+    use util;
+
     let mut command = Command::new(OsStr::new(program.as_ref()));
     command.args(args.iter().map(AsRef::as_ref).map(OsStr::new));
 
-    let job_control_is_enabled = if cfg!(windows) {
-        command.stdin(stdin);
-        command.stdout(stdout);
-        command.stderr(stderr);
-        shell.is_job_control_enabled()
-    } else {
-        use std::os::unix::process::CommandExt;
+    // Configure stdout and stderr (e.g. pipe, redirect). Do not configure
+    // stdin, as we need to do that manually in before_exec *after* we have
+    // set the terminal control device to the job's process group. If we were
+    // to configure stdin here, then stdin would be changed before our code
+    // executes in before_exec, so if the child is not the first process in the
+    // pipeline, its stdin would not be a tty and tcsetpgrp would tell us so.
+    command.stdout(stdout);
+    command.stderr(stderr);
 
-        use nix::{
-            sys::signal::{self, SigHandler, Signal},
-            unistd::{self, Pid},
-        };
+    let job_control_is_enabled = shell.is_job_control_enabled();
+    let shell_terminal = util::unix::get_terminal();
+    command.before_exec(move || {
+        if job_control_is_enabled {
+            // Put process into process group
+            let pid = unistd::getpid();
+            let pgid = pgid.map(|pgid| Pid::from_raw(pgid as i32)).unwrap_or(pid);
 
-        // Configure stdout and stderr (e.g. pipe, redirect). Do not configure
-        // stdin, as we need to do that manually in before_exec *after* we have
-        // set the terminal control device to the job's process group. If we were
-        // to configure stdin here, then stdin would be changed before our code
-        // executes in before_exec, so if the child is not the first process in the
-        // pipeline, its stdin would not be a tty and tcsetpgrp would tell us so.
-        command.stdout(stdout);
-        command.stderr(stderr);
+            // setpgid(2) failing represents programmer error, e.g.
+            // 1) invalid pid or pgid
+            unistd::setpgid(pid, pgid).expect("setpgid failed");
 
-        let job_control_is_enabled = shell.is_job_control_enabled();
-        let shell_terminal = util::get_terminal();
-        command.before_exec(move || {
-            if job_control_is_enabled {
-                // Put process into process group
-                let pid = unistd::getpid();
-                let pgid = pgid.map(|pgid| Pid::from_raw(pgid as i32)).unwrap_or(pid);
+            // Set the terminal control device in both parent process (see job
+            // manager) and child process to avoid race conditions
+            // tcsetpgrp(3) failing represents programmer error, e.g.
+            // 1) invalid fd or pgid
+            // 2) not a tty
+            //   - Are you configuring stdin using Command::stdin? If so, then
+            //     stdin will not be a TTY if this process isn't first in the
+            //     pipeline, as Command::stdin configures stdin *before*
+            //     before_exec runs.
+            // 3) incorrect permissions
+            unistd::tcsetpgrp(shell_terminal, pgid).expect("tcsetpgrp failed");
 
-                // setpgid(2) failing represents programmer error, e.g.
-                // 1) invalid pid or pgid
-                unistd::setpgid(pid, pgid).expect("setpgid failed");
-
-                // Set the terminal control device in both parent process (see job
-                // manager) and child process to avoid race conditions
-                // tcsetpgrp(3) failing represents programmer error, e.g.
-                // 1) invalid fd or pgid
-                // 2) not a tty
-                //   - Are you configuring stdin using Command::stdin? If so, then
-                //     stdin will not be a TTY if this process isn't first in the
-                //     pipeline, as Command::stdin configures stdin *before*
-                //     before_exec runs.
-                // 3) incorrect permissions
-                unistd::tcsetpgrp(shell_terminal, pgid).expect("tcsetpgrp failed");
-
-                // Reset job control signal handling back to default
-                unsafe {
-                    // signal(3) failing represents programmer error, e.g.
-                    // 1) signal argument is not a valid signal number
-                    // 2) an attempt is made to supply a signal handler for a
-                    //    signal that cannot have a custom signal handler
-                    signal::signal(Signal::SIGINT, SigHandler::SigDfl)
-                        .expect("failed to set SIGINT signal handler");
-                    signal::signal(Signal::SIGQUIT, SigHandler::SigDfl)
-                        .expect("failed to set SIGQUIT signal handler");
-                    signal::signal(Signal::SIGTSTP, SigHandler::SigDfl)
-                        .expect("failed to set SIGTSTP signal handler");
-                    signal::signal(Signal::SIGTTIN, SigHandler::SigDfl)
-                        .expect("failed to set SIGTTIN signal handler");
-                    signal::signal(Signal::SIGTTOU, SigHandler::SigDfl)
-                        .expect("failed to set SIGTTOU signal handler");
-                    signal::signal(Signal::SIGCHLD, SigHandler::SigDfl)
-                        .expect("failed to set SIGCHLD signal handler");
-                }
+            // Reset job control signal handling back to default
+            unsafe {
+                // signal(3) failing represents programmer error, e.g.
+                // 1) signal argument is not a valid signal number
+                // 2) an attempt is made to supply a signal handler for a
+                //    signal that cannot have a custom signal handler
+                signal::signal(Signal::SIGINT, SigHandler::SigDfl)
+                    .expect("failed to set SIGINT signal handler");
+                signal::signal(Signal::SIGQUIT, SigHandler::SigDfl)
+                    .expect("failed to set SIGQUIT signal handler");
+                signal::signal(Signal::SIGTSTP, SigHandler::SigDfl)
+                    .expect("failed to set SIGTSTP signal handler");
+                signal::signal(Signal::SIGTTIN, SigHandler::SigDfl)
+                    .expect("failed to set SIGTTIN signal handler");
+                signal::signal(Signal::SIGTTOU, SigHandler::SigDfl)
+                    .expect("failed to set SIGTTOU signal handler");
+                signal::signal(Signal::SIGCHLD, SigHandler::SigDfl)
+                    .expect("failed to set SIGCHLD signal handler");
             }
+        }
 
-            // See comment at the top of this function on why we are configuring
-            // this manually (hint: it's because tcsetpgrp needs the original stdin
-            // and Command::stdin will change stdin *before* before_exec runs).
-            let stdin = stdin.as_raw_fd();
-            if stdin != libc::STDIN_FILENO {
-                unistd::dup2(stdin, libc::STDIN_FILENO).expect("failed to dup stdin");
-                unistd::close(stdin).expect("failed to close stdin");
-            }
+        // See comment at the top of this function on why we are configuring
+        // this manually (hint: it's because tcsetpgrp needs the original stdin
+        // and Command::stdin will change stdin *before* before_exec runs).
+        let stdin = stdin.as_raw_fd();
+        if stdin != libc::STDIN_FILENO {
+            unistd::dup2(stdin, libc::STDIN_FILENO).expect("failed to dup stdin");
+            unistd::close(stdin).expect("failed to close stdin");
+        }
 
-            Ok(())
-        });
-        job_control_is_enabled
-    };
+        Ok(())
+    });
 
     let child = match command.spawn() {
         Ok(child) => child,
         Err(e) => {
-            if cfg!(unix) && job_control_is_enabled {
-                use nix::unistd;
-
+            if job_control_is_enabled {
                 warn!("failed to spawn child, resetting terminal's pgrp");
                 // see above comment for tcsetpgrp(2) failing being programmer
                 // error
-                unistd::tcsetpgrp(util::get_terminal(), unistd::getpgrp()).unwrap();
+                unistd::tcsetpgrp(util::unix::get_terminal(), unistd::getpgrp()).unwrap();
             }
 
             if e.kind() == io::ErrorKind::NotFound {
@@ -632,9 +608,7 @@ where
     };
 
     let pgid = pgid.unwrap_or_else(|| child.id());
-    if cfg!(unix) && job_control_is_enabled {
-        use nix::unistd::{self, Pid};
-
+    if job_control_is_enabled {
         let temp_result = unistd::setpgid(
             Pid::from_raw(child.id() as libc::pid_t),
             Pid::from_raw(pgid as libc::pid_t),
@@ -648,6 +622,41 @@ where
         );
     }
 
+    Ok((
+        Box::new(ExternalProcess::new(program, args, child)),
+        Some(pgid),
+    ))
+}
+
+#[cfg(windows)]
+fn run_external_command<S1, S2>(
+    _shell: &Shell,
+    program: S1,
+    args: &[S2],
+    stdin: Stdin,
+    stdout: Output,
+    stderr: Output,
+    pgid: Option<u32>,
+) -> Result<(Box<Process>, Option<u32>)>
+where
+    S1: AsRef<str>,
+    S2: AsRef<str>,
+{
+    let mut command = Command::new(OsStr::new(program.as_ref()));
+    command.args(args.iter().map(AsRef::as_ref).map(OsStr::new));
+    command.stdin(stdin);
+    command.stdout(stdout);
+    command.stderr(stderr);
+
+    let child = command.spawn().map_err(|e| {
+        if e.kind() == io::ErrorKind::NotFound {
+            Error::command_not_found(&program)
+        } else {
+            e.context(ErrorKind::Io).into()
+        }
+    })?;
+
+    let pgid = pgid.unwrap_or_else(|| child.id());
     Ok((
         Box::new(ExternalProcess::new(program, args, child)),
         Some(pgid),

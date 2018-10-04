@@ -5,21 +5,30 @@ use std::{
     process::{self, ExitStatus},
 };
 
+use atty::{self, Stream};
 use dirs;
 use failure::ResultExt;
 
 use core::{intermediate_representation as ir, parser::Command, variable_expansion};
 use editor::Editor;
 use errors::{Error, ErrorKind, Result};
-use execute_command::Process;
-use util::{self, BshExitStatusExt};
+use execute_command::{spawn_processes, Process, ProcessStatus};
+use util::BshExitStatusExt;
 
 const HISTORY_FILE_NAME: &str = ".bsh_history";
 const SYNTAX_ERROR_EXIT_STATUS: i32 = 2;
 const COMMAND_NOT_FOUND_EXIT_STATUS: i32 = 127;
 
-#[cfg(unix)]
-pub use self::unix::create_shell;
+cfg_if! {
+    if #[cfg(unix)] {
+        pub use self::unix::create_shell;
+    } else {
+        pub fn create_shell(config: ShellConfig) -> Result<Box<dyn Shell>> {
+            create_simple_shell(config)
+        }
+    }
+}
+
 #[cfg(unix)]
 #[allow(unsafe_code)]
 pub mod unix;
@@ -150,15 +159,37 @@ pub struct SimpleShell {
 
 impl SimpleShell {
     fn new(config: ShellConfig) -> Result<Self> {
-        let shell = SimpleShell {
+        let mut shell = SimpleShell {
             editor: Editor::with_capacity(config.command_history_capacity),
             history_file: None,
             last_exit_status: ExitStatus::from_success(),
             config,
-            is_interactive: util::isatty(),
+            is_interactive: atty::is(Stream::Stdin),
         };
 
+        if config.enable_command_history {
+            shell.load_history()?
+        }
+
+        info!("bsh started up");
         Ok(shell)
+    }
+
+    fn load_history(&mut self) -> Result<()> {
+        self.history_file = dirs::home_dir().map(|p| p.join(HISTORY_FILE_NAME));
+        if let Some(ref history_file) = self.history_file {
+            self.editor.load_history(&history_file).or_else(|e| {
+                if let ErrorKind::HistoryFileNotFound = *e.kind() {
+                    return Ok(());
+                }
+
+                Err(e)
+            })?;
+        } else {
+            warn!("unable to get home directory")
+        }
+
+        Ok(())
     }
 
     /// Custom prompt to output to the user.
@@ -180,8 +211,31 @@ impl SimpleShell {
         Ok(line)
     }
 
-    fn execute_command(&mut self, _command_group: &mut ir::CommandGroup) -> Result<()> {
-        unimplemented!()
+    fn execute_command(&mut self, command_group: &mut ir::CommandGroup) -> Result<()> {
+        let mut process_group = match spawn_processes(self, &command_group) {
+            Ok(process_group) => Ok(process_group),
+            Err(e) => {
+                if let ErrorKind::CommandNotFound(ref command) = *e.kind() {
+                    eprintln!("bsh: {}: command not found", command);
+                    self.last_exit_status = ExitStatus::from_status(COMMAND_NOT_FOUND_EXIT_STATUS);
+                    return Ok(());
+                }
+
+                Err(e)
+            }
+        }?;
+
+        let num_processes = process_group.processes.len();
+        let mut num_done = 0;
+        while num_done < num_processes {
+            for process in &mut process_group.processes {
+                if process.status() != ProcessStatus::Completed && process.try_wait()?.is_some() {
+                    num_done += 1;
+                }
+            }
+        }
+
+        Ok(())
     }
 }
 
