@@ -48,6 +48,28 @@ fn test_simple_echo() {
 }
 
 #[test]
+fn test_logical_or_pipeline() {
+    BIN_UNDER_TEST
+        .command()
+        .args(&[OsStr::new("--log"), LOG_FILE_NAME.as_os_str()])
+        .args(&["-c", "echo 1 || echo 2"])
+        .unwrap()
+        .assert()
+        .stdout(predicates::str::similar("1\n").from_utf8());
+}
+
+#[test]
+fn test_logical_and_pipeline() {
+    BIN_UNDER_TEST
+        .command()
+        .args(&[OsStr::new("--log"), LOG_FILE_NAME.as_os_str()])
+        .args(&["-c", "echo 1 && echo 2"])
+        .unwrap()
+        .assert()
+        .stdout(predicates::str::similar("1\n2\n").from_utf8());
+}
+
+#[test]
 fn test_exit_normal_large_negative() {
     let err = BIN_UNDER_TEST
         .command()
