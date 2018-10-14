@@ -1,5 +1,7 @@
 #!/bin/sh
 
+rustup default nightly
+
 rustup component add cargo-clippy
 rustup component add rustfmt-preview
 

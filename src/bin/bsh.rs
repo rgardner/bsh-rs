@@ -1,18 +1,11 @@
-extern crate bsh;
-extern crate dirs;
-extern crate docopt;
-#[macro_use]
-extern crate log;
-extern crate fern;
-#[macro_use]
-extern crate serde_derive;
-
 use std::path::{Path, PathBuf};
 use std::process::{self, ExitStatus};
 
 use bsh::errors::*;
 use bsh::{create_shell, BshExitStatusExt, Shell, ShellConfig};
 use docopt::Docopt;
+use log::{debug, error};
+use serde_derive::Deserialize;
 
 const COMMAND_HISTORY_CAPACITY: usize = 10;
 const LOG_FILE_NAME: &str = ".bsh_log";
@@ -45,7 +38,6 @@ struct Args {
     flag_log: Option<String>,
 }
 
-#[cfg_attr(feature = "cargo-clippy", allow(print_literal))]
 fn main() {
     let args: Args = Docopt::new(USAGE)
         .and_then(|d| d.deserialize())
@@ -79,7 +71,8 @@ fn init_logger(path: &Option<String>) {
                 record.target(),
                 message
             ))
-        }).level(log::LevelFilter::Debug)
+        })
+        .level(log::LevelFilter::Debug)
         .level_for("rustyline", log::LevelFilter::Info)
         .chain(fern::log_file(log_path).unwrap())
         .apply()

@@ -13,7 +13,7 @@ use rustyline::{
     history, CompletionType, Config, Helper,
 };
 
-use errors::{Error, ErrorKind, Result};
+use crate::errors::{Error, ErrorKind, Result};
 
 struct EditorHelper(FilenameCompleter);
 
@@ -178,7 +178,7 @@ impl Editor {
         Ok(())
     }
 
-    pub fn enumerate_history_entries(&self) -> EditorEnumerate {
+    pub fn enumerate_history_entries(&self) -> EditorEnumerate<'_> {
         let start = self
             .history_count
             .checked_sub(self.history_capacity)
@@ -191,7 +191,7 @@ impl Editor {
 }
 
 impl fmt::Display for Editor {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for (i, e) in self.enumerate_history_entries() {
             writeln!(f, "\t{}\t{}", i + 1, e)?;
         }
@@ -201,7 +201,7 @@ impl fmt::Display for Editor {
 }
 
 impl fmt::Debug for Editor {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "count: {}", self.history_count)?;
         writeln!(f, "capacity: {}", self.history_capacity)?;
         write!(f, "{}", self)
@@ -230,7 +230,7 @@ impl<'a> Iterator for EditorEnumerate<'a> {
 }
 
 impl<'a> fmt::Debug for EditorEnumerate<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "pos: {}", self.pos)
     }
 }

@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use core::parser::ast;
+use crate::core::parser::ast;
 
 grammar;
 
@@ -48,7 +48,7 @@ Redirect: ast::Redirect = {
     ">" <redirectee:Redirectee> => ast::Redirect {
         redirector: None,
         instruction: ast::RedirectInstruction::Output,
-        redirectee: redirectee,
+        redirectee,
     },
     <fd:OutputDupSourceFd> <redirectee:Redirectee> => ast::Redirect {
         redirector: Some(ast::Redirectee::FileDescriptor(i32::from_str(&fd[..fd.len()-1]).unwrap())),

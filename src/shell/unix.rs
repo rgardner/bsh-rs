@@ -12,6 +12,7 @@ use atty::{self, Stream};
 use dirs;
 use failure::ResultExt;
 use libc;
+use log::{debug, error, info, warn};
 use nix::{
     sys::{
         signal::{self, SigHandler, Signal},
@@ -24,11 +25,13 @@ use super::{
     Job, JobId, Shell, ShellConfig, COMMAND_NOT_FOUND_EXIT_STATUS, HISTORY_FILE_NAME,
     SYNTAX_ERROR_EXIT_STATUS,
 };
-use core::{intermediate_representation as ir, parser::Command, variable_expansion};
-use editor::Editor;
-use errors::{Error, ErrorKind, Result};
-use execute_command::{spawn_processes, Process, ProcessGroup, ProcessStatus};
-use util::{self, BshExitStatusExt};
+use crate::{
+    core::{intermediate_representation as ir, parser::Command, variable_expansion},
+    editor::Editor,
+    errors::{Error, ErrorKind, Result},
+    execute_command::{spawn_processes, Process, ProcessGroup, ProcessStatus},
+    util::{self, BshExitStatusExt},
+};
 
 pub struct JobControlShell {
     /// Responsible for readline and history.
@@ -259,7 +262,7 @@ impl Shell for JobControlShell {
         &mut self.editor
     }
 
-    fn get_jobs(&self) -> Vec<&Job> {
+    fn get_jobs(&self) -> Vec<&dyn Job> {
         self.job_manager.get_jobs()
     }
 
@@ -277,13 +280,13 @@ impl Shell for JobControlShell {
             .put_job_in_background(job_id, true /* cont */)
     }
 
-    fn kill_background_job(&mut self, job_id: u32) -> Result<Option<&Job>> {
+    fn kill_background_job(&mut self, job_id: u32) -> Result<Option<&dyn Job>> {
         self.job_manager.kill_job(JobId(job_id))
     }
 }
 
 impl fmt::Debug for JobControlShell {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?} jobs\n{:?}", self.job_manager, self.editor)
     }
 }
@@ -305,7 +308,8 @@ fn initialize_job_control() -> Result<()> {
             signal::kill(
                 Pid::from_raw(-libc::pid_t::from(shell_pgid)),
                 Signal::SIGTTIN,
-            ).unwrap();
+            )
+            .unwrap();
         }
     }
 
@@ -331,11 +335,11 @@ fn initialize_job_control() -> Result<()> {
 }
 
 trait AsJob {
-    fn as_job(&self) -> &Job;
+    fn as_job(&self) -> &dyn Job;
 }
 
 impl<T: Job> AsJob for T {
-    fn as_job(&self) -> &Job {
+    fn as_job(&self) -> &dyn Job {
         self
     }
 }
@@ -375,7 +379,7 @@ impl JobManager {
         !self.jobs.is_empty()
     }
 
-    pub fn get_jobs(&self) -> Vec<&Job> {
+    pub fn get_jobs(&self) -> Vec<&dyn Job> {
         self.jobs.iter().map(|j| j.as_job()).collect()
     }
 
@@ -460,7 +464,7 @@ impl JobManager {
         Ok(())
     }
 
-    pub fn kill_job(&mut self, job_id: JobId) -> Result<Option<&Job>> {
+    pub fn kill_job(&mut self, job_id: JobId) -> Result<Option<&dyn Job>> {
         if let Some(job_index) = self.find_job(job_id) {
             self.jobs[job_index].kill()?;
             Ok(Some(&self.jobs[job_index]))
@@ -518,7 +522,7 @@ impl JobManager {
 }
 
 impl fmt::Debug for JobManager {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "{} jobs\tjob_count: {}", self.jobs.len(), self.job_count)?;
         for job in &self.jobs {
             write!(f, "{:?}", job)?;
@@ -529,7 +533,7 @@ impl fmt::Debug for JobManager {
 }
 
 impl fmt::Display for JobStatus {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             JobStatus::Running => write!(f, "Running"),
             JobStatus::Stopped => write!(f, "Stopped"),
@@ -542,7 +546,7 @@ pub struct JobImpl {
     id: JobId,
     input: String,
     pgid: Option<libc::pid_t>,
-    processes: Vec<Box<Process>>,
+    processes: Vec<Box<dyn Process>>,
     last_status_code: Option<ExitStatus>,
     last_running_in_foreground: bool,
     notified_stopped_job: bool,
@@ -554,7 +558,7 @@ impl JobImpl {
         id: JobId,
         input: &str,
         pgid: Option<libc::pid_t>,
-        processes: Vec<Box<Process>>,
+        processes: Vec<Box<dyn Process>>,
     ) -> Self {
         // Initialize last_status_code if possible; this prevents a completed
         // job from having a None last_status_code if all processes have
@@ -648,7 +652,7 @@ impl Job for JobImpl {
         format!("[{}] {}\t{}", self.id, self.status(), self.input)
     }
 
-    fn processes(&self) -> &Vec<Box<Process>> {
+    fn processes(&self) -> &Vec<Box<dyn Process>> {
         &self.processes
     }
 }
@@ -670,13 +674,13 @@ impl JobExt for JobImpl {
 }
 
 impl fmt::Display for JobImpl {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "[{}] {}\t{}", self.id, self.status(), self.input)
     }
 }
 
 impl fmt::Debug for JobImpl {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "id: {}\tinput: {}", self.id, self.input)
     }
 }

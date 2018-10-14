@@ -103,7 +103,7 @@ pub mod visit {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use core::parser::grammar::CommandParser;
+    use crate::core::parser::grammar::CommandParser;
 
     fn simple_command(words: &[&str]) -> Command {
         Command::Simple {

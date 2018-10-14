@@ -6,14 +6,18 @@ use std::{
 };
 
 use atty::{self, Stream};
+use cfg_if::cfg_if;
 use dirs;
 use failure::ResultExt;
+use log::{error, info, warn};
 
-use core::{intermediate_representation as ir, parser::Command, variable_expansion};
-use editor::Editor;
-use errors::{Error, ErrorKind, Result};
-use execute_command::{spawn_processes, Process, ProcessStatus};
-use util::BshExitStatusExt;
+use crate::{
+    core::{intermediate_representation as ir, parser::Command, variable_expansion},
+    editor::Editor,
+    errors::{Error, ErrorKind, Result},
+    execute_command::{spawn_processes, Process, ProcessStatus},
+    util::BshExitStatusExt,
+};
 
 const HISTORY_FILE_NAME: &str = ".bsh_history";
 const SYNTAX_ERROR_EXIT_STATUS: i32 = 2;
@@ -40,7 +44,7 @@ pub trait Job {
     fn id(&self) -> JobId;
     fn input(&self) -> String;
     fn display(&self) -> String;
-    fn processes(&self) -> &Vec<Box<Process>>;
+    fn processes(&self) -> &Vec<Box<dyn Process>>;
 }
 
 pub trait Shell {
@@ -69,7 +73,7 @@ pub trait Shell {
     fn editor_mut(&mut self) -> &mut Editor;
 
     /// Returns the shell's jobs (running and stopped).
-    fn get_jobs(&self) -> Vec<&Job>;
+    fn get_jobs(&self) -> Vec<&dyn Job>;
 
     /// Returns `true` if the shell has background jobs.
     fn has_background_jobs(&self) -> bool;
@@ -83,7 +87,7 @@ pub trait Shell {
     /// Kills a child with the corresponding job id.
     ///
     /// Returns `true` if a corresponding job exists; `false`, otherwise.
-    fn kill_background_job(&mut self, job_id: u32) -> Result<Option<&Job>>;
+    fn kill_background_job(&mut self, job_id: u32) -> Result<Option<&dyn Job>>;
 }
 
 /// Policy object to control a Shell's behavior
@@ -144,7 +148,7 @@ impl Default for ShellConfig {
 }
 
 impl fmt::Display for JobId {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
     }
 }
@@ -349,7 +353,7 @@ impl Shell for SimpleShell {
         &mut self.editor
     }
 
-    fn get_jobs(&self) -> Vec<&Job> {
+    fn get_jobs(&self) -> Vec<&dyn Job> {
         vec![]
     }
 
@@ -365,7 +369,7 @@ impl Shell for SimpleShell {
         Err(Error::no_job_control())
     }
 
-    fn kill_background_job(&mut self, job_id: u32) -> Result<Option<&Job>> {
+    fn kill_background_job(&mut self, job_id: u32) -> Result<Option<&dyn Job>> {
         // For compatibility with bash, return "no such job" instead of "no job
         // control"
         Err(Error::no_such_job(job_id.to_string()))

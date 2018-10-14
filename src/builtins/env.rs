@@ -1,7 +1,7 @@
 use std::env;
 use std::ffi::OsStr;
 
-use builtins::{self, prelude::*};
+use crate::builtins::{self, prelude::*};
 
 pub struct Declare;
 
@@ -12,7 +12,11 @@ impl builtins::BuiltinCommand for Declare {
 declare: declare [name[=value] ...]
     Declare a variable and assign it a value.";
 
-    fn run<T: AsRef<str>>(_shell: &mut Shell, args: &[T], _stdout: &mut Write) -> Result<()> {
+    fn run<T: AsRef<str>>(
+        _shell: &mut dyn Shell,
+        args: &[T],
+        _stdout: &mut dyn Write,
+    ) -> Result<()> {
         let mut bad_args = Vec::new();
         for arg in args {
             let key_value: Vec<&str> = arg.as_ref().splitn(2, '=').collect();
@@ -44,7 +48,11 @@ impl builtins::BuiltinCommand for Unset {
 unset: unset [name ...]
     For each name, remove the corresponding variable.";
 
-    fn run<T: AsRef<str>>(_shell: &mut Shell, args: &[T], _stdout: &mut Write) -> Result<()> {
+    fn run<T: AsRef<str>>(
+        _shell: &mut dyn Shell,
+        args: &[T],
+        _stdout: &mut dyn Write,
+    ) -> Result<()> {
         let mut bad_args = Vec::new();
         for arg in args {
             if arg.as_ref().is_empty() || arg.as_ref().contains('=') {
@@ -74,8 +82,8 @@ mod tests {
     use std::env;
     use std::io;
 
-    use builtins::BuiltinCommand;
-    use shell::{create_shell, ShellConfig};
+    use crate::builtins::BuiltinCommand;
+    use crate::shell::{create_shell, ShellConfig};
 
     macro_rules! generate_unique_env_key {
         () => {
@@ -97,7 +105,8 @@ mod tests {
                 &mut *shell,
                 &["=baz", &format!("{}={}", key, value), "=baz"],
                 &mut io::sink(),
-            ).is_err()
+            )
+            .is_err()
         );
         assert_eq!(env::var(key).unwrap(), value);
     }
@@ -116,7 +125,8 @@ mod tests {
                 &mut *shell,
                 &[&format!("{}={}", key, value1)],
                 &mut io::sink(),
-            ).is_ok()
+            )
+            .is_ok()
         );
         assert_eq!(env::var(&key).unwrap(), value1);
 
@@ -126,7 +136,8 @@ mod tests {
                 &mut *shell,
                 &[format!("{}={}", key, value2)],
                 &mut io::sink(),
-            ).is_ok()
+            )
+            .is_ok()
         );
         assert_eq!(env::var(&key).unwrap(), value2);
     }
@@ -143,7 +154,8 @@ mod tests {
                 &mut *shell,
                 &[format!("{}={}", key1, value), format!("{}={}", key2, value)],
                 &mut io::sink(),
-            ).is_ok()
+            )
+            .is_ok()
         );
         assert_eq!(env::var(&key1).unwrap(), value);
         assert_eq!(env::var(&key2).unwrap(), value);

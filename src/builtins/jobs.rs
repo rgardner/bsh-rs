@@ -2,9 +2,13 @@ use std::num::ParseIntError;
 use std::result as res;
 
 use failure::ResultExt;
+use log::debug;
+use serde_derive::Deserialize;
 
-use builtins::{self, prelude::*};
-use shell::JobId;
+use crate::{
+    builtins::{self, prelude::*},
+    shell::JobId,
+};
 
 pub struct Jobs;
 
@@ -37,7 +41,7 @@ Options:
 Exit Status:
 Returns success unless an invalid option is given or an error occurs.";
 
-    fn run<T: AsRef<str>>(shell: &mut Shell, args: &[T], stdout: &mut Write) -> Result<()> {
+    fn run<T: AsRef<str>>(shell: &mut dyn Shell, args: &[T], stdout: &mut dyn Write) -> Result<()> {
         let args: JobsArgs = parse_args(Self::HELP, Self::NAME, args.iter().map(AsRef::as_ref))?;
         debug!("{:?}", args);
 
@@ -52,7 +56,8 @@ Returns success unless an invalid option is given or an error occurs.";
                         first.id(),
                         first.status(),
                         first.argv()
-                    ).context(ErrorKind::Io)?;
+                    )
+                    .context(ErrorKind::Io)?;
                 }
                 for process in processes.iter().skip(1) {
                     writeln!(
@@ -61,7 +66,8 @@ Returns success unless an invalid option is given or an error occurs.";
                         process.id(),
                         process.status(),
                         process.argv()
-                    ).context(ErrorKind::Io)?;
+                    )
+                    .context(ErrorKind::Io)?;
                 }
             } else if args.flag_p {
                 for process in processes {
@@ -92,7 +98,11 @@ fg: fg [job_spec]
     Exit Status:
     Status of command placed in foreground or failure if an error occurs.";
 
-    fn run<T: AsRef<str>>(shell: &mut Shell, args: &[T], _stdout: &mut Write) -> Result<()> {
+    fn run<T: AsRef<str>>(
+        shell: &mut dyn Shell,
+        args: &[T],
+        _stdout: &mut dyn Write,
+    ) -> Result<()> {
         let job_id = args
             .first()
             .map(|s| s.as_ref().parse::<u32>())
@@ -121,7 +131,7 @@ bg: bg [<jobspec>...]
     Exit Status:
     Returns success unless job control is not enabled or an error occurs.";
 
-    fn run<T: AsRef<str>>(shell: &mut Shell, args: &[T], stdout: &mut Write) -> Result<()> {
+    fn run<T: AsRef<str>>(shell: &mut dyn Shell, args: &[T], stdout: &mut dyn Write) -> Result<()> {
         if args.is_empty() {
             if let Err(e) = shell.put_job_in_background(None) {
                 writeln!(stdout, "{}", e).context(ErrorKind::Io)?;

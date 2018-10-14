@@ -1,8 +1,9 @@
 use std::env;
 use std::path::Path;
 
-use builtins::{self, prelude::*};
 use dirs;
+
+use crate::builtins::{self, prelude::*};
 
 pub struct Cd;
 
@@ -15,7 +16,11 @@ cd: cd [dir]
     If DIR is '-', then the current directory will be the variable $OLDPWD,
     which is the last working directory.";
 
-    fn run<T: AsRef<str>>(_shell: &mut Shell, args: &[T], stdout: &mut Write) -> Result<()> {
+    fn run<T: AsRef<str>>(
+        _shell: &mut dyn Shell,
+        args: &[T],
+        stdout: &mut dyn Write,
+    ) -> Result<()> {
         let dir = match args.first().map(|arg| arg.as_ref()) {
             None => {
                 dirs::home_dir().ok_or_else(|| Error::builtin_command("cd: HOME not set", 1))?
