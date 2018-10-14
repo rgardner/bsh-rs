@@ -48,6 +48,7 @@ fn test_simple_echo() {
 }
 
 #[test]
+#[cfg(unix)] // TODO (#22): Support Windows
 fn test_logical_or_pipeline() {
     BIN_UNDER_TEST
         .command()
@@ -59,6 +60,7 @@ fn test_logical_or_pipeline() {
 }
 
 #[test]
+#[cfg(unix)] // TODO (#22): Support Windows
 fn test_logical_and_pipeline() {
     BIN_UNDER_TEST
         .command()
@@ -70,6 +72,7 @@ fn test_logical_and_pipeline() {
 }
 
 #[test]
+#[cfg(unix)] // TODO (#22): Support Windows
 fn test_exit_normal_large_negative() {
     let err = BIN_UNDER_TEST
         .command()
@@ -97,6 +100,7 @@ fn test_exit_normal_large_negative() {
 }
 
 #[test]
+#[cfg(unix)] // TODO (#22): Support Windows
 fn test_simple_pipeline() {
     BIN_UNDER_TEST
         .command()
@@ -108,6 +112,7 @@ fn test_simple_pipeline() {
 }
 
 #[test]
+#[cfg(unix)] // TODO (#22): Support Windows
 fn test_simple_redirects() {
     let temp_dir = generate_temp_directory().unwrap();
     let command = "echo 'test needle, please ignore' >outfile; grep <outfile 'needle'";
@@ -123,6 +128,7 @@ fn test_simple_redirects() {
 }
 
 #[test]
+#[cfg(unix)] // TODO (#22): Support Windows
 fn test_stderr_redirect() {
     let temp_dir = generate_temp_directory().unwrap();
     let command = r#"python3 -c 'import sys; print("test needle", file=sys.stderr)' 2>errfile"#;
@@ -143,6 +149,7 @@ fn test_stderr_redirect() {
 }
 
 #[test]
+#[cfg(unix)] // TODO (#22): Support Windows
 fn test_command_not_found() {
     let args = ["-c", "foo"];
     let expected_stderr = "bsh: foo: command not found\n";
@@ -160,6 +167,7 @@ fn test_command_not_found() {
 }
 
 #[test]
+#[cfg(unix)] // TODO (#22): Support Windows
 fn test_syntax_error() {
     let args = ["-c", ";"];
     let expected_stderr = "bsh: syntax error near: ;\n";

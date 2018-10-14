@@ -688,6 +688,7 @@ fn create_pipe() -> Result<(File, File)> {
 
 #[cfg(windows)]
 fn create_pipe() -> Result<(File, File)> {
+    // TODO (#22): Support Windows
     // See CreatePipe, HANDLE, and "impl FromRawHandle for File"
     unimplemented!()
 }
