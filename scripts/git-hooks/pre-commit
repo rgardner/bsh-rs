@@ -8,7 +8,7 @@ cargo fmt --all -- --check
 exit_status="$?"
 if [ "$exit_status" -ne 0 ]; then
     >&2 echo "Review rustfmt changes"
-    cargo fmt
+    cargo fmt --all
 fi
 
 exit "$exit_status"

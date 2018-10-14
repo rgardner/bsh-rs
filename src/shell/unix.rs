@@ -308,7 +308,8 @@ fn initialize_job_control() -> Result<()> {
             signal::kill(
                 Pid::from_raw(-libc::pid_t::from(shell_pgid)),
                 Signal::SIGTTIN,
-            ).unwrap();
+            )
+            .unwrap();
         }
     }
 

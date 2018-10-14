@@ -56,7 +56,8 @@ Returns success unless an invalid option is given or an error occurs.";
                         first.id(),
                         first.status(),
                         first.argv()
-                    ).context(ErrorKind::Io)?;
+                    )
+                    .context(ErrorKind::Io)?;
                 }
                 for process in processes.iter().skip(1) {
                     writeln!(
@@ -65,7 +66,8 @@ Returns success unless an invalid option is given or an error occurs.";
                         process.id(),
                         process.status(),
                         process.argv()
-                    ).context(ErrorKind::Io)?;
+                    )
+                    .context(ErrorKind::Io)?;
                 }
             } else if args.flag_p {
                 for process in processes {

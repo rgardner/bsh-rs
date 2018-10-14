@@ -10,7 +10,6 @@
     unused_import_braces,
     unused_qualifications
 )]
-#![feature(tool_lints)]
 
 pub use crate::errors::{Error, ErrorKind, Result};
 pub use crate::shell::{create_shell, create_simple_shell, Shell, ShellConfig};

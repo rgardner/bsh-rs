@@ -27,7 +27,8 @@ exit: exit [n]
                     eprintln!("bsh: exit: {}: numeric argument required", arg.as_ref());
                     2
                 })
-            }).map(ExitStatus::from_status);
+            })
+            .map(ExitStatus::from_status);
         shell.exit(status_code);
     }
 }

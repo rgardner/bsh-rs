@@ -71,7 +71,8 @@ fn init_logger(path: &Option<String>) {
                 record.target(),
                 message
             ))
-        }).level(log::LevelFilter::Debug)
+        })
+        .level(log::LevelFilter::Debug)
         .level_for("rustyline", log::LevelFilter::Info)
         .chain(fern::log_file(log_path).unwrap())
         .apply()

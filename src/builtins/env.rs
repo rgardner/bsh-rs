@@ -105,7 +105,8 @@ mod tests {
                 &mut *shell,
                 &["=baz", &format!("{}={}", key, value), "=baz"],
                 &mut io::sink(),
-            ).is_err()
+            )
+            .is_err()
         );
         assert_eq!(env::var(key).unwrap(), value);
     }
@@ -124,7 +125,8 @@ mod tests {
                 &mut *shell,
                 &[&format!("{}={}", key, value1)],
                 &mut io::sink(),
-            ).is_ok()
+            )
+            .is_ok()
         );
         assert_eq!(env::var(&key).unwrap(), value1);
 
@@ -134,7 +136,8 @@ mod tests {
                 &mut *shell,
                 &[format!("{}={}", key, value2)],
                 &mut io::sink(),
-            ).is_ok()
+            )
+            .is_ok()
         );
         assert_eq!(env::var(&key).unwrap(), value2);
     }
@@ -151,7 +154,8 @@ mod tests {
                 &mut *shell,
                 &[format!("{}={}", key1, value), format!("{}={}", key2, value)],
                 &mut io::sink(),
-            ).is_ok()
+            )
+            .is_ok()
         );
         assert_eq!(env::var(&key1).unwrap(), value);
         assert_eq!(env::var(&key2).unwrap(), value);

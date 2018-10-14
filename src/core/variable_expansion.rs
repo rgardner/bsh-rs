@@ -71,7 +71,8 @@ impl Visitor<Command> for VariableExpander {
                         }
                         ref other => other.clone(),
                     },
-                }).collect(),
+                })
+                .collect(),
             background,
         }
     }
