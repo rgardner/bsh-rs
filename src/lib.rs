@@ -11,6 +11,9 @@
     unused_qualifications
 )]
 
+extern crate atty;
+#[macro_use]
+extern crate cfg_if;
 extern crate dirs;
 extern crate docopt;
 extern crate failure;
@@ -18,6 +21,7 @@ extern crate lalrpop_util;
 extern crate libc;
 #[macro_use]
 extern crate log;
+#[cfg(unix)]
 extern crate nix;
 extern crate rustyline;
 extern crate serde;
@@ -25,7 +29,7 @@ extern crate serde;
 extern crate serde_derive;
 
 pub use errors::{Error, ErrorKind, Result};
-pub use shell::{Shell, ShellConfig};
+pub use shell::{create_shell, create_simple_shell, Shell, ShellConfig};
 pub use util::BshExitStatusExt;
 
 macro_rules! log_if_err {
@@ -53,7 +57,7 @@ mod editor;
 pub mod errors;
 #[allow(unsafe_code)]
 mod execute_command;
-#[allow(unsafe_code)]
-mod job_control;
+// TODO: remove this once the dust has settled
+#[allow(missing_docs)]
 mod shell;
 mod util;

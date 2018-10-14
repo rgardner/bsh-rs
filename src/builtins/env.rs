@@ -75,7 +75,7 @@ mod tests {
     use std::io;
 
     use builtins::BuiltinCommand;
-    use shell::{Shell, ShellConfig};
+    use shell::{create_shell, ShellConfig};
 
     macro_rules! generate_unique_env_key {
         () => {
@@ -85,16 +85,16 @@ mod tests {
 
     #[test]
     fn declare_invalid_identifier() {
-        let mut shell = Shell::new(ShellConfig::noninteractive()).unwrap();
+        let mut shell = create_shell(ShellConfig::noninteractive()).unwrap();
 
-        assert!(Declare::run(&mut shell, &[""], &mut io::sink()).is_err());
-        assert!(Declare::run(&mut shell, &["=FOO"], &mut io::sink()).is_err());
+        assert!(Declare::run(&mut *shell, &[""], &mut io::sink()).is_err());
+        assert!(Declare::run(&mut *shell, &["=FOO"], &mut io::sink()).is_err());
 
         let key = generate_unique_env_key!();
         let value = "bar";
         assert!(
             Declare::run(
-                &mut shell,
+                &mut *shell,
                 &["=baz", &format!("{}={}", key, value), "=baz"],
                 &mut io::sink(),
             ).is_err()
@@ -104,16 +104,16 @@ mod tests {
 
     #[test]
     fn declare_assignment() {
-        let mut shell = Shell::new(ShellConfig::noninteractive()).unwrap();
+        let mut shell = create_shell(ShellConfig::noninteractive()).unwrap();
 
         let key = generate_unique_env_key!();
-        assert!(Declare::run(&mut shell, &[&key.clone()], &mut io::sink()).is_ok());
+        assert!(Declare::run(&mut *shell, &[&key.clone()], &mut io::sink()).is_ok());
         assert_eq!(&env::var(&key).unwrap(), "");
 
         let value1 = "bar";
         assert!(
             Declare::run(
-                &mut shell,
+                &mut *shell,
                 &[&format!("{}={}", key, value1)],
                 &mut io::sink(),
             ).is_ok()
@@ -123,7 +123,7 @@ mod tests {
         let value2 = "baz";
         assert!(
             Declare::run(
-                &mut shell,
+                &mut *shell,
                 &[format!("{}={}", key, value2)],
                 &mut io::sink(),
             ).is_ok()
@@ -133,14 +133,14 @@ mod tests {
 
     #[test]
     fn declare_multiple_assignments() {
-        let mut shell = Shell::new(ShellConfig::noninteractive()).unwrap();
+        let mut shell = create_shell(ShellConfig::noninteractive()).unwrap();
 
         let key1 = generate_unique_env_key!();
         let key2 = generate_unique_env_key!();
         let value = "baz";
         assert!(
             Declare::run(
-                &mut shell,
+                &mut *shell,
                 &[format!("{}={}", key1, value), format!("{}={}", key2, value)],
                 &mut io::sink(),
             ).is_ok()
@@ -151,21 +151,21 @@ mod tests {
 
     #[test]
     fn unset_invalid_identifier() {
-        let mut shell = Shell::new(ShellConfig::noninteractive()).unwrap();
+        let mut shell = create_shell(ShellConfig::noninteractive()).unwrap();
         let key = generate_unique_env_key!();
-        assert!(Declare::run(&mut shell, &[&key], &mut io::sink()).is_ok());
-        assert!(Unset::run(&mut shell, &["", &key, "=FOO"], &mut io::sink(),).is_err());
+        assert!(Declare::run(&mut *shell, &[&key], &mut io::sink()).is_ok());
+        assert!(Unset::run(&mut *shell, &["", &key, "=FOO"], &mut io::sink(),).is_err());
         assert!(env::var(&key).is_err());
     }
 
     #[test]
     fn unset_multiple_assignments() {
-        let mut shell = Shell::new(ShellConfig::noninteractive()).unwrap();
+        let mut shell = create_shell(ShellConfig::noninteractive()).unwrap();
         let key1 = generate_unique_env_key!();
         let key2 = generate_unique_env_key!();
-        assert!(Declare::run(&mut shell, &[&key1, &key2], &mut io::sink(),).is_ok());
+        assert!(Declare::run(&mut *shell, &[&key1, &key2], &mut io::sink(),).is_ok());
 
-        assert!(Unset::run(&mut shell, &[&key1, &key2], &mut io::sink(),).is_ok());
+        assert!(Unset::run(&mut *shell, &[&key1, &key2], &mut io::sink(),).is_ok());
         assert!(env::var(key1).is_err());
         assert!(env::var(key2).is_err());
     }

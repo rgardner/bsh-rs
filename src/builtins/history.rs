@@ -15,21 +15,21 @@ history: history [-c] [-s size] [n]
 
     fn run<T: AsRef<str>>(shell: &mut Shell, args: &[T], stdout: &mut Write) -> Result<()> {
         if args.is_empty() {
-            write!(stdout, "{}", shell.editor).context(ErrorKind::Io)?;
+            write!(stdout, "{}", shell.editor()).context(ErrorKind::Io)?;
             return Ok(());
         }
 
         match args.first().unwrap().as_ref() {
-            "-c" => shell.editor.clear_history(),
+            "-c" => shell.editor_mut().clear_history(),
             "-s" => {
                 if let Some(s) = args.get(2) {
                     if let Ok(n) = s.as_ref().parse::<usize>() {
-                        shell.editor.set_history_max_size(n);
+                        shell.editor_mut().set_history_max_size(n);
                     }
                 }
             }
             s => match s.parse::<usize>() {
-                Ok(n) => writeln!(stdout, "{}", history_display(&shell.editor, n))
+                Ok(n) => writeln!(stdout, "{}", history_display(&shell.editor(), n))
                     .context(ErrorKind::Io)?,
                 Err(_) => {
                     let msg = format!("history: {}: nonnegative numeric argument required", s);

@@ -35,6 +35,10 @@ impl Error {
     pub(crate) fn no_such_job<T: AsRef<str>>(job: T) -> Error {
         Error::from(ErrorKind::NoSuchJob(job.as_ref().to_string()))
     }
+
+    pub(crate) fn no_job_control() -> Error {
+        Error::from(ErrorKind::NoJobControl)
+    }
 }
 
 impl Fail for Error {
@@ -60,6 +64,7 @@ pub enum ErrorKind {
     CommandNotFound(String),
     HistoryFileNotFound,
     NoSuchJob(String),
+    NoJobControl,
     Docopt,
     Io,
     Nix,
@@ -74,6 +79,7 @@ impl fmt::Display for ErrorKind {
             ErrorKind::CommandNotFound(ref line) => write!(f, "{}: command not found", line),
             ErrorKind::HistoryFileNotFound => write!(f, "history file not found"),
             ErrorKind::NoSuchJob(ref job) => write!(f, "{}: no such job", job),
+            ErrorKind::NoJobControl => write!(f, "no job control"),
             ErrorKind::Docopt => write!(f, "Docopt error occurred"),
             ErrorKind::Io => write!(f, "I/O error occurred"),
             ErrorKind::Nix => write!(f, " Nix error occurred"),

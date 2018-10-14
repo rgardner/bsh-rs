@@ -1,27 +1,21 @@
 use std::ffi::OsStr;
+use std::fmt;
 use std::fs::{File, OpenOptions};
 use std::io;
-use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
-use std::os::unix::process::CommandExt;
-use std::process::{ChildStdout, Command, ExitStatus, Stdio};
+use std::iter;
+#[cfg(unix)]
+use std::os::unix::io::{AsRawFd, RawFd};
+use std::process::{Child, ChildStdout, Command, ExitStatus, Stdio};
 
 use failure::{Fail, ResultExt};
-use libc;
-use nix::sys::signal::{self, SigHandler, Signal};
-use nix::unistd::{self, Pid};
 
 use builtins;
-use core::{
-    intermediate_representation as ir,
-    job::{Process, ProcessGroup, ProcessId, ProcessStatus},
-    parser::ast,
-};
+use core::{intermediate_representation as ir, parser::ast};
 use errors::{Error, ErrorKind, Result};
 use shell::Shell;
-use util::{self, BshExitStatusExt};
 
 #[derive(Debug)]
-enum Stdin {
+pub enum Stdin {
     Inherit,
     File(File),
     Child(ChildStdout),
@@ -36,9 +30,26 @@ enum Output {
 
 impl Stdin {
     /// simple commands prefer file redirects to piping, following bash's behavior
+    #[cfg(unix)]
+    fn new(redirect: &ir::Stdio, pipe: Option<Stdin>) -> Result<Self> {
+        use std::os::unix::io::FromRawFd;
+
+        match (redirect, pipe) {
+            (ir::Stdio::FileDescriptor(0), _) => Ok(Stdin::Inherit),
+            (ir::Stdio::FileDescriptor(fd), _) => unsafe { Ok(File::from_raw_fd(*fd).into()) },
+            (ir::Stdio::Filename(filename), _) => Ok(Stdin::File(
+                File::open(filename).with_context(|_| ErrorKind::Io)?,
+            )),
+            (_, Some(stdin)) => Ok(stdin),
+            _ => Ok(Stdin::Inherit),
+        }
+    }
+
+    #[cfg(windows)]
     fn new(redirect: &ir::Stdio, pipe: Option<Stdin>) -> Result<Self> {
         match (redirect, pipe) {
-            (ir::Stdio::FileDescriptor(fd), _) => unsafe { Ok(File::from_raw_fd(*fd).into()) },
+            (ir::Stdio::FileDescriptor(0), _) => Ok(Stdin::Inherit),
+            (ir::Stdio::FileDescriptor(_fd), _) => unimplemented!(),
             (ir::Stdio::Filename(filename), _) => Ok(Stdin::File(
                 File::open(filename).with_context(|_| ErrorKind::Io)?,
             )),
@@ -50,9 +61,28 @@ impl Stdin {
 
 impl Output {
     /// simple commands prefer file redirects to piping, following bash's behavior
+    #[cfg(unix)]
     fn new(redirect: &ir::Stdio, pipe: Option<Output>) -> Result<Self> {
+        use std::os::unix::io::FromRawFd;
+
         match (redirect, pipe) {
             (ir::Stdio::FileDescriptor(fd), _) => unsafe { Ok(File::from_raw_fd(*fd).into()) },
+            (ir::Stdio::Filename(filename), _) => Ok(Output::File(
+                OpenOptions::new()
+                    .write(true)
+                    .create(true)
+                    .open(filename)
+                    .context(ErrorKind::Io)?,
+            )),
+            (_, Some(output)) => Ok(output),
+            _ => Ok(Output::Inherit),
+        }
+    }
+
+    #[cfg(windows)]
+    fn new(redirect: &ir::Stdio, pipe: Option<Output>) -> Result<Self> {
+        match (redirect, pipe) {
+            (ir::Stdio::FileDescriptor(_fd), _) => unimplemented!(),
             (ir::Stdio::Filename(filename), _) => Ok(Output::File(
                 OpenOptions::new()
                     .write(true)
@@ -72,8 +102,11 @@ impl From<File> for Stdin {
     }
 }
 
+#[cfg(unix)]
 impl AsRawFd for Stdin {
     fn as_raw_fd(&self) -> RawFd {
+        use libc;
+
         match self {
             Stdin::Inherit => libc::STDIN_FILENO,
             Stdin::File(f) => f.as_raw_fd(),
@@ -108,19 +141,190 @@ impl From<Output> for Stdio {
     }
 }
 
-/// # Panics
-/// Panics if job is in an invalid state
-pub fn wait(process: Process) -> Result<(Process, ExitStatus)> {
-    if let ProcessStatus::Completed = process.status() {
-        let status_code = process
-            .status_code()
-            .expect("invalid status code for completed process");
-        Ok((process, status_code))
-    } else if let Some(pid) = process.id() {
-        let status_code = wait_for_process(pid)?;
-        Ok((process.mark_exited(status_code), status_code))
-    } else {
-        panic!("process status is not 'Completed' and pid is not set");
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ProcessId(u32);
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum ProcessStatus {
+    Running,
+    Stopped,
+    Completed,
+}
+
+pub trait Process {
+    fn id(&self) -> Option<ProcessId>;
+    fn argv(&self) -> String;
+    fn status(&self) -> ProcessStatus;
+    fn status_code(&self) -> Option<ExitStatus>;
+    fn stdout(&mut self) -> Option<Stdin>;
+    fn kill(&mut self) -> Result<()>;
+    fn wait(&mut self) -> Result<ExitStatus>;
+    fn try_wait(&mut self) -> Result<Option<ExitStatus>>;
+}
+
+impl fmt::Debug for Process {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "Process {{ id: {} }}",
+            self.id()
+                .map(|id| id.0.to_string())
+                .unwrap_or_else(|| "(builtin)".to_string())
+        )
+    }
+}
+
+#[derive(Debug)]
+pub struct ProcessGroup {
+    pub id: Option<u32>,
+    pub processes: Vec<Box<Process>>,
+    pub foreground: bool,
+}
+
+struct BuiltinProcess {
+    argv: Vec<String>,
+    status_code: ExitStatus,
+    stdout: Option<Stdin>,
+}
+
+impl BuiltinProcess {
+    pub fn new<S1, S2>(
+        program: S1,
+        args: &[S2],
+        status_code: ExitStatus,
+        stdout: Option<Stdin>,
+    ) -> Self
+    where
+        S1: AsRef<str>,
+        S2: AsRef<str>,
+    {
+        Self {
+            argv: iter::once(program)
+                .map(|p| p.as_ref().to_string())
+                .chain(args.iter().map(|arg| arg.as_ref().to_string()))
+                .collect(),
+            status_code,
+            stdout,
+        }
+    }
+}
+
+impl Process for BuiltinProcess {
+    fn id(&self) -> Option<ProcessId> {
+        None
+    }
+
+    fn argv(&self) -> String {
+        self.argv[..].join(" ")
+    }
+
+    fn status(&self) -> ProcessStatus {
+        ProcessStatus::Completed
+    }
+
+    fn status_code(&self) -> Option<ExitStatus> {
+        Some(self.status_code)
+    }
+
+    fn stdout(&mut self) -> Option<Stdin> {
+        self.stdout.take()
+    }
+
+    fn kill(&mut self) -> Result<()> {
+        Ok(())
+    }
+
+    fn wait(&mut self) -> Result<ExitStatus> {
+        Ok(self.status_code)
+    }
+
+    fn try_wait(&mut self) -> Result<Option<ExitStatus>> {
+        Ok(Some(self.status_code))
+    }
+}
+
+struct ExternalProcess {
+    argv: Vec<String>,
+    child: Child,
+    status: ProcessStatus,
+    status_code: Option<ExitStatus>,
+}
+
+impl ExternalProcess {
+    pub fn new<S1, S2>(program: S1, args: &[S2], child: Child) -> Self
+    where
+        S1: AsRef<str>,
+        S2: AsRef<str>,
+    {
+        Self {
+            argv: iter::once(&program)
+                .map(|p| p.as_ref().to_string())
+                .chain(args.iter().map(|arg| arg.as_ref().to_string()))
+                .collect(),
+            child,
+            status: ProcessStatus::Running,
+            status_code: None,
+        }
+    }
+}
+
+impl Process for ExternalProcess {
+    fn id(&self) -> Option<ProcessId> {
+        Some(self.child.id().into())
+    }
+
+    fn argv(&self) -> String {
+        self.argv[..].join(" ")
+    }
+
+    fn status(&self) -> ProcessStatus {
+        self.status
+    }
+
+    fn status_code(&self) -> Option<ExitStatus> {
+        self.status_code
+    }
+
+    fn stdout(&mut self) -> Option<Stdin> {
+        self.child.stdout.take().map(Stdin::Child)
+    }
+
+    fn kill(&mut self) -> Result<()> {
+        self.child.kill().context(ErrorKind::Io)?;
+        Ok(())
+    }
+
+    fn wait(&mut self) -> Result<ExitStatus> {
+        let exit_status = self.child.wait().context(ErrorKind::Io)?;
+        self.status = ProcessStatus::Completed;
+        self.status_code = Some(exit_status);
+        Ok(exit_status)
+    }
+
+    fn try_wait(&mut self) -> Result<Option<ExitStatus>> {
+        if let Some(exit_status) = self.child.try_wait().context(ErrorKind::Io)? {
+            self.status = ProcessStatus::Completed;
+            self.status_code = Some(exit_status);
+            Ok(Some(exit_status))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
+impl From<u32> for ProcessId {
+    fn from(value: u32) -> Self {
+        ProcessId(value)
+    }
+}
+
+impl fmt::Display for ProcessStatus {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            ProcessStatus::Running => write!(f, "Running"),
+            ProcessStatus::Stopped => write!(f, "Stopped"),
+            ProcessStatus::Completed => write!(f, "Completed"),
+        }
     }
 }
 
@@ -130,7 +334,7 @@ pub fn spawn_processes(
     shell: &mut Shell,
     command_group: &ir::CommandGroup,
 ) -> Result<ProcessGroup> {
-    let (processes, pgid, _) = _spawn_processes(shell, &command_group.command, None, None, None)?;
+    let (processes, pgid) = _spawn_processes(shell, &command_group.command, None, None, None)?;
     Ok(ProcessGroup {
         id: pgid,
         processes,
@@ -144,13 +348,13 @@ fn _spawn_processes(
     stdin: Option<Stdin>,
     stdout: Option<Output>,
     pgid: Option<u32>,
-) -> Result<(Vec<Process>, Option<u32>, Option<Stdin>)> {
+) -> Result<(Vec<Box<Process>>, Option<u32>)> {
     match command {
         ir::Command::Simple(simple_command) => {
             let stdin = Stdin::new(&simple_command.stdin, stdin)?;
             let stdout = Output::new(&simple_command.stdout, stdout)?;
             let stderr = Output::new(&simple_command.stderr, None /*pipe*/)?;
-            let (result, pgid, output) = run_simple_command(
+            let (result, pgid) = run_simple_command(
                 shell,
                 &simple_command.program,
                 &simple_command.args,
@@ -159,7 +363,7 @@ fn _spawn_processes(
                 stderr,
                 pgid,
             )?;
-            Ok((vec![result], pgid, output))
+            Ok((vec![result], pgid))
         }
         ir::Command::Connection {
             ref first,
@@ -177,7 +381,7 @@ fn run_simple_command<S1, S2>(
     stdout: Output,
     stderr: Output,
     pgid: Option<u32>,
-) -> Result<(Process, Option<u32>, Option<Stdin>)>
+) -> Result<(Box<Process>, Option<u32>)>
 where
     S1: AsRef<str>,
     S2: AsRef<str>,
@@ -197,58 +401,63 @@ fn run_connection_command(
     stdin: Option<Stdin>,
     stdout: Option<Output>,
     pgid: Option<u32>,
-) -> Result<(Vec<Process>, Option<u32>, Option<Stdin>)> {
+) -> Result<(Vec<Box<Process>>, Option<u32>)> {
     match connector {
         ast::Connector::Pipe => {
-            let (mut first_result, pgid, pipe) =
+            let (mut first_result, pgid) =
                 _spawn_processes(shell, first, stdin, Some(Output::CreatePipe), pgid)?;
-            let (second_result, pgid, output) =
-                _spawn_processes(shell, second, pipe, stdout, pgid)?;
+            let (mut second_result, pgid) = _spawn_processes(
+                shell,
+                second,
+                first_result.last_mut().unwrap().stdout(),
+                stdout,
+                pgid,
+            )?;
             first_result.extend(second_result);
-            Ok((first_result, pgid, output))
+            Ok((first_result, pgid))
         }
         ast::Connector::Semicolon => {
-            let (mut first_result, _, _) = _spawn_processes(shell, first, stdin, None, pgid)?;
-            let last_process_index = first_result.len() - 1;
-            let last_process = first_result.swap_remove(last_process_index);
-            let (process, _) = wait(last_process)?;
-            first_result.push(process);
-            let (second_result, pgid, output) =
-                _spawn_processes(shell, second, None, stdout, None)?;
+            let (mut first_result, _) = _spawn_processes(shell, first, stdin, None, pgid)?;
+            first_result.last_mut().unwrap().wait()?;
+            let (second_result, pgid) = _spawn_processes(shell, second, None, stdout, None)?;
             first_result.extend(second_result);
-            Ok((first_result, pgid, output))
+            Ok((first_result, pgid))
         }
         ast::Connector::And => {
-            let (mut first_result, _, _) = _spawn_processes(shell, first, stdin, None, pgid)?;
-            let last_process_index = first_result.len() - 1;
-            let last_process = first_result.swap_remove(last_process_index);
-            let (last_process, last_process_status_code) = wait(last_process)?;
-            first_result.push(last_process);
-            let (pgid, output) = if last_process_status_code.success() {
-                let (second_result, pgid, output) =
-                    _spawn_processes(shell, second, None, stdout, None)?;
+            let (mut first_result, _) = _spawn_processes(shell, first, stdin, None, pgid)?;
+            first_result.last_mut().unwrap().wait()?;
+            let pgid = if first_result
+                .last()
+                .unwrap()
+                .status_code()
+                .unwrap()
+                .success()
+            {
+                let (second_result, pgid) = _spawn_processes(shell, second, None, stdout, None)?;
                 first_result.extend(second_result);
-                (pgid, output)
+                pgid
             } else {
-                (None, None)
+                None
             };
-            Ok((first_result, pgid, output))
+            Ok((first_result, pgid))
         }
         ast::Connector::Or => {
-            let (mut first_result, _, _) = _spawn_processes(shell, first, stdin, None, pgid)?;
-            let last_process_index = first_result.len() - 1;
-            let last_process = first_result.swap_remove(last_process_index);
-            let (last_process, last_process_status_code) = wait(last_process)?;
-            first_result.push(last_process);
-            let (pgid, output) = if !last_process_status_code.success() {
-                let (second_result, pgid, output) =
-                    _spawn_processes(shell, second, None, stdout, None)?;
+            let (mut first_result, _) = _spawn_processes(shell, first, stdin, None, pgid)?;
+            first_result.last_mut().unwrap().wait()?;
+            let pgid = if !first_result
+                .last()
+                .unwrap()
+                .status_code()
+                .unwrap()
+                .success()
+            {
+                let (second_result, pgid) = _spawn_processes(shell, second, None, stdout, None)?;
                 first_result.extend(second_result);
-                (pgid, output)
+                pgid
             } else {
-                (None, None)
+                None
             };
-            Ok((first_result, pgid, output))
+            Ok((first_result, pgid))
         }
     }
 }
@@ -259,7 +468,7 @@ fn run_builtin_command<S1, S2>(
     args: &[S2],
     stdout: Output,
     pgid: Option<u32>,
-) -> Result<(Process, Option<u32>, Option<Stdin>)>
+) -> Result<(Box<Process>, Option<u32>)>
 where
     S1: AsRef<str>,
     S2: AsRef<str>,
@@ -281,10 +490,13 @@ where
         ),
     };
 
-    let process = Process::new_builtin(&program, &args, status_code);
-    Ok((process, pgid, output))
+    Ok((
+        Box::new(BuiltinProcess::new(&program, &args, status_code, output)),
+        pgid,
+    ))
 }
 
+#[cfg(unix)]
 fn run_external_command<S1, S2>(
     shell: &Shell,
     program: S1,
@@ -293,11 +505,21 @@ fn run_external_command<S1, S2>(
     stdout: Output,
     stderr: Output,
     pgid: Option<u32>,
-) -> Result<(Process, Option<u32>, Option<Stdin>)>
+) -> Result<(Box<Process>, Option<u32>)>
 where
     S1: AsRef<str>,
     S2: AsRef<str>,
 {
+    use std::os::unix::process::CommandExt;
+
+    use libc;
+    use nix::{
+        sys::signal::{self, SigHandler, Signal},
+        unistd::{self, Pid},
+    };
+
+    use util;
+
     let mut command = Command::new(OsStr::new(program.as_ref()));
     command.args(args.iter().map(AsRef::as_ref).map(OsStr::new));
 
@@ -310,10 +532,10 @@ where
     command.stdout(stdout);
     command.stderr(stderr);
 
-    let shell_is_interactive = shell.is_interactive();
-    let shell_terminal = util::get_terminal();
+    let job_control_is_enabled = shell.is_job_control_enabled();
+    let shell_terminal = util::unix::get_terminal();
     command.before_exec(move || {
-        if shell_is_interactive {
+        if job_control_is_enabled {
             // Put process into process group
             let pid = unistd::getpid();
             let pgid = pgid.map(|pgid| Pid::from_raw(pgid as i32)).unwrap_or(pid);
@@ -370,11 +592,11 @@ where
     let child = match command.spawn() {
         Ok(child) => child,
         Err(e) => {
-            if shell_is_interactive {
+            if job_control_is_enabled {
                 warn!("failed to spawn child, resetting terminal's pgrp");
                 // see above comment for tcsetpgrp(2) failing being programmer
                 // error
-                unistd::tcsetpgrp(util::get_terminal(), unistd::getpgrp()).unwrap();
+                unistd::tcsetpgrp(util::unix::get_terminal(), unistd::getpgrp()).unwrap();
             }
 
             if e.kind() == io::ErrorKind::NotFound {
@@ -386,27 +608,69 @@ where
     };
 
     let pgid = pgid.unwrap_or_else(|| child.id());
-    let temp_result = unistd::setpgid(
-        Pid::from_raw(child.id() as libc::pid_t),
-        Pid::from_raw(pgid as libc::pid_t),
-    );
-    log_if_err!(
-        temp_result,
-        "failed to set pgid ({}) for pid ({})",
-        child.id(),
-        pgid
-    );
+    if job_control_is_enabled {
+        let temp_result = unistd::setpgid(
+            Pid::from_raw(child.id() as libc::pid_t),
+            Pid::from_raw(pgid as libc::pid_t),
+        );
+
+        log_if_err!(
+            temp_result,
+            "failed to set pgid ({}) for pid ({})",
+            child.id(),
+            pgid
+        );
+    }
 
     Ok((
-        Process::new_external(program, args, child.id().into()),
+        Box::new(ExternalProcess::new(program, args, child)),
         Some(pgid),
-        child.stdout.map(Stdin::Child),
+    ))
+}
+
+#[cfg(windows)]
+fn run_external_command<S1, S2>(
+    _shell: &Shell,
+    program: S1,
+    args: &[S2],
+    stdin: Stdin,
+    stdout: Output,
+    stderr: Output,
+    pgid: Option<u32>,
+) -> Result<(Box<Process>, Option<u32>)>
+where
+    S1: AsRef<str>,
+    S2: AsRef<str>,
+{
+    let mut command = Command::new(OsStr::new(program.as_ref()));
+    command.args(args.iter().map(AsRef::as_ref).map(OsStr::new));
+    command.stdin(stdin);
+    command.stdout(stdout);
+    command.stderr(stderr);
+
+    let child = command.spawn().map_err(|e| {
+        if e.kind() == io::ErrorKind::NotFound {
+            Error::command_not_found(&program)
+        } else {
+            e.context(ErrorKind::Io).into()
+        }
+    })?;
+
+    let pgid = pgid.unwrap_or_else(|| child.id());
+    Ok((
+        Box::new(ExternalProcess::new(program, args, child)),
+        Some(pgid),
     ))
 }
 
 /// Wraps `unistd::pipe()` to return RAII structs instead of raw, owning file descriptors
 /// Returns (`read_end_pipe`, `write_end_pipe`)
+#[cfg(unix)]
 fn create_pipe() -> Result<(File, File)> {
+    use std::os::unix::io::FromRawFd;
+
+    use nix::unistd;
+
     // IMPORTANT: immediately pass the RawFds returned by unistd::pipe()
     // into RAII structs (File). If the function returns before they are moved
     // into RAII structs, the fds could be leaked.
@@ -422,15 +686,9 @@ fn create_pipe() -> Result<(File, File)> {
     }
 }
 
-fn wait_for_process(pid: ProcessId) -> Result<ExitStatus> {
-    use nix::sys::wait::{self, WaitStatus};
-    use nix::unistd::Pid;
-
-    let pid: Pid = pid.into();
-    let wait_status = wait::waitpid(pid, None).context(ErrorKind::Nix)?;
-    match wait_status {
-        WaitStatus::Exited(_, status) => Ok(ExitStatus::from_status(status)),
-        WaitStatus::Signaled(_, signal, _) => Ok(ExitStatus::from_status(128 + signal as i32)),
-        _ => panic!("not sure what to do here"),
-    }
+#[cfg(windows)]
+fn create_pipe() -> Result<(File, File)> {
+    // TODO (#22): Support Windows
+    // See CreatePipe, HANDLE, and "impl FromRawHandle for File"
+    unimplemented!()
 }

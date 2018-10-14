@@ -26,6 +26,8 @@ regex = "0.2.2"
 rustyline = "2.1.0"
 serde = "1.0.18"
 serde_derive = "1.0.18"
+atty = "0.2.11"
+cfg-if = "0.1.5"
 
 [dependencies.nix]
 branch = "implement-libc-signal"
