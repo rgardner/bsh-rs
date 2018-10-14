@@ -129,6 +129,14 @@ mod tests {
         }
     }
 
+    fn output_fd_redirection(fd: i32) -> Redirect {
+        Redirect {
+            redirector: None,
+            instruction: RedirectInstruction::Output,
+            redirectee: Redirectee::FileDescriptor(fd),
+        }
+    }
+
     fn fd_to_file_redirection(fd: i32, filename: &str) -> Redirect {
         Redirect {
             redirector: Some(Redirectee::FileDescriptor(fd)),
@@ -277,6 +285,20 @@ mod tests {
             Command::Simple {
                 words: vec!["echo".into(), "bob".into()],
                 redirects: vec![output_filename_redirection("out"), input_redirection("in"),],
+                background: false,
+            }
+        );
+
+        assert_eq!(
+            CommandParser::new()
+                .parse("2>errfile >&2 echo needle",)
+                .expect("'2>errfile >&2 echo needle' should be valid",),
+            Command::Simple {
+                words: vec!["echo".into(), "needle".into()],
+                redirects: vec![
+                    fd_to_file_redirection(2, "errfile"),
+                    output_fd_redirection(2),
+                ],
                 background: false,
             }
         );
