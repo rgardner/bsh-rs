@@ -8,6 +8,7 @@ use std::os::unix::io::{AsRawFd, RawFd};
 use std::process::{Child, ChildStdout, Command, ExitStatus, Stdio};
 
 use failure::{Fail, ResultExt};
+use log::warn;
 
 use crate::{
     builtins,

@@ -1,5 +1,7 @@
 //! BSH Parser
 
+use log::debug;
+
 use self::grammar::CommandParser;
 use crate::errors::{Error, Result};
 

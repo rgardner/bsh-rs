@@ -12,6 +12,7 @@ use atty::{self, Stream};
 use dirs;
 use failure::ResultExt;
 use libc;
+use log::{debug, error, info, warn};
 use nix::{
     sys::{
         signal::{self, SigHandler, Signal},

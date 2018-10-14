@@ -12,16 +12,6 @@
 )]
 #![feature(tool_lints)]
 
-#[macro_use]
-extern crate cfg_if;
-use dirs;
-
-#[macro_use]
-extern crate log;
-#[cfg(unix)]
-#[macro_use]
-extern crate serde_derive;
-
 pub use crate::errors::{Error, ErrorKind, Result};
 pub use crate::shell::{create_shell, create_simple_shell, Shell, ShellConfig};
 pub use crate::util::BshExitStatusExt;
@@ -29,17 +19,17 @@ pub use crate::util::BshExitStatusExt;
 macro_rules! log_if_err {
     ($result:expr) => {{
         if let Err(e) = $result {
-            error!("{}", e);
+            log::error!("{}", e);
         }
     }};
     ($result:expr, $fmt:expr) => {{
         if let Err(e) = $result {
-            error!(concat!($fmt, ": {}"), e);
+            log::error!(concat!($fmt, ": {}"), e);
         }
     }};
     ($result:expr, $fmt:expr, $($arg:tt)*) => {{
         if let Err(e) = $result {
-            error!(concat!($fmt, ": {}"), $($arg)*, e);
+            log::error!(concat!($fmt, ": {}"), $($arg)*, e);
         }
     }};
 }

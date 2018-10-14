@@ -2,6 +2,8 @@ use std::num::ParseIntError;
 use std::result as res;
 
 use failure::ResultExt;
+use log::debug;
+use serde_derive::Deserialize;
 
 use crate::{
     builtins::{self, prelude::*},

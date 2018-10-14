@@ -1,10 +1,9 @@
 use std::env;
 use std::path::Path;
 
-use crate::{
-    builtins::{self, prelude::*},
-    dirs,
-};
+use dirs;
+
+use crate::builtins::{self, prelude::*};
 
 pub struct Cd;
 

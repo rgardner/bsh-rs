@@ -1,13 +1,5 @@
 //! Integration Tests
 
-extern crate assert_cmd;
-extern crate chrono;
-#[macro_use]
-extern crate lazy_static;
-extern crate escargot;
-extern crate predicates;
-extern crate tempfile;
-
 use std::ffi::OsStr;
 use std::fs::File;
 use std::io::{self, Read};
@@ -15,6 +7,7 @@ use std::path::PathBuf;
 
 use assert_cmd::prelude::*;
 use chrono::{DateTime, Local};
+use lazy_static::lazy_static;
 use predicates::prelude::*;
 use tempfile::TempDir;
 
