@@ -61,7 +61,7 @@ pub trait BuiltinCommand {
         Self::HELP.lines().nth(0).unwrap().to_owned()
     }
     /// Runs the command with the given arguments in the `shell` environment.
-    fn run<T: AsRef<str>>(shell: &mut Shell, args: &[T], stdout: &mut Write) -> Result<()>;
+    fn run<T: AsRef<str>>(shell: &mut dyn Shell, args: &[T], stdout: &mut dyn Write) -> Result<()>;
 }
 
 pub fn is_builtin<T: AsRef<str>>(program: T) -> bool {
@@ -83,10 +83,10 @@ pub fn is_builtin<T: AsRef<str>>(program: T) -> bool {
 /// precondition: command is a builtin.
 /// Returns (`exit_status_code`, `builtin_result`)
 pub fn run<S1, S2>(
-    shell: &mut Shell,
+    shell: &mut dyn Shell,
     program: S1,
     args: &[S2],
-    stdout: &mut Write,
+    stdout: &mut dyn Write,
 ) -> (ExitStatus, Result<()>)
 where
     S1: AsRef<str>,

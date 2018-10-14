@@ -11,7 +11,11 @@ help: help [command ...]
     gives detailed help on all commands matching COMMAND, otherwise a list of the
     builtins is printed.";
 
-    fn run<T: AsRef<str>>(_shell: &mut Shell, args: &[T], stdout: &mut Write) -> Result<()> {
+    fn run<T: AsRef<str>>(
+        _shell: &mut dyn Shell,
+        args: &[T],
+        stdout: &mut dyn Write,
+    ) -> Result<()> {
         if args.is_empty() {
             print_all_usage_strings(stdout)?;
         } else {
@@ -47,7 +51,7 @@ help: help [command ...]
     }
 }
 
-fn print_all_usage_strings(writer: &mut Write) -> Result<()> {
+fn print_all_usage_strings(writer: &mut dyn Write) -> Result<()> {
     writeln!(writer, "{}", jobs::Bg::usage()).context(ErrorKind::Io)?;
     writeln!(writer, "{}", dirs::Cd::usage()).context(ErrorKind::Io)?;
     writeln!(writer, "{}", env::Declare::usage()).context(ErrorKind::Io)?;

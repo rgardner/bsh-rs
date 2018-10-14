@@ -15,7 +15,7 @@ history: history [-c] [-s size] [n]
     the history list to be cleared by deleting all of the entries.
     The `-s' option sets the size of the history list.";
 
-    fn run<T: AsRef<str>>(shell: &mut Shell, args: &[T], stdout: &mut Write) -> Result<()> {
+    fn run<T: AsRef<str>>(shell: &mut dyn Shell, args: &[T], stdout: &mut dyn Write) -> Result<()> {
         if args.is_empty() {
             write!(stdout, "{}", shell.editor()).context(ErrorKind::Io)?;
             return Ok(());

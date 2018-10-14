@@ -20,7 +20,7 @@ kill: kill pid | %jobspec
     Exit Status:
     Returns success unless an invalid option is given or an error occurs.";
 
-    fn run<T: AsRef<str>>(shell: &mut Shell, args: &[T], stdout: &mut Write) -> Result<()> {
+    fn run<T: AsRef<str>>(shell: &mut dyn Shell, args: &[T], stdout: &mut dyn Write) -> Result<()> {
         if args.is_empty() {
             return Err(Error::builtin_command(Self::usage(), 2));
         }

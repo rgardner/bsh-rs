@@ -12,7 +12,11 @@ exit: exit [n]
     Exit the shell with a status of N. If N is omitted, the exit status
     is 0.";
 
-    fn run<T: AsRef<str>>(shell: &mut Shell, args: &[T], _stdout: &mut Write) -> Result<()> {
+    fn run<T: AsRef<str>>(
+        shell: &mut dyn Shell,
+        args: &[T],
+        _stdout: &mut dyn Write,
+    ) -> Result<()> {
         if shell.has_background_jobs() {
             return Err(Error::builtin_command("There are stopped jobs.", 1));
         }

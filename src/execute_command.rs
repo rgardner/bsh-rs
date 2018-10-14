@@ -164,8 +164,8 @@ pub trait Process {
     fn try_wait(&mut self) -> Result<Option<ExitStatus>>;
 }
 
-impl fmt::Debug for Process {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl fmt::Debug for dyn Process {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "Process {{ id: {} }}",
@@ -179,7 +179,7 @@ impl fmt::Debug for Process {
 #[derive(Debug)]
 pub struct ProcessGroup {
     pub id: Option<u32>,
-    pub processes: Vec<Box<Process>>,
+    pub processes: Vec<Box<dyn Process>>,
     pub foreground: bool,
 }
 
@@ -321,7 +321,7 @@ impl From<u32> for ProcessId {
 }
 
 impl fmt::Display for ProcessStatus {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             ProcessStatus::Running => write!(f, "Running"),
             ProcessStatus::Stopped => write!(f, "Stopped"),
@@ -333,7 +333,7 @@ impl fmt::Display for ProcessStatus {
 /// Spawn processes for each `command`, returning processes, the process group, and a `bool`
 /// representing whether the processes are running in the foreground.
 pub fn spawn_processes(
-    shell: &mut Shell,
+    shell: &mut dyn Shell,
     command_group: &ir::CommandGroup,
 ) -> Result<ProcessGroup> {
     let (processes, pgid) = _spawn_processes(shell, &command_group.command, None, None, None)?;
@@ -345,12 +345,12 @@ pub fn spawn_processes(
 }
 
 fn _spawn_processes(
-    shell: &mut Shell,
+    shell: &mut dyn Shell,
     command: &ir::Command,
     stdin: Option<Stdin>,
     stdout: Option<Output>,
     pgid: Option<u32>,
-) -> Result<(Vec<Box<Process>>, Option<u32>)> {
+) -> Result<(Vec<Box<dyn Process>>, Option<u32>)> {
     match command {
         ir::Command::Simple(simple_command) => {
             let stdin = Stdin::new(&simple_command.stdin, stdin)?;
@@ -376,14 +376,14 @@ fn _spawn_processes(
 }
 
 fn run_simple_command<S1, S2>(
-    shell: &mut Shell,
+    shell: &mut dyn Shell,
     program: S1,
     args: &[S2],
     stdin: Stdin,
     stdout: Output,
     stderr: Output,
     pgid: Option<u32>,
-) -> Result<(Box<Process>, Option<u32>)>
+) -> Result<(Box<dyn Process>, Option<u32>)>
 where
     S1: AsRef<str>,
     S2: AsRef<str>,
@@ -396,14 +396,14 @@ where
 }
 
 fn run_connection_command(
-    shell: &mut Shell,
+    shell: &mut dyn Shell,
     first: &ir::Command,
     second: &ir::Command,
     connector: ast::Connector,
     stdin: Option<Stdin>,
     stdout: Option<Output>,
     pgid: Option<u32>,
-) -> Result<(Vec<Box<Process>>, Option<u32>)> {
+) -> Result<(Vec<Box<dyn Process>>, Option<u32>)> {
     match connector {
         ast::Connector::Pipe => {
             let (mut first_result, pgid) =
@@ -465,12 +465,12 @@ fn run_connection_command(
 }
 
 fn run_builtin_command<S1, S2>(
-    shell: &mut Shell,
+    shell: &mut dyn Shell,
     program: S1,
     args: &[S2],
     stdout: Output,
     pgid: Option<u32>,
-) -> Result<(Box<Process>, Option<u32>)>
+) -> Result<(Box<dyn Process>, Option<u32>)>
 where
     S1: AsRef<str>,
     S2: AsRef<str>,
@@ -500,14 +500,14 @@ where
 
 #[cfg(unix)]
 fn run_external_command<S1, S2>(
-    shell: &Shell,
+    shell: &dyn Shell,
     program: S1,
     args: &[S2],
     stdin: Stdin,
     stdout: Output,
     stderr: Output,
     pgid: Option<u32>,
-) -> Result<(Box<Process>, Option<u32>)>
+) -> Result<(Box<dyn Process>, Option<u32>)>
 where
     S1: AsRef<str>,
     S2: AsRef<str>,
