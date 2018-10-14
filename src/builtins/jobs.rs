@@ -3,8 +3,10 @@ use std::result as res;
 
 use failure::ResultExt;
 
-use builtins::{self, prelude::*};
-use shell::JobId;
+use crate::{
+    builtins::{self, prelude::*},
+    shell::JobId,
+};
 
 pub struct Jobs;
 

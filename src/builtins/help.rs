@@ -1,4 +1,4 @@
-use builtins::{self, dirs, env, exit, history, jobs, kill, prelude::*, BuiltinCommand};
+use crate::builtins::{self, dirs, env, exit, history, jobs, kill, prelude::*, BuiltinCommand};
 
 pub struct Help;
 

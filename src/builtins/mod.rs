@@ -26,9 +26,9 @@ pub mod prelude {
     pub use failure::ResultExt;
 
     pub use super::parse_args;
-    pub use errors::{Error, ErrorKind, Result};
-    pub use shell::Shell;
-    pub use util::BshExitStatusExt;
+    pub use crate::errors::{Error, ErrorKind, Result};
+    pub use crate::shell::Shell;
+    pub use crate::util::BshExitStatusExt;
 }
 
 mod dirs;

@@ -10,6 +10,7 @@
     unused_import_braces,
     unused_qualifications
 )]
+#![feature(tool_lints)]
 
 extern crate atty;
 #[macro_use]
@@ -28,9 +29,9 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 
-pub use errors::{Error, ErrorKind, Result};
-pub use shell::{create_shell, create_simple_shell, Shell, ShellConfig};
-pub use util::BshExitStatusExt;
+pub use crate::errors::{Error, ErrorKind, Result};
+pub use crate::shell::{create_shell, create_simple_shell, Shell, ShellConfig};
+pub use crate::util::BshExitStatusExt;
 
 macro_rules! log_if_err {
     ($result:expr) => {{

@@ -13,7 +13,7 @@ use rustyline::{
     history, CompletionType, Config, Helper,
 };
 
-use errors::{Error, ErrorKind, Result};
+use crate::errors::{Error, ErrorKind, Result};
 
 struct EditorHelper(FilenameCompleter);
 

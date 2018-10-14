@@ -2,6 +2,7 @@
 authors = ["Bob Gardner <bob.hn.gardner@gmail.com>"]
 build = "build.rs"
 description = "Command line shell"
+edition = "2018"
 license = "MIT or Apache-2.0"
 name = "bsh"
 readme = "README.md"

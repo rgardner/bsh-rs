@@ -9,11 +9,13 @@ use atty::{self, Stream};
 use dirs;
 use failure::ResultExt;
 
-use core::{intermediate_representation as ir, parser::Command, variable_expansion};
-use editor::Editor;
-use errors::{Error, ErrorKind, Result};
-use execute_command::{spawn_processes, Process, ProcessStatus};
-use util::BshExitStatusExt;
+use crate::{
+    core::{intermediate_representation as ir, parser::Command, variable_expansion},
+    editor::Editor,
+    errors::{Error, ErrorKind, Result},
+    execute_command::{spawn_processes, Process, ProcessStatus},
+    util::BshExitStatusExt,
+};
 
 const HISTORY_FILE_NAME: &str = ".bsh_history";
 const SYNTAX_ERROR_EXIT_STATUS: i32 = 2;

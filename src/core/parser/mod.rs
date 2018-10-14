@@ -1,11 +1,11 @@
 //! BSH Parser
 
 use self::grammar::CommandParser;
-use errors::{Error, Result};
+use crate::errors::{Error, Result};
 
 pub mod ast;
 #[allow(dead_code, unused_qualifications)]
-#[cfg_attr(feature = "cargo-clippy", allow(clippy))]
+#[allow(clippy::all)]
 #[cfg_attr(rustfmt, rustfmt_skip)]
 mod grammar;
 

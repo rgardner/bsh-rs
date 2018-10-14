@@ -1,5 +1,7 @@
-use builtins::{self, prelude::*};
-use editor::Editor;
+use crate::{
+    builtins::{self, prelude::*},
+    editor::Editor,
+};
 
 pub struct History;
 

@@ -9,10 +9,12 @@ use std::process::{Child, ChildStdout, Command, ExitStatus, Stdio};
 
 use failure::{Fail, ResultExt};
 
-use builtins;
-use core::{intermediate_representation as ir, parser::ast};
-use errors::{Error, ErrorKind, Result};
-use shell::Shell;
+use crate::{
+    builtins,
+    core::{intermediate_representation as ir, parser::ast},
+    errors::{Error, ErrorKind, Result},
+    shell::Shell,
+};
 
 #[derive(Debug)]
 pub enum Stdin {
@@ -406,7 +408,7 @@ fn run_connection_command(
         ast::Connector::Pipe => {
             let (mut first_result, pgid) =
                 _spawn_processes(shell, first, stdin, Some(Output::CreatePipe), pgid)?;
-            let (mut second_result, pgid) = _spawn_processes(
+            let (second_result, pgid) = _spawn_processes(
                 shell,
                 second,
                 first_result.last_mut().unwrap().stdout(),
@@ -518,7 +520,7 @@ where
         unistd::{self, Pid},
     };
 
-    use util;
+    use crate::util;
 
     let mut command = Command::new(OsStr::new(program.as_ref()));
     command.args(args.iter().map(AsRef::as_ref).map(OsStr::new));

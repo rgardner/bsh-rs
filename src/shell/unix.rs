@@ -24,11 +24,13 @@ use super::{
     Job, JobId, Shell, ShellConfig, COMMAND_NOT_FOUND_EXIT_STATUS, HISTORY_FILE_NAME,
     SYNTAX_ERROR_EXIT_STATUS,
 };
-use core::{intermediate_representation as ir, parser::Command, variable_expansion};
-use editor::Editor;
-use errors::{Error, ErrorKind, Result};
-use execute_command::{spawn_processes, Process, ProcessGroup, ProcessStatus};
-use util::{self, BshExitStatusExt};
+use crate::{
+    core::{intermediate_representation as ir, parser::Command, variable_expansion},
+    editor::Editor,
+    errors::{Error, ErrorKind, Result},
+    execute_command::{spawn_processes, Process, ProcessGroup, ProcessStatus},
+    util::{self, BshExitStatusExt},
+};
 
 pub struct JobControlShell {
     /// Responsible for readline and history.

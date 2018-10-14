@@ -3,7 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use core::parser::ast::{visit::Visitor, Command, Connector, Redirect, Redirectee};
+use crate::core::parser::ast::{visit::Visitor, Command, Connector, Redirect, Redirectee};
 
 pub fn expand_variables<I, P, K, V>(command: &Command, home_dir: Option<P>, vars: I) -> Command
 where
@@ -128,7 +128,7 @@ mod tests {
 
     use std::iter;
 
-    use core::parser::ast::{Command, RedirectInstruction, Redirectee};
+    use crate::core::parser::ast::{Command, RedirectInstruction, Redirectee};
 
     macro_rules! generate_unique_env_key {
         () => {

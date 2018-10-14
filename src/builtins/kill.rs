@@ -1,7 +1,7 @@
 use std::ffi::OsStr;
 use std::process::Command;
 
-use builtins::{self, prelude::*};
+use crate::builtins::{self, prelude::*};
 
 pub struct Kill;
 

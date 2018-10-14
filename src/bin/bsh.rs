@@ -45,7 +45,6 @@ struct Args {
     flag_log: Option<String>,
 }
 
-#[cfg_attr(feature = "cargo-clippy", allow(print_literal))]
 fn main() {
     let args: Args = Docopt::new(USAGE)
         .and_then(|d| d.deserialize())

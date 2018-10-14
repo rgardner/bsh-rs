@@ -1,7 +1,7 @@
 use std::env;
 use std::ffi::OsStr;
 
-use builtins::{self, prelude::*};
+use crate::builtins::{self, prelude::*};
 
 pub struct Declare;
 
@@ -74,8 +74,8 @@ mod tests {
     use std::env;
     use std::io;
 
-    use builtins::BuiltinCommand;
-    use shell::{create_shell, ShellConfig};
+    use crate::builtins::BuiltinCommand;
+    use crate::shell::{create_shell, ShellConfig};
 
     macro_rules! generate_unique_env_key {
         () => {
