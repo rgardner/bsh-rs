@@ -193,10 +193,7 @@ fn is_stderr_redirect(redirect: &ast::Redirect) -> bool {
         return false;
     }
 
-    match redirect.redirectee {
-        ast::Redirectee::Filename(_) => true,
-        _ => false,
-    }
+    true
 }
 
 #[cfg(test)]

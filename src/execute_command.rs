@@ -21,13 +21,23 @@ use crate::{
 pub enum Stdin {
     Inherit,
     File(File),
+    FileDescriptor(i32),
     Child(ChildStdout),
 }
 
 #[derive(Debug)]
-enum Output {
+enum Stdout {
     Inherit,
     File(File),
+    FileDescriptor(i32),
+    CreatePipe,
+}
+
+#[derive(Debug)]
+enum Stderr {
+    Inherit,
+    File(File),
+    FileDescriptor(i32),
     CreatePipe,
 }
 
@@ -35,11 +45,9 @@ impl Stdin {
     /// simple commands prefer file redirects to piping, following bash's behavior
     #[cfg(unix)]
     fn new(redirect: &ir::Stdio, pipe: Option<Stdin>) -> Result<Self> {
-        use std::os::unix::io::FromRawFd;
-
         match (redirect, pipe) {
             (ir::Stdio::FileDescriptor(0), _) => Ok(Stdin::Inherit),
-            (ir::Stdio::FileDescriptor(fd), _) => unsafe { Ok(File::from_raw_fd(*fd).into()) },
+            (ir::Stdio::FileDescriptor(fd), _) => Ok(Stdin::FileDescriptor(*fd)),
             (ir::Stdio::Filename(filename), _) => Ok(Stdin::File(
                 File::open(filename).with_context(|_| ErrorKind::Io)?,
             )),
@@ -58,43 +66,6 @@ impl Stdin {
             )),
             (_, Some(stdin)) => Ok(stdin),
             _ => Ok(Stdin::Inherit),
-        }
-    }
-}
-
-impl Output {
-    /// simple commands prefer file redirects to piping, following bash's behavior
-    #[cfg(unix)]
-    fn new(redirect: &ir::Stdio, pipe: Option<Output>) -> Result<Self> {
-        use std::os::unix::io::FromRawFd;
-
-        match (redirect, pipe) {
-            (ir::Stdio::FileDescriptor(fd), _) => unsafe { Ok(File::from_raw_fd(*fd).into()) },
-            (ir::Stdio::Filename(filename), _) => Ok(Output::File(
-                OpenOptions::new()
-                    .write(true)
-                    .create(true)
-                    .open(filename)
-                    .context(ErrorKind::Io)?,
-            )),
-            (_, Some(output)) => Ok(output),
-            _ => Ok(Output::Inherit),
-        }
-    }
-
-    #[cfg(windows)]
-    fn new(redirect: &ir::Stdio, pipe: Option<Output>) -> Result<Self> {
-        match (redirect, pipe) {
-            (ir::Stdio::FileDescriptor(_fd), _) => unimplemented!(),
-            (ir::Stdio::Filename(filename), _) => Ok(Output::File(
-                OpenOptions::new()
-                    .write(true)
-                    .create(true)
-                    .open(filename)
-                    .context(ErrorKind::Io)?,
-            )),
-            (_, Some(output)) => Ok(output),
-            _ => Ok(Output::Inherit),
         }
     }
 }
@@ -113,33 +84,116 @@ impl AsRawFd for Stdin {
         match self {
             Stdin::Inherit => libc::STDIN_FILENO,
             Stdin::File(f) => f.as_raw_fd(),
+            Stdin::FileDescriptor(fd) => *fd,
             Stdin::Child(child) => child.as_raw_fd(),
         }
     }
 }
 
-impl From<File> for Output {
-    fn from(file: File) -> Self {
-        Output::File(file)
+impl Stdout {
+    /// simple commands prefer file redirects to piping, following bash's behavior
+    #[cfg(unix)]
+    fn new(redirect: &ir::Stdio, pipe: Option<Stdout>) -> Result<Self> {
+        match (redirect, pipe) {
+            (ir::Stdio::FileDescriptor(1), _) => Ok(Stdout::Inherit),
+            (ir::Stdio::FileDescriptor(fd), _) => Ok(Stdout::FileDescriptor(*fd)),
+            (ir::Stdio::Filename(filename), _) => Ok(Stdout::File(
+                OpenOptions::new()
+                    .write(true)
+                    .create(true)
+                    .open(filename)
+                    .context(ErrorKind::Io)?,
+            )),
+            (_, Some(output)) => Ok(output),
+            _ => Ok(Stdout::Inherit),
+        }
     }
-}
 
-impl From<Stdin> for Stdio {
-    fn from(stdin: Stdin) -> Self {
-        match stdin {
-            Stdin::Inherit => Self::inherit(),
-            Stdin::File(file) => file.into(),
-            Stdin::Child(child) => child.into(),
+    #[cfg(windows)]
+    fn new(redirect: &ir::Stdio, pipe: Option<Stdout>) -> Result<Self> {
+        match (redirect, pipe) {
+            (ir::Stdio::FileDescriptor(1), _) => Ok(Stdout::Inherit),
+            (ir::Stdio::FileDescriptor(_fd), _) => unimplemented!(),
+            (ir::Stdio::Filename(filename), _) => Ok(Stdout::File(
+                OpenOptions::new()
+                    .write(true)
+                    .create(true)
+                    .open(filename)
+                    .context(ErrorKind::Io)?,
+            )),
+            (_, Some(output)) => Ok(output),
+            _ => Ok(Stdout::Inherit),
         }
     }
 }
 
-impl From<Output> for Stdio {
-    fn from(stdout: Output) -> Self {
+impl From<File> for Stdout {
+    fn from(file: File) -> Self {
+        Stdout::File(file)
+    }
+}
+
+impl From<Stdout> for Stdio {
+    fn from(stdout: Stdout) -> Self {
         match stdout {
-            Output::Inherit => Self::inherit(),
-            Output::File(file) => file.into(),
-            Output::CreatePipe => Self::piped(),
+            Stdout::Inherit => Self::inherit(),
+            Stdout::File(file) => file.into(),
+            Stdout::FileDescriptor(_fd) => panic!("must occur after fork(2)"),
+            Stdout::CreatePipe => Self::piped(),
+        }
+    }
+}
+
+impl Stderr {
+    /// simple commands prefer file redirects to piping, following bash's behavior
+    #[cfg(unix)]
+    fn new(redirect: &ir::Stdio, pipe: Option<Stderr>) -> Result<Self> {
+        match (redirect, pipe) {
+            (ir::Stdio::FileDescriptor(2), _) => Ok(Stderr::Inherit),
+            (ir::Stdio::FileDescriptor(fd), _) => Ok(Stderr::FileDescriptor(*fd)),
+            (ir::Stdio::Filename(filename), _) => Ok(Stderr::File(
+                OpenOptions::new()
+                    .write(true)
+                    .create(true)
+                    .open(filename)
+                    .context(ErrorKind::Io)?,
+            )),
+            (_, Some(output)) => Ok(output),
+            _ => Ok(Stderr::Inherit),
+        }
+    }
+
+    #[cfg(windows)]
+    fn new(redirect: &ir::Stdio, pipe: Option<Stderr>) -> Result<Self> {
+        match (redirect, pipe) {
+            (ir::Stdio::FileDescriptor(2), _) => Ok(Stderr::Inherit),
+            (ir::Stdio::FileDescriptor(_fd), _) => unimplemented!(),
+            (ir::Stdio::Filename(filename), _) => Ok(Stderr::File(
+                OpenOptions::new()
+                    .write(true)
+                    .create(true)
+                    .open(filename)
+                    .context(ErrorKind::Io)?,
+            )),
+            (_, Some(output)) => Ok(output),
+            _ => Ok(Stderr::Inherit),
+        }
+    }
+}
+
+impl From<File> for Stderr {
+    fn from(file: File) -> Self {
+        Stderr::File(file)
+    }
+}
+
+impl From<Stderr> for Stdio {
+    fn from(stderr: Stderr) -> Self {
+        match stderr {
+            Stderr::Inherit => Self::inherit(),
+            Stderr::File(file) => file.into(),
+            Stderr::FileDescriptor(_fd) => panic!("must occur after fork(2)"),
+            Stderr::CreatePipe => Self::piped(),
         }
     }
 }
@@ -349,14 +403,14 @@ fn _spawn_processes(
     shell: &mut dyn Shell,
     command: &ir::Command,
     stdin: Option<Stdin>,
-    stdout: Option<Output>,
+    stdout: Option<Stdout>,
     pgid: Option<u32>,
 ) -> Result<(Vec<Box<dyn Process>>, Option<u32>)> {
     match command {
         ir::Command::Simple(simple_command) => {
             let stdin = Stdin::new(&simple_command.stdin, stdin)?;
-            let stdout = Output::new(&simple_command.stdout, stdout)?;
-            let stderr = Output::new(&simple_command.stderr, None /*pipe*/)?;
+            let stdout = Stdout::new(&simple_command.stdout, stdout)?;
+            let stderr = Stderr::new(&simple_command.stderr, None /*pipe*/)?;
             let (result, pgid) = run_simple_command(
                 shell,
                 &simple_command.program,
@@ -381,8 +435,8 @@ fn run_simple_command<S1, S2>(
     program: S1,
     args: &[S2],
     stdin: Stdin,
-    stdout: Output,
-    stderr: Output,
+    stdout: Stdout,
+    stderr: Stderr,
     pgid: Option<u32>,
 ) -> Result<(Box<dyn Process>, Option<u32>)>
 where
@@ -402,13 +456,13 @@ fn run_connection_command(
     second: &ir::Command,
     connector: ast::Connector,
     stdin: Option<Stdin>,
-    stdout: Option<Output>,
+    stdout: Option<Stdout>,
     pgid: Option<u32>,
 ) -> Result<(Vec<Box<dyn Process>>, Option<u32>)> {
     match connector {
         ast::Connector::Pipe => {
             let (mut first_result, pgid) =
-                _spawn_processes(shell, first, stdin, Some(Output::CreatePipe), pgid)?;
+                _spawn_processes(shell, first, stdin, Some(Stdout::CreatePipe), pgid)?;
             let (second_result, pgid) = _spawn_processes(
                 shell,
                 second,
@@ -469,7 +523,7 @@ fn run_builtin_command<S1, S2>(
     shell: &mut dyn Shell,
     program: S1,
     args: &[S2],
-    stdout: Output,
+    stdout: Stdout,
     pgid: Option<u32>,
 ) -> Result<(Box<dyn Process>, Option<u32>)>
 where
@@ -479,15 +533,16 @@ where
     // TODO(rogardn): change Result usage in builtin to only be for rust
     // errors, e.g. builtin::execute shouldn't return a Result
     let (status_code, output) = match stdout {
-        Output::File(mut file) => (builtins::run(shell, &program, args, &mut file).0, None),
-        Output::CreatePipe => {
+        Stdout::File(mut file) => (builtins::run(shell, &program, args, &mut file).0, None),
+        Stdout::FileDescriptor(_fd) => unimplemented!(),
+        Stdout::CreatePipe => {
             let (read_end_pipe, mut write_end_pipe) = create_pipe()?;
             (
                 builtins::run(shell, &program, args, &mut write_end_pipe).0,
                 Some(read_end_pipe.into()),
             )
         }
-        Output::Inherit => (
+        Stdout::Inherit => (
             builtins::run(shell, &program, args, &mut io::stdout()).0,
             None,
         ),
@@ -505,8 +560,8 @@ fn run_external_command<S1, S2>(
     program: S1,
     args: &[S2],
     stdin: Stdin,
-    stdout: Output,
-    stderr: Output,
+    stdout: Stdout,
+    stderr: Stderr,
     pgid: Option<u32>,
 ) -> Result<(Box<dyn Process>, Option<u32>)>
 where
@@ -532,8 +587,19 @@ where
     // to configure stdin here, then stdin would be changed before our code
     // executes in before_exec, so if the child is not the first process in the
     // pipeline, its stdin would not be a tty and tcsetpgrp would tell us so.
-    command.stdout(stdout);
-    command.stderr(stderr);
+    let stdout_fd = if let Stdout::FileDescriptor(fd) = stdout {
+        Some(fd)
+    } else {
+        command.stdout(stdout);
+        None
+    };
+
+    let stderr_fd = if let Stderr::FileDescriptor(fd) = stderr {
+        Some(fd)
+    } else {
+        command.stderr(stderr);
+        None
+    };
 
     let job_control_is_enabled = shell.is_job_control_enabled();
     let shell_terminal = util::unix::get_terminal();
@@ -589,6 +655,20 @@ where
             unistd::close(stdin).expect("failed to close stdin");
         }
 
+        if let Some(fd) = stdout_fd {
+            if fd != libc::STDOUT_FILENO {
+                unistd::dup2(fd, libc::STDOUT_FILENO).expect("failed to dup stdout");
+                unistd::close(fd).expect("failed to close stdout");
+            }
+        }
+
+        if let Some(fd) = stderr_fd {
+            if fd != libc::STDERR_FILENO {
+                unistd::dup2(fd, libc::STDERR_FILENO).expect("failed to dup stderr");
+                unistd::close(fd).expect("failed to close stderr");
+            }
+        }
+
         Ok(())
     });
 
@@ -637,8 +717,8 @@ fn run_external_command<S1, S2>(
     program: S1,
     args: &[S2],
     stdin: Stdin,
-    stdout: Output,
-    stderr: Output,
+    stdout: Stdout,
+    stderr: Stderr,
     pgid: Option<u32>,
 ) -> Result<(Box<Process>, Option<u32>)>
 where

@@ -124,7 +124,7 @@ fn test_simple_redirects() {
 #[cfg(unix)] // TODO (#22): Support Windows
 fn test_stderr_redirect() {
     let temp_dir = generate_temp_directory().unwrap();
-    let command = r#"python3 -c 'import sys; print("test needle", file=sys.stderr)' 2>errfile"#;
+    let command = "2>errfile >&2 echo needle";
     BIN_UNDER_TEST
         .command()
         .args(&[OsStr::new("--log"), LOG_FILE_NAME.as_os_str()])
@@ -138,7 +138,7 @@ fn test_stderr_redirect() {
     let mut contents = String::new();
     file.read_to_string(&mut contents)
         .expect("failed to read errfile");
-    assert_eq!(contents, "test needle\n");
+    assert_eq!(contents, "needle\n");
 }
 
 #[test]
