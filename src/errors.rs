@@ -17,27 +17,32 @@ impl Error {
         self.ctx.get_context()
     }
 
-    pub(crate) fn syntax<T: AsRef<str>>(line: T) -> Error {
+    pub(crate) fn syntax<T: AsRef<str>>(line: T) -> Self {
         Error::from(ErrorKind::Syntax(line.as_ref().to_string()))
     }
 
-    pub(crate) fn builtin_command<T: AsRef<str>>(message: T, code: i32) -> Error {
+    pub(crate) fn builtin_command<T: AsRef<str>>(message: T, code: i32) -> Self {
         Error::from(ErrorKind::BuiltinCommand {
             message: message.as_ref().to_string(),
             code,
         })
     }
 
-    pub(crate) fn command_not_found<T: AsRef<str>>(command: T) -> Error {
+    pub(crate) fn command_not_found<T: AsRef<str>>(command: T) -> Self {
         Error::from(ErrorKind::CommandNotFound(command.as_ref().to_string()))
     }
 
-    pub(crate) fn no_such_job<T: AsRef<str>>(job: T) -> Error {
+    pub(crate) fn no_such_job<T: AsRef<str>>(job: T) -> Self {
         Error::from(ErrorKind::NoSuchJob(job.as_ref().to_string()))
     }
 
-    pub(crate) fn no_job_control() -> Error {
+    pub(crate) fn no_job_control() -> Self {
         Error::from(ErrorKind::NoJobControl)
+    }
+
+    #[cfg(windows)]
+    pub(crate) fn not_supported<T: AsRef<str>>(message: T) -> Self {
+        Error::from(ErrorKind::NotSupported(message.as_ref().to_string()))
     }
 }
 
@@ -65,6 +70,7 @@ pub enum ErrorKind {
     HistoryFileNotFound,
     NoSuchJob(String),
     NoJobControl,
+    NotSupported(String),
     Docopt,
     Io,
     Nix,
@@ -80,6 +86,7 @@ impl fmt::Display for ErrorKind {
             ErrorKind::HistoryFileNotFound => write!(f, "history file not found"),
             ErrorKind::NoSuchJob(ref job) => write!(f, "{}: no such job", job),
             ErrorKind::NoJobControl => write!(f, "no job control"),
+            ErrorKind::NotSupported(ref message) => write!(f, "{}", message),
             ErrorKind::Docopt => write!(f, "Docopt error occurred"),
             ErrorKind::Io => write!(f, "I/O error occurred"),
             ErrorKind::Nix => write!(f, " Nix error occurred"),
