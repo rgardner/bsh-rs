@@ -8,7 +8,6 @@ use std::os::unix::io::{AsRawFd, RawFd};
 use std::process::{Child, ChildStdout, Command, ExitStatus, Stdio};
 
 use failure::{Fail, ResultExt};
-use log::warn;
 
 use crate::{
     builtins,
@@ -599,6 +598,8 @@ where
         Ok(child) => child,
         Err(e) => {
             if job_control_is_enabled {
+                use log::warn;
+
                 warn!("failed to spawn child, resetting terminal's pgrp");
                 // see above comment for tcsetpgrp(2) failing being programmer
                 // error
