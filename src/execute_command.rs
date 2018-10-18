@@ -53,6 +53,17 @@ impl From<File> for Stdin {
     }
 }
 
+impl From<Stdin> for Stdio {
+    fn from(stdin: Stdin) -> Self {
+        match stdin {
+            Stdin::Inherit => Self::inherit(),
+            Stdin::File(file) => file.into(),
+            Stdin::FileDescriptor(_) => panic!("must occur after fork(2)"),
+            Stdin::Child(child) => child.into(),
+        }
+    }
+}
+
 #[cfg(unix)]
 impl AsRawFd for Stdin {
     fn as_raw_fd(&self) -> RawFd {
@@ -649,20 +660,25 @@ where
     S1: AsRef<str>,
     S2: AsRef<str>,
 {
+    if let Stdin::FileDescriptor(_) = stdin {
+        return Err(Error::not_supported(
+            "file descriptor redirects are not supported on Windows",
+        ));
+    } else if let Output::FileDescriptor(_) = stdout {
+        return Err(Error::not_supported(
+            "file descriptor redirects are not supported on Windows",
+        ));
+    } else if let Output::FileDescriptor(_) = stderr {
+        return Err(Error::not_supported(
+            "file descriptor redirects are not supported on Windows",
+        ));
+    }
+
     let mut command = Command::new(OsStr::new(program.as_ref()));
     command.args(args.iter().map(AsRef::as_ref).map(OsStr::new));
-
     command.stdin(stdin);
-    if let Output::FileDescriptor(_) = stdout {
-        Error::not_supported("file descriptor redirects are not supported on Windows")?;
-    } else {
-        command.stdout(stdout);
-    }
-    if let Output::FileDescriptor(_) = stderr {
-        Error::not_supported("file descriptor redirects are not supported on Windows")?;
-    } else {
-        command.stderr(stderr);
-    }
+    command.stdout(stdout);
+    command.stderr(stderr);
 
     let child = command.spawn().map_err(|e| {
         if e.kind() == io::ErrorKind::NotFound {
