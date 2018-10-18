@@ -8,7 +8,6 @@ use std::os::unix::io::{AsRawFd, RawFd};
 use std::process::{Child, ChildStdout, Command, ExitStatus, Stdio};
 
 use failure::{Fail, ResultExt};
-use log::warn;
 
 use crate::{
     builtins,
@@ -21,6 +20,7 @@ use crate::{
 pub enum Stdin {
     Inherit,
     File(File),
+    FileDescriptor(i32),
     Child(ChildStdout),
 }
 
@@ -28,73 +28,21 @@ pub enum Stdin {
 enum Output {
     Inherit,
     File(File),
+    FileDescriptor(i32),
     CreatePipe,
 }
 
 impl Stdin {
     /// simple commands prefer file redirects to piping, following bash's behavior
-    #[cfg(unix)]
     fn new(redirect: &ir::Stdio, pipe: Option<Stdin>) -> Result<Self> {
-        use std::os::unix::io::FromRawFd;
-
         match (redirect, pipe) {
             (ir::Stdio::FileDescriptor(0), _) => Ok(Stdin::Inherit),
-            (ir::Stdio::FileDescriptor(fd), _) => unsafe { Ok(File::from_raw_fd(*fd).into()) },
+            (ir::Stdio::FileDescriptor(fd), _) => Ok(Stdin::FileDescriptor(*fd)),
             (ir::Stdio::Filename(filename), _) => Ok(Stdin::File(
                 File::open(filename).with_context(|_| ErrorKind::Io)?,
             )),
             (_, Some(stdin)) => Ok(stdin),
             _ => Ok(Stdin::Inherit),
-        }
-    }
-
-    #[cfg(windows)]
-    fn new(redirect: &ir::Stdio, pipe: Option<Stdin>) -> Result<Self> {
-        match (redirect, pipe) {
-            (ir::Stdio::FileDescriptor(0), _) => Ok(Stdin::Inherit),
-            (ir::Stdio::FileDescriptor(_fd), _) => unimplemented!(),
-            (ir::Stdio::Filename(filename), _) => Ok(Stdin::File(
-                File::open(filename).with_context(|_| ErrorKind::Io)?,
-            )),
-            (_, Some(stdin)) => Ok(stdin),
-            _ => Ok(Stdin::Inherit),
-        }
-    }
-}
-
-impl Output {
-    /// simple commands prefer file redirects to piping, following bash's behavior
-    #[cfg(unix)]
-    fn new(redirect: &ir::Stdio, pipe: Option<Output>) -> Result<Self> {
-        use std::os::unix::io::FromRawFd;
-
-        match (redirect, pipe) {
-            (ir::Stdio::FileDescriptor(fd), _) => unsafe { Ok(File::from_raw_fd(*fd).into()) },
-            (ir::Stdio::Filename(filename), _) => Ok(Output::File(
-                OpenOptions::new()
-                    .write(true)
-                    .create(true)
-                    .open(filename)
-                    .context(ErrorKind::Io)?,
-            )),
-            (_, Some(output)) => Ok(output),
-            _ => Ok(Output::Inherit),
-        }
-    }
-
-    #[cfg(windows)]
-    fn new(redirect: &ir::Stdio, pipe: Option<Output>) -> Result<Self> {
-        match (redirect, pipe) {
-            (ir::Stdio::FileDescriptor(_fd), _) => unimplemented!(),
-            (ir::Stdio::Filename(filename), _) => Ok(Output::File(
-                OpenOptions::new()
-                    .write(true)
-                    .create(true)
-                    .open(filename)
-                    .context(ErrorKind::Io)?,
-            )),
-            (_, Some(output)) => Ok(output),
-            _ => Ok(Output::Inherit),
         }
     }
 }
@@ -102,6 +50,17 @@ impl Output {
 impl From<File> for Stdin {
     fn from(file: File) -> Self {
         Stdin::File(file)
+    }
+}
+
+impl From<Stdin> for Stdio {
+    fn from(stdin: Stdin) -> Self {
+        match stdin {
+            Stdin::Inherit => Self::inherit(),
+            Stdin::File(file) => file.into(),
+            Stdin::FileDescriptor(_) => panic!("must occur after fork(2)"),
+            Stdin::Child(child) => child.into(),
+        }
     }
 }
 
@@ -113,7 +72,44 @@ impl AsRawFd for Stdin {
         match self {
             Stdin::Inherit => libc::STDIN_FILENO,
             Stdin::File(f) => f.as_raw_fd(),
+            Stdin::FileDescriptor(fd) => *fd,
             Stdin::Child(child) => child.as_raw_fd(),
+        }
+    }
+}
+
+impl Output {
+    /// simple commands prefer file redirects to piping, following bash's behavior
+    fn new_stdout(redirect: &ir::Stdio, pipe: Option<Output>) -> Result<Self> {
+        match (redirect, pipe) {
+            (ir::Stdio::FileDescriptor(1), _) => Ok(Output::Inherit),
+            (ir::Stdio::FileDescriptor(fd), _) => Ok(Output::FileDescriptor(*fd)),
+            (ir::Stdio::Filename(filename), _) => Ok(Output::File(
+                OpenOptions::new()
+                    .write(true)
+                    .create(true)
+                    .open(filename)
+                    .context(ErrorKind::Io)?,
+            )),
+            (_, Some(output)) => Ok(output),
+            _ => Ok(Output::Inherit),
+        }
+    }
+
+    /// simple commands prefer file redirects to piping, following bash's behavior
+    fn new_stderr(redirect: &ir::Stdio, pipe: Option<Output>) -> Result<Self> {
+        match (redirect, pipe) {
+            (ir::Stdio::FileDescriptor(2), _) => Ok(Output::Inherit),
+            (ir::Stdio::FileDescriptor(fd), _) => Ok(Output::FileDescriptor(*fd)),
+            (ir::Stdio::Filename(filename), _) => Ok(Output::File(
+                OpenOptions::new()
+                    .write(true)
+                    .create(true)
+                    .open(filename)
+                    .context(ErrorKind::Io)?,
+            )),
+            (_, Some(output)) => Ok(output),
+            _ => Ok(Output::Inherit),
         }
     }
 }
@@ -124,21 +120,12 @@ impl From<File> for Output {
     }
 }
 
-impl From<Stdin> for Stdio {
-    fn from(stdin: Stdin) -> Self {
-        match stdin {
-            Stdin::Inherit => Self::inherit(),
-            Stdin::File(file) => file.into(),
-            Stdin::Child(child) => child.into(),
-        }
-    }
-}
-
 impl From<Output> for Stdio {
     fn from(stdout: Output) -> Self {
         match stdout {
             Output::Inherit => Self::inherit(),
             Output::File(file) => file.into(),
+            Output::FileDescriptor(_fd) => panic!("must occur after fork(2)"),
             Output::CreatePipe => Self::piped(),
         }
     }
@@ -355,8 +342,8 @@ fn _spawn_processes(
     match command {
         ir::Command::Simple(simple_command) => {
             let stdin = Stdin::new(&simple_command.stdin, stdin)?;
-            let stdout = Output::new(&simple_command.stdout, stdout)?;
-            let stderr = Output::new(&simple_command.stderr, None /*pipe*/)?;
+            let stdout = Output::new_stdout(&simple_command.stdout, stdout)?;
+            let stderr = Output::new_stderr(&simple_command.stderr, None /*pipe*/)?;
             let (result, pgid) = run_simple_command(
                 shell,
                 &simple_command.program,
@@ -480,6 +467,7 @@ where
     // errors, e.g. builtin::execute shouldn't return a Result
     let (status_code, output) = match stdout {
         Output::File(mut file) => (builtins::run(shell, &program, args, &mut file).0, None),
+        Output::FileDescriptor(_fd) => unimplemented!(),
         Output::CreatePipe => {
             let (read_end_pipe, mut write_end_pipe) = create_pipe()?;
             (
@@ -532,8 +520,19 @@ where
     // to configure stdin here, then stdin would be changed before our code
     // executes in before_exec, so if the child is not the first process in the
     // pipeline, its stdin would not be a tty and tcsetpgrp would tell us so.
-    command.stdout(stdout);
-    command.stderr(stderr);
+    let stdout_fd = if let Output::FileDescriptor(fd) = stdout {
+        Some(fd)
+    } else {
+        command.stdout(stdout);
+        None
+    };
+
+    let stderr_fd = if let Output::FileDescriptor(fd) = stderr {
+        Some(fd)
+    } else {
+        command.stderr(stderr);
+        None
+    };
 
     let job_control_is_enabled = shell.is_job_control_enabled();
     let shell_terminal = util::unix::get_terminal();
@@ -589,6 +588,20 @@ where
             unistd::close(stdin).expect("failed to close stdin");
         }
 
+        if let Some(fd) = stdout_fd {
+            if fd != libc::STDOUT_FILENO {
+                unistd::dup2(fd, libc::STDOUT_FILENO).expect("failed to dup stdout");
+                unistd::close(fd).expect("failed to close stdout");
+            }
+        }
+
+        if let Some(fd) = stderr_fd {
+            if fd != libc::STDERR_FILENO {
+                unistd::dup2(fd, libc::STDERR_FILENO).expect("failed to dup stderr");
+                unistd::close(fd).expect("failed to close stderr");
+            }
+        }
+
         Ok(())
     });
 
@@ -596,6 +609,8 @@ where
         Ok(child) => child,
         Err(e) => {
             if job_control_is_enabled {
+                use log::warn;
+
                 warn!("failed to spawn child, resetting terminal's pgrp");
                 // see above comment for tcsetpgrp(2) failing being programmer
                 // error
@@ -645,6 +660,20 @@ where
     S1: AsRef<str>,
     S2: AsRef<str>,
 {
+    if let Stdin::FileDescriptor(_) = stdin {
+        return Err(Error::not_supported(
+            "file descriptor redirects are not supported on Windows",
+        ));
+    } else if let Output::FileDescriptor(_) = stdout {
+        return Err(Error::not_supported(
+            "file descriptor redirects are not supported on Windows",
+        ));
+    } else if let Output::FileDescriptor(_) = stderr {
+        return Err(Error::not_supported(
+            "file descriptor redirects are not supported on Windows",
+        ));
+    }
+
     let mut command = Command::new(OsStr::new(program.as_ref()));
     command.args(args.iter().map(AsRef::as_ref).map(OsStr::new));
     command.stdin(stdin);

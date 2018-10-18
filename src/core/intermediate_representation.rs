@@ -171,10 +171,7 @@ fn is_stdout_redirect(redirect: &ast::Redirect) -> bool {
         return false;
     }
 
-    match redirect.redirectee {
-        ast::Redirectee::Filename(_) => true,
-        _ => false,
-    }
+    true
 }
 
 /// Gets the last stderr redirect in `redirects`
@@ -196,10 +193,7 @@ fn is_stderr_redirect(redirect: &ast::Redirect) -> bool {
         return false;
     }
 
-    match redirect.redirectee {
-        ast::Redirectee::Filename(_) => true,
-        _ => false,
-    }
+    true
 }
 
 #[cfg(test)]
@@ -265,6 +259,18 @@ mod tests {
             redirector: Some(ast::Redirectee::FileDescriptor(fd)),
             instruction: ast::RedirectInstruction::Output,
             redirectee: ast::Redirectee::Filename(filename.into()),
+        }
+    }
+
+    fn fd_to_fd_redirection(
+        input_fd: i32,
+        instruction: ast::RedirectInstruction,
+        output_fd: i32,
+    ) -> ast::Redirect {
+        ast::Redirect {
+            redirector: Some(ast::Redirectee::FileDescriptor(input_fd)),
+            instruction,
+            redirectee: ast::Redirectee::FileDescriptor(output_fd),
         }
     }
 
@@ -433,6 +439,35 @@ mod tests {
                 background: false,
             }
         );
+    }
+
+    #[test]
+    fn test_redirect_stderr_file() {
+        let input = "2>errfile >&2 echo needle".to_string();
+        assert_eq!(
+            Interpreter::parse(parser::Command {
+                input: input.clone(),
+                inner: ast::Command::Simple {
+                    words: vec!["echo".into(), "needle".into()],
+                    redirects: vec![
+                        fd_to_file_redirection(2, "errfile"),
+                        fd_to_fd_redirection(1, ast::RedirectInstruction::Output, 2),
+                    ],
+                    background: false,
+                },
+            }),
+            CommandGroup {
+                input,
+                command: Command::Simple(
+                    SimpleCommandBuilder::new("echo")
+                        .arg("needle")
+                        .stdout(Stdio::FileDescriptor(2))
+                        .stderr(Stdio::Filename("errfile".into()))
+                        .build()
+                ),
+                background: false
+            }
+        )
     }
 
     #[test]
