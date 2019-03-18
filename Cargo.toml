@@ -32,9 +32,9 @@ serde = "1.0.89"
 serde_derive = "1.0.89"
 
 [dev-dependencies]
-assert_cmd = "0.10.1"
+assert_cmd = "0.11.0"
 chrono = "0.4.6"
-escargot = "0.3.1"
-lazy_static = "1.1.0"
+escargot = "0.4.0"
+lazy_static = "1.3.0"
 predicates = "1.0.0"
-tempfile = "3.0.4"
+tempfile = "3.0.7"
