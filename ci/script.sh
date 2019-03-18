@@ -1,9 +1,20 @@
-#!/usr/bin/env bash
+#!/bin/bash
+#
+# Builds and run tests for bsh.
 
+# Exit immediately if a command fails
+# Print commands and their arguments
 set -ex
 
 cargo build --verbose
-cargo fmt --all -- --check # precondition: built grammar first
+
+# precondition: built grammar first via cargo build
+cargo fmt --all -- --check
+
 # best-effort run clippy
-[[ -n {CLIPPY_NIGHTLY_INSTALLED} ]] && cargo clippy --all-targets
+if [ -n {CLIPPY_NIGHTLY_INSTALLED} ]; then
+  cargo clippy --all-targets
+fi
+
 cargo test --verbose
+cargo test --release --verbose
