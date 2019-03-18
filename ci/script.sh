@@ -12,7 +12,7 @@ cargo build --verbose
 cargo fmt --all -- --check
 
 # best-effort run clippy
-if [ -n {CLIPPY_NIGHTLY_INSTALLED} ]; then
+if [ -n "$CLIPPY_NIGHTLY_INSTALLED" ]; then
   cargo clippy --all-targets
 fi
 
