@@ -28,7 +28,7 @@ shell program](https://github.com/rgardner/bsh).
 * contribute back to the Rust ecosystem
   - [rustyline: Add `const` way of accessing editor history](https://github.com/kkawakam/rustyline/commit/f536c969e73bb121a3968b71342db5dba4e885fa)
   - [rustyline: Fix multi-line prompts clearing too many lines](https://github.com/kkawakam/rustyline/commit/59c4b7b045870127405da4ef8345cd917740166f)
-  - [nix (in-progress): add wrapper for signal(3) function](https://github.com/nix-rust/nix/pull/817)
+  - [nix: add wrapper for signal(3) function](https://github.com/nix-rust/nix/commit/6bff42166472c929a3871e3f7f2a7bc4d9b77e6a)
 
 
 ## Usage
