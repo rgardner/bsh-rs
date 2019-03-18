@@ -77,7 +77,7 @@ pub fn is_builtin<T: AsRef<str>>(program: T) -> bool {
         JOBS_NAME,
         UNSET_NAME,
     ]
-        .contains(&program.as_ref())
+    .contains(&program.as_ref())
 }
 
 /// precondition: command is a builtin.
