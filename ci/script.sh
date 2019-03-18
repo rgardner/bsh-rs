@@ -17,4 +17,3 @@ if [ -n {CLIPPY_NIGHTLY_INSTALLED} ]; then
 fi
 
 cargo test --verbose
-cargo test --release --verbose

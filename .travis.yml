@@ -10,8 +10,8 @@ matrix:
   fast_finish: true
 before_script:
   # best-effort install clippy
-  - rustup component add clippy ||
-      cargo install --git https://github.com/rust-lang/rust-clippy/ --force clippy &&
-      export CLIPPY_NIGHTLY_INSTALLED=1 || true
+  - ((rustup component add clippy ||
+      cargo install --git https://github.com/rust-lang/rust-clippy/ --force clippy) &&
+      export CLIPPY_NIGHTLY_INSTALLED=1) || true
   - rustup component add rustfmt
 script: ci/script.sh
