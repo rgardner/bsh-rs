@@ -9,6 +9,7 @@ rust:
 matrix:
   fast_finish: true
 before_script:
-  - rustup component add clippy || cargo install --git https://github.com/rust-lang/rust-clippy/ --force clippy
+  # best-effort install clippy
+  - rustup component add clippy || cargo install --git https://github.com/rust-lang/rust-clippy/ --force clippy || true
   - rustup component add rustfmt
 script: ci/script.sh

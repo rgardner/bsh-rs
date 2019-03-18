@@ -4,5 +4,6 @@ set -ex
 
 cargo build --verbose
 cargo fmt --all -- --check # precondition: built grammar first
-cargo clippy --all-targets
+# best-effort run clippy
+command -V cargo-clippy && cargo clippy --all-targets
 cargo test --verbose
