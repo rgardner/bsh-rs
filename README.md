@@ -1,9 +1,9 @@
 # bsh-rs
+
 [![Build Status](https://travis-ci.com/rgardner/bsh-rs.svg?branch=master)](https://travis-ci.com/rgardner/bsh-rs)
 
 This is the [Rust](https://www.rust-lang.org/) version of my [bsh
 shell program](https://github.com/rgardner/bsh).
-
 
 ## Features
 
@@ -19,7 +19,6 @@ shell program](https://github.com/rgardner/bsh).
   - `bg`, `fg`, `jobs`
   - `declare`, `unset`
 
-
 ## Goals
 
 * learn idiomatic Rust
@@ -29,7 +28,6 @@ shell program](https://github.com/rgardner/bsh).
   - [rustyline: Add `const` way of accessing editor history](https://github.com/kkawakam/rustyline/commit/f536c969e73bb121a3968b71342db5dba4e885fa)
   - [rustyline: Fix multi-line prompts clearing too many lines](https://github.com/kkawakam/rustyline/commit/59c4b7b045870127405da4ef8345cd917740166f)
   - [nix: add wrapper for signal(3) function](https://github.com/nix-rust/nix/commit/6bff42166472c929a3871e3f7f2a7bc4d9b77e6a)
-
 
 ## Usage
 
@@ -68,43 +66,41 @@ unset: unset [name ...]
 ## Installation
 
 ```bash
-$ git clone https://github.com/rgardner/bsh-rs
-$ cd bsh-rs
-$ # run bsh via cargo
-$ cargo run
-$ # run bsh directly
-$ target/debug/bsh
-$ # display bsh help
-$ target/debug/bsh --help
+git clone https://github.com/rgardner/bsh-rs
+cd bsh-rs
+# run bsh via cargo
+cargo run
+# run bsh directly
+target/debug/bsh
+# display bsh help
+target/debug/bsh --help
 ```
-
 
 ## Development
 
 ```bash
-$ # setup dev environment (e.g. git hooks)
-$ ./scripts/dev_setup.sh
-$ # Check program for errors, quicker than full build
-$ cargo check
-$ # build
-$ cargo build
-$ # run lints
-$ cargo clippy
-$ # run tests
-$ cargo test
-$ # generate documentation
-$ cargo doc --document-private-items
+# setup dev environment (e.g. git hooks)
+./scripts/dev_setup.sh
+# Check program for errors, quicker than full build
+cargo check
+# build
+cargo build
+run lints
+cargo clippy
+# run tests
+cargo test
+# generate documentation
+cargo doc --document-private-items
 ```
-
 
 ## License
 
 Licensed under either of
 
- * Apache License, Version 2.0
-   ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
- * MIT license
-   ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
+* Apache License, Version 2.0
+  ([LICENSE-APACHE](LICENSE-APACHE) or <http://www.apache.org/licenses/LICENSE-2.0>)
+* MIT license
+  ([LICENSE-MIT](LICENSE-MIT) or <http://opensource.org/licenses/MIT>)
 
 at your option.
 
