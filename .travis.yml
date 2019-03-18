@@ -9,6 +9,7 @@ rust:
 matrix:
   fast_finish: true
 before_script:
+  - rustup self update
   - rustup component add clippy
   - rustup component add rustfmt
 script: ci/script.sh
