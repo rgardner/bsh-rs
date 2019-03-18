@@ -100,14 +100,12 @@ mod tests {
 
         let key = generate_unique_env_key!();
         let value = "bar";
-        assert!(
-            Declare::run(
-                &mut *shell,
-                &["=baz", &format!("{}={}", key, value), "=baz"],
-                &mut io::sink(),
-            )
-            .is_err()
-        );
+        assert!(Declare::run(
+            &mut *shell,
+            &["=baz", &format!("{}={}", key, value), "=baz"],
+            &mut io::sink(),
+        )
+        .is_err());
         assert_eq!(env::var(key).unwrap(), value);
     }
 
@@ -120,25 +118,21 @@ mod tests {
         assert_eq!(&env::var(&key).unwrap(), "");
 
         let value1 = "bar";
-        assert!(
-            Declare::run(
-                &mut *shell,
-                &[&format!("{}={}", key, value1)],
-                &mut io::sink(),
-            )
-            .is_ok()
-        );
+        assert!(Declare::run(
+            &mut *shell,
+            &[&format!("{}={}", key, value1)],
+            &mut io::sink(),
+        )
+        .is_ok());
         assert_eq!(env::var(&key).unwrap(), value1);
 
         let value2 = "baz";
-        assert!(
-            Declare::run(
-                &mut *shell,
-                &[format!("{}={}", key, value2)],
-                &mut io::sink(),
-            )
-            .is_ok()
-        );
+        assert!(Declare::run(
+            &mut *shell,
+            &[format!("{}={}", key, value2)],
+            &mut io::sink(),
+        )
+        .is_ok());
         assert_eq!(env::var(&key).unwrap(), value2);
     }
 
@@ -149,14 +143,12 @@ mod tests {
         let key1 = generate_unique_env_key!();
         let key2 = generate_unique_env_key!();
         let value = "baz";
-        assert!(
-            Declare::run(
-                &mut *shell,
-                &[format!("{}={}", key1, value), format!("{}={}", key2, value)],
-                &mut io::sink(),
-            )
-            .is_ok()
-        );
+        assert!(Declare::run(
+            &mut *shell,
+            &[format!("{}={}", key1, value), format!("{}={}", key2, value)],
+            &mut io::sink(),
+        )
+        .is_ok());
         assert_eq!(env::var(&key1).unwrap(), value);
         assert_eq!(env::var(&key2).unwrap(), value);
     }

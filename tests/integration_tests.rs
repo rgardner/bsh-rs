@@ -20,8 +20,8 @@ lazy_static! {
             "log",
             &format!("test-{}.log", log_name),
         ]
-            .iter()
-            .collect()
+        .iter()
+        .collect()
     };
     static ref BIN_UNDER_TEST: escargot::CargoRun = escargot::CargoBuild::new()
         .bin("bsh")
