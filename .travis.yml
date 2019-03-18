@@ -9,6 +9,6 @@ rust:
 matrix:
   fast_finish: true
 before_script:
-  - rustup component add clippy-preview
-  - rustup component add rustfmt-preview
+  - rustup component add clippy
+  - rustup component add rustfmt
 script: ci/script.sh
