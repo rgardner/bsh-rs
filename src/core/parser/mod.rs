@@ -1,5 +1,6 @@
 //! BSH Parser
 
+use lalrpop_util::lalrpop_mod;
 use log::debug;
 
 use self::grammar::CommandParser;
@@ -9,7 +10,7 @@ pub mod ast;
 #[allow(dead_code, unused_qualifications)]
 #[allow(clippy::all)]
 #[cfg_attr(rustfmt, rustfmt_skip)]
-mod grammar;
+lalrpop_mod!(grammar, "/core/parser/grammar.rs");
 
 #[derive(Debug)]
 pub struct Command {
