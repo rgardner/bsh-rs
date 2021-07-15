@@ -7,7 +7,6 @@ use std::iter;
 
 use docopt::Docopt;
 use failure::Fail;
-use serde;
 
 use self::prelude::*;
 
@@ -58,7 +57,7 @@ pub trait BuiltinCommand {
     const HELP: &'static str;
     /// The usage string to display to the user.
     fn usage() -> String {
-        Self::HELP.lines().nth(0).unwrap().to_owned()
+        Self::HELP.lines().next().unwrap().to_owned()
     }
     /// Runs the command with the given arguments in the `shell` environment.
     fn run<T: AsRef<str>>(shell: &mut dyn Shell, args: &[T], stdout: &mut dyn Write) -> Result<()>;

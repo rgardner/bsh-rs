@@ -563,12 +563,7 @@ impl JobImpl {
         // Initialize last_status_code if possible; this prevents a completed
         // job from having a None last_status_code if all processes have
         // already completed (e.g. 'false && echo foo')
-        let last_status_code = processes
-            .iter()
-            .rev()
-            .filter(|p| p.status_code().is_some())
-            .nth(0)
-            .map(|p| p.status_code().unwrap());
+        let last_status_code = processes.iter().rev().find_map(|p| p.status_code());
 
         Self {
             id,

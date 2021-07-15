@@ -7,10 +7,8 @@ use self::grammar::CommandParser;
 use crate::errors::{Error, Result};
 
 pub mod ast;
-#[allow(dead_code, unused_qualifications)]
-#[allow(clippy::all)]
-#[cfg_attr(rustfmt, rustfmt_skip)]
-lalrpop_mod!(grammar, "/core/parser/grammar.rs");
+#[rustfmt::skip]
+lalrpop_mod!(#[allow(clippy::all, unused_qualifications)] grammar, "/core/parser/grammar.rs");
 
 #[derive(Debug)]
 pub struct Command {

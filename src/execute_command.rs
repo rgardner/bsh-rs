@@ -67,8 +67,6 @@ impl From<Stdin> for Stdio {
 #[cfg(unix)]
 impl AsRawFd for Stdin {
     fn as_raw_fd(&self) -> RawFd {
-        use libc;
-
         match self {
             Stdin::Inherit => libc::STDIN_FILENO,
             Stdin::File(f) => f.as_raw_fd(),
@@ -503,7 +501,6 @@ where
 {
     use std::os::unix::process::CommandExt;
 
-    use libc;
     use nix::{
         sys::signal::{self, SigHandler, Signal},
         unistd::{self, Pid},
@@ -536,74 +533,73 @@ where
 
     let job_control_is_enabled = shell.is_job_control_enabled();
     let shell_terminal = util::unix::get_terminal();
-    command.before_exec(move || {
-        if job_control_is_enabled {
-            // Put process into process group
-            let pid = unistd::getpid();
-            let pgid = pgid.map(|pgid| Pid::from_raw(pgid as i32)).unwrap_or(pid);
+    unsafe {
+        command.pre_exec(move || {
+            if job_control_is_enabled {
+                // Put process into process group
+                let pid = unistd::getpid();
+                let pgid = pgid.map(|pgid| Pid::from_raw(pgid as i32)).unwrap_or(pid);
 
-            // setpgid(2) failing represents programmer error, e.g.
-            // 1) invalid pid or pgid
-            unistd::setpgid(pid, pgid).expect("setpgid failed");
+                // setpgid(2) failing represents programmer error, e.g.
+                // 1) invalid pid or pgid
+                unistd::setpgid(pid, pgid).expect("setpgid failed");
 
-            // Set the terminal control device in both parent process (see job
-            // manager) and child process to avoid race conditions
-            // tcsetpgrp(3) failing represents programmer error, e.g.
-            // 1) invalid fd or pgid
-            // 2) not a tty
-            //   - Are you configuring stdin using Command::stdin? If so, then
-            //     stdin will not be a TTY if this process isn't first in the
-            //     pipeline, as Command::stdin configures stdin *before*
-            //     before_exec runs.
-            // 3) incorrect permissions
-            unistd::tcsetpgrp(shell_terminal, pgid).expect("tcsetpgrp failed");
+                // Set the terminal control device in both parent process (see job
+                // manager) and child process to avoid race conditions
+                // tcsetpgrp(3) failing represents programmer error, e.g.
+                // 1) invalid fd or pgid
+                // 2) not a tty
+                //   - Are you configuring stdin using Command::stdin? If so, then
+                //     stdin will not be a TTY if this process isn't first in the
+                //     pipeline, as Command::stdin configures stdin *before*
+                //     before_exec runs.
+                // 3) incorrect permissions
+                unistd::tcsetpgrp(shell_terminal, pgid).expect("tcsetpgrp failed");
 
-            // Reset job control signal handling back to default
-            unsafe {
+                // Reset job control signal handling back to default
                 // signal(3) failing represents programmer error, e.g.
                 // 1) signal argument is not a valid signal number
                 // 2) an attempt is made to supply a signal handler for a
                 //    signal that cannot have a custom signal handler
-                signal::signal(Signal::SIGINT, SigHandler::SigDfl)
-                    .expect("failed to set SIGINT signal handler");
-                signal::signal(Signal::SIGQUIT, SigHandler::SigDfl)
-                    .expect("failed to set SIGQUIT signal handler");
-                signal::signal(Signal::SIGTSTP, SigHandler::SigDfl)
-                    .expect("failed to set SIGTSTP signal handler");
-                signal::signal(Signal::SIGTTIN, SigHandler::SigDfl)
-                    .expect("failed to set SIGTTIN signal handler");
-                signal::signal(Signal::SIGTTOU, SigHandler::SigDfl)
-                    .expect("failed to set SIGTTOU signal handler");
-                signal::signal(Signal::SIGCHLD, SigHandler::SigDfl)
-                    .expect("failed to set SIGCHLD signal handler");
+                for signal in [
+                    Signal::SIGINT,
+                    Signal::SIGQUIT,
+                    Signal::SIGTSTP,
+                    Signal::SIGTTIN,
+                    Signal::SIGTTOU,
+                    Signal::SIGCHLD,
+                ] {
+                    signal::signal(signal, SigHandler::SigDfl)
+                        .expect("failed to reset signal handler");
+                }
             }
-        }
 
-        // See comment at the top of this function on why we are configuring
-        // this manually (hint: it's because tcsetpgrp needs the original stdin
-        // and Command::stdin will change stdin *before* before_exec runs).
-        let stdin = stdin.as_raw_fd();
-        if stdin != libc::STDIN_FILENO {
-            unistd::dup2(stdin, libc::STDIN_FILENO).expect("failed to dup stdin");
-            unistd::close(stdin).expect("failed to close stdin");
-        }
-
-        if let Some(fd) = stdout_fd {
-            if fd != libc::STDOUT_FILENO {
-                unistd::dup2(fd, libc::STDOUT_FILENO).expect("failed to dup stdout");
-                unistd::close(fd).expect("failed to close stdout");
+            // See comment at the top of this function on why we are configuring
+            // this manually (hint: it's because tcsetpgrp needs the original stdin
+            // and Command::stdin will change stdin *before* before_exec runs).
+            let stdin = stdin.as_raw_fd();
+            if stdin != libc::STDIN_FILENO {
+                unistd::dup2(stdin, libc::STDIN_FILENO).expect("failed to dup stdin");
+                unistd::close(stdin).expect("failed to close stdin");
             }
-        }
 
-        if let Some(fd) = stderr_fd {
-            if fd != libc::STDERR_FILENO {
-                unistd::dup2(fd, libc::STDERR_FILENO).expect("failed to dup stderr");
-                unistd::close(fd).expect("failed to close stderr");
+            if let Some(fd) = stdout_fd {
+                if fd != libc::STDOUT_FILENO {
+                    unistd::dup2(fd, libc::STDOUT_FILENO).expect("failed to dup stdout");
+                    unistd::close(fd).expect("failed to close stdout");
+                }
             }
-        }
 
-        Ok(())
-    });
+            if let Some(fd) = stderr_fd {
+                if fd != libc::STDERR_FILENO {
+                    unistd::dup2(fd, libc::STDERR_FILENO).expect("failed to dup stderr");
+                    unistd::close(fd).expect("failed to close stderr");
+                }
+            }
+
+            Ok(())
+        });
+    }
 
     let child = match command.spawn() {
         Ok(child) => child,

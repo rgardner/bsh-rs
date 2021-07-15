@@ -44,10 +44,7 @@ history: history [-c] [-s size] [n]
 }
 
 pub fn history_display(state: &Editor, n_last_entries: usize) -> String {
-    let num_to_skip = state
-        .get_history_count()
-        .checked_sub(n_last_entries)
-        .unwrap_or(0);
+    let num_to_skip = state.get_history_count().saturating_sub(n_last_entries);
     state
         .enumerate_history_entries()
         .skip(num_to_skip)

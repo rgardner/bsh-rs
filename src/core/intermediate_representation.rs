@@ -133,11 +133,7 @@ impl Interpreter {
 
 /// Gets the last stdin redirect in `redirects`
 fn get_stdin_redirect(redirects: &[ast::Redirect]) -> Option<&ast::Redirect> {
-    redirects
-        .iter()
-        .rev()
-        .filter(|r| is_stdin_redirect(r))
-        .nth(0)
+    redirects.iter().rev().find(|r| is_stdin_redirect(r))
 }
 
 fn is_stdin_redirect(redirect: &ast::Redirect) -> bool {
@@ -146,19 +142,12 @@ fn is_stdin_redirect(redirect: &ast::Redirect) -> bool {
         return false;
     }
 
-    match redirect.redirectee {
-        ast::Redirectee::Filename(_) => true,
-        _ => false,
-    }
+    matches!(redirect.redirectee, ast::Redirectee::Filename(_))
 }
 
 /// Gets the last stdout redirect in `redirects`
 fn get_stdout_redirect(redirects: &[ast::Redirect]) -> Option<&ast::Redirect> {
-    redirects
-        .iter()
-        .rev()
-        .filter(|r| is_stdout_redirect(r))
-        .nth(0)
+    redirects.iter().rev().find(|r| is_stdout_redirect(r))
 }
 
 fn is_stdout_redirect(redirect: &ast::Redirect) -> bool {
@@ -176,11 +165,7 @@ fn is_stdout_redirect(redirect: &ast::Redirect) -> bool {
 
 /// Gets the last stderr redirect in `redirects`
 fn get_stderr_redirect(redirects: &[ast::Redirect]) -> Option<&ast::Redirect> {
-    redirects
-        .iter()
-        .rev()
-        .filter(|r| is_stderr_redirect(r))
-        .nth(0)
+    redirects.iter().rev().find(|r| is_stderr_redirect(r))
 }
 
 fn is_stderr_redirect(redirect: &ast::Redirect) -> bool {
