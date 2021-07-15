@@ -9,7 +9,7 @@ use rustyline::{
     completion::{Completer, FilenameCompleter, Pair},
     error::ReadlineError,
     highlight::Highlighter,
-    hint::{Hint, Hinter},
+    hint::Hinter,
     history,
     validate::Validator,
     CompletionType, Config, Helper,
@@ -32,23 +32,13 @@ impl Completer for EditorHelper {
     }
 }
 
-struct EditorHint;
-
-impl Hint for EditorHint {
-    fn display(&self) -> &str {
-        todo!()
-    }
-
-    fn completion(&self) -> Option<&str> {
-        todo!()
-    }
-}
-
 impl Hinter for EditorHelper {
-    type Hint = EditorHint;
+    type Hint = String;
 
     fn hint(&self, _line: &str, _pos: usize, _ctx: &rustyline::Context<'_>) -> Option<Self::Hint> {
-        // not implemented
+        // decision: not a good experience to implement history-based hinting by
+        // default for every prompt. Might be worth implementing for some future
+        // workflows (e.g.  configuration) or opt-in.
         None
     }
 }
