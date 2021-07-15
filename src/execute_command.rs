@@ -67,8 +67,6 @@ impl From<Stdin> for Stdio {
 #[cfg(unix)]
 impl AsRawFd for Stdin {
     fn as_raw_fd(&self) -> RawFd {
-        use libc;
-
         match self {
             Stdin::Inherit => libc::STDIN_FILENO,
             Stdin::File(f) => f.as_raw_fd(),
@@ -503,7 +501,6 @@ where
 {
     use std::os::unix::process::CommandExt;
 
-    use libc;
     use nix::{
         sys::signal::{self, SigHandler, Signal},
         unistd::{self, Pid},
