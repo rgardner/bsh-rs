@@ -37,7 +37,7 @@ fn test_simple_echo() {
         .args(&["-c", "echo foo"])
         .unwrap()
         .assert()
-        .stdout(predicates::str::similar("foo\n").from_utf8());
+        .stdout(predicates::str::diff("foo\n").from_utf8());
 }
 
 #[test]
@@ -49,7 +49,7 @@ fn test_logical_or_pipeline() {
         .args(&["-c", "echo 1 || echo 2"])
         .unwrap()
         .assert()
-        .stdout(predicates::str::similar("1\n").from_utf8());
+        .stdout(predicates::str::diff("1\n").from_utf8());
 }
 
 #[test]
@@ -61,7 +61,7 @@ fn test_logical_and_pipeline() {
         .args(&["-c", "echo 1 && echo 2"])
         .unwrap()
         .assert()
-        .stdout(predicates::str::similar("1\n2\n").from_utf8());
+        .stdout(predicates::str::diff("1\n2\n").from_utf8());
 }
 
 #[test]
@@ -101,7 +101,7 @@ fn test_simple_pipeline() {
         .args(&["-c", "echo needle | grep needle"])
         .unwrap()
         .assert()
-        .stdout(predicates::str::similar("needle\n").from_utf8());
+        .stdout(predicates::str::diff("needle\n").from_utf8());
 }
 
 #[test]
@@ -117,7 +117,7 @@ fn test_simple_redirects() {
         .args(&["-c", command])
         .unwrap()
         .assert()
-        .stdout(predicates::str::similar(expected_stdout).from_utf8());
+        .stdout(predicates::str::diff(expected_stdout).from_utf8());
 }
 
 #[test]
@@ -155,7 +155,7 @@ fn test_command_not_found() {
     output
         .clone()
         .assert()
-        .stderr(predicates::str::similar(expected_stderr).from_utf8())
+        .stderr(predicates::str::diff(expected_stderr).from_utf8())
         .code(predicate::eq(127));
 }
 
@@ -174,7 +174,7 @@ fn test_syntax_error() {
     output
         .clone()
         .assert()
-        .stderr(predicates::str::similar(expected_stderr).from_utf8())
+        .stderr(predicates::str::diff(expected_stderr).from_utf8())
         .code(predicate::eq(2));
 }
 
