@@ -1,17 +1,17 @@
 # bsh-rs
 
-[![Build Status](https://travis-ci.com/rgardner/bsh-rs.svg?branch=master)](https://travis-ci.com/rgardner/bsh-rs)
+![Build Status](https://github.com/rgardner/bsh-rs/workflows/BSH%20CI/badge.svg)
 
 This is the [Rust](https://www.rust-lang.org/) version of my [bsh
 shell program](https://github.com/rgardner/bsh).
 
 ## Features
 
-* runs builtin and external commands
-* expands history and environment variables
-* supports `|`, `;`, `||`, `&&`
-* supports job control
-* has the following builtins:
+- runs builtin and external commands
+- expands history and environment variables
+- supports `|`, `;`, `||`, `&&`
+- supports job control
+- has the following builtins:
   - `cd`
   - `history`
   - `kill`
@@ -21,10 +21,10 @@ shell program](https://github.com/rgardner/bsh).
 
 ## Goals
 
-* learn idiomatic Rust
-* make the C version of `bsh` more memory safe by using Rust's memory safety
+- learn idiomatic Rust
+- make the C version of `bsh` more memory safe by using Rust's memory safety
   principles
-* contribute back to the Rust ecosystem
+- contribute back to the Rust ecosystem
   - [rustyline: Add `const` way of accessing editor history](https://github.com/kkawakam/rustyline/commit/f536c969e73bb121a3968b71342db5dba4e885fa)
   - [rustyline: Fix multi-line prompts clearing too many lines](https://github.com/kkawakam/rustyline/commit/59c4b7b045870127405da4ef8345cd917740166f)
   - [nix: add wrapper for signal(3) function](https://github.com/nix-rust/nix/commit/6bff42166472c929a3871e3f7f2a7bc4d9b77e6a)
@@ -97,9 +97,9 @@ cargo doc --document-private-items
 
 Licensed under either of
 
-* Apache License, Version 2.0
+- Apache License, Version 2.0
   ([LICENSE-APACHE](LICENSE-APACHE) or <http://www.apache.org/licenses/LICENSE-2.0>)
-* MIT license
+- MIT license
   ([LICENSE-MIT](LICENSE-MIT) or <http://opensource.org/licenses/MIT>)
 
 at your option.
