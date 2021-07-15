@@ -1,6 +1,6 @@
 # bsh-rs
 
-![Build Status](https://github.com/rgardner/bsh-rs/workflows/BSH%20CI/badge.svg)
+[![BSH CI](https://github.com/rgardner/bsh-rs/actions/workflows/bsh_ci.yml/badge.svg)](https://github.com/rgardner/bsh-rs/actions/workflows/bsh_ci.yml)
 
 This is the [Rust](https://www.rust-lang.org/) version of my [bsh
 shell program](https://github.com/rgardner/bsh).
