@@ -4,13 +4,15 @@ use std::path::Path;
 use std::str;
 
 use failure::{Fail, ResultExt};
-use rustyline::error::ReadlineError;
 use rustyline::{
     self,
     completion::{Completer, FilenameCompleter, Pair},
+    error::ReadlineError,
     highlight::Highlighter,
-    hint::Hinter,
-    history, CompletionType, Config, Helper,
+    hint::{Hint, Hinter},
+    history,
+    validate::Validator,
+    CompletionType, Config, Helper,
 };
 
 use crate::errors::{Error, ErrorKind, Result};
@@ -24,14 +26,29 @@ impl Completer for EditorHelper {
         &self,
         line: &str,
         pos: usize,
+        ctx: &rustyline::Context<'_>,
     ) -> ::std::result::Result<(usize, Vec<Pair>), ReadlineError> {
-        self.0.complete(line, pos)
+        self.0.complete(line, pos, ctx)
+    }
+}
+
+struct EditorHint;
+
+impl Hint for EditorHint {
+    fn display(&self) -> &str {
+        todo!()
+    }
+
+    fn completion(&self) -> Option<&str> {
+        todo!()
     }
 }
 
 impl Hinter for EditorHelper {
-    fn hint(&self, _line: &str, _pos: usize) -> Option<String> {
-        // default implementation for now: no hint is available
+    type Hint = EditorHint;
+
+    fn hint(&self, _line: &str, _pos: usize, _ctx: &rustyline::Context<'_>) -> Option<Self::Hint> {
+        // not implemented
         None
     }
 }
@@ -39,6 +56,8 @@ impl Hinter for EditorHelper {
 impl Highlighter for EditorHelper {}
 
 impl Helper for EditorHelper {}
+
+impl Validator for EditorHelper {}
 
 pub struct Editor {
     internal: rustyline::Editor<EditorHelper>,
@@ -93,7 +112,7 @@ impl Editor {
         }
     }
 
-    pub fn save_history<P: AsRef<Path> + ?Sized>(&self, path: &P) -> Result<()> {
+    pub fn save_history<P: AsRef<Path> + ?Sized>(&mut self, path: &P) -> Result<()> {
         self.internal
             .save_history(path)
             .context(ErrorKind::Readline)?;

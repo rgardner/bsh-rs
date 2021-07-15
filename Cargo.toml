@@ -27,7 +27,7 @@ libc = "0.2.50"
 log = "0.4.6"
 nix = "0.13.0"
 regex = "1.1.2"
-rustyline = "3.0.0"
+rustyline = "8.0.0"
 serde = "1.0.89"
 serde_derive = "1.0.89"
 
