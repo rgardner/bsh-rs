@@ -111,7 +111,7 @@ fn display_error_and_exit(error: &Error) -> ! {
     process::exit(ExitStatus::from_failure().code().unwrap());
 }
 
-fn exit(result: Result<()>, shell: &mut Shell) -> ! {
+fn exit(result: Result<()>, shell: &mut dyn Shell) -> ! {
     if let Err(e) = result {
         eprintln!("bsh: {}", e);
         shell.exit(Some(ExitStatus::from_failure()));
