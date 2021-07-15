@@ -128,10 +128,7 @@ impl Editor {
     /// Get the history entry at an absolute position
     pub fn get_history_entry(&self, abs_pos: usize) -> Option<&String> {
         // map abs_pos to [0, self.history_capacity]
-        let begin = self
-            .history_count
-            .checked_sub(self.history_capacity)
-            .unwrap_or(0);
+        let begin = self.history_count.saturating_sub(self.history_capacity);
         if (abs_pos < begin) || (abs_pos > self.history_count) {
             return None;
         }
@@ -198,10 +195,7 @@ impl Editor {
     }
 
     pub fn enumerate_history_entries(&self) -> EditorEnumerate<'_> {
-        let start = self
-            .history_count
-            .checked_sub(self.history_capacity)
-            .unwrap_or(0);
+        let start = self.history_count.saturating_sub(self.history_capacity);
         EditorEnumerate {
             editor: self,
             pos: start,

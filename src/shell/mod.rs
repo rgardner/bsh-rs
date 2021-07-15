@@ -7,7 +7,6 @@ use std::{
 
 use atty::{self, Stream};
 use cfg_if::cfg_if;
-use dirs;
 use failure::ResultExt;
 use log::{error, info, warn};
 
