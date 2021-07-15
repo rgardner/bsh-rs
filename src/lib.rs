@@ -7,8 +7,7 @@
     trivial_casts,
     trivial_numeric_casts,
     unsafe_code,
-    unused_import_braces,
-    unused_qualifications
+    unused_import_braces
 )]
 
 pub use crate::errors::{Error, ErrorKind, Result};

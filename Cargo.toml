@@ -13,7 +13,7 @@ name = "bsh"
 path = "src/bin/bsh.rs"
 
 [build-dependencies]
-lalrpop = "0.16.3"
+lalrpop = "0.19.6"
 
 [dependencies]
 atty = "0.2.11"
@@ -22,7 +22,7 @@ dirs = "1.0.5"
 docopt = "1.0.2"
 failure = "0.1.5"
 fern = "0.5.7"
-lalrpop-util = "0.16.3"
+lalrpop-util = "0.19.6"
 libc = "0.2.50"
 log = "0.4.6"
 nix = "0.13.0"
