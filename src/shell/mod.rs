@@ -215,7 +215,7 @@ impl SimpleShell {
     }
 
     fn execute_command(&mut self, command_group: &mut ir::CommandGroup) -> Result<()> {
-        let mut process_group = match spawn_processes(self, &command_group) {
+        let mut process_group = match spawn_processes(self, command_group) {
             Ok(process_group) => Ok(process_group),
             Err(e) => {
                 if let ErrorKind::CommandNotFound(ref command) = *e.kind() {

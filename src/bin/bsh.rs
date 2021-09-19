@@ -90,7 +90,7 @@ fn execute_from_command_string_or_file(args: &Args) -> ! {
     let result = if let Some(ref command) = args.arg_command {
         shell.execute_command_string(command)
     } else if let Some(ref file_path) = args.arg_file {
-        shell.execute_commands_from_file(&Path::new(file_path))
+        shell.execute_commands_from_file(Path::new(file_path))
     } else {
         unreachable!();
     };

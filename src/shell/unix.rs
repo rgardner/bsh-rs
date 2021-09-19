@@ -115,7 +115,7 @@ impl JobControlShell {
 
     /// Runs a job.
     fn execute_command(&mut self, command_group: &mut ir::CommandGroup) -> Result<()> {
-        let process_group = match spawn_processes(self, &command_group) {
+        let process_group = match spawn_processes(self, command_group) {
             Ok(process_group) => Ok(process_group),
             Err(e) => {
                 if let ErrorKind::CommandNotFound(ref command) = *e.kind() {
