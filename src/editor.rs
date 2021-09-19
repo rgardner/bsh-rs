@@ -164,8 +164,12 @@ impl Editor {
             Err(_) => self
                 .internal
                 .history()
-                .search(&arg, self.history_count - 1, history::Direction::Reverse)
-                .and_then(|idx| self.internal.history().get(idx)),
+                .search(
+                    &arg,
+                    self.history_count - 1,
+                    history::SearchDirection::Reverse,
+                )
+                .and_then(|idx| self.internal.history().get(idx.idx)),
         };
 
         match entry {
