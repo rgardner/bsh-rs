@@ -375,9 +375,9 @@ where
     S2: AsRef<str>,
 {
     if builtins::is_builtin(&program) {
-        run_builtin_command(shell, program, &args, stdout, pgid)
+        run_builtin_command(shell, program, args, stdout, pgid)
     } else {
-        run_external_command(shell, program, &args, stdin, stdout, stderr, pgid)
+        run_external_command(shell, program, args, stdin, stdout, stderr, pgid)
     }
 }
 
@@ -480,7 +480,7 @@ where
     };
 
     Ok((
-        Box::new(BuiltinProcess::new(&program, &args, status_code, output)),
+        Box::new(BuiltinProcess::new(&program, args, status_code, output)),
         pgid,
     ))
 }

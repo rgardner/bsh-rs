@@ -29,7 +29,7 @@ kill: kill pid | %jobspec
         if arg.as_ref().starts_with('%') {
             match arg.as_ref()[1..].parse::<u32>() {
                 Ok(n) => match shell.kill_background_job(n) {
-                    Ok(Some(ref job)) => {
+                    Ok(Some(job)) => {
                         writeln!(stdout, "[{}]+\tTerminated: 15\t{}", n, job.input())
                             .context(ErrorKind::Io)?;
                         Ok(())

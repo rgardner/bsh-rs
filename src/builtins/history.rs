@@ -31,7 +31,7 @@ history: history [-c] [-s size] [n]
                 }
             }
             s => match s.parse::<usize>() {
-                Ok(n) => writeln!(stdout, "{}", history_display(&shell.editor(), n))
+                Ok(n) => writeln!(stdout, "{}", history_display(shell.editor(), n))
                     .context(ErrorKind::Io)?,
                 Err(_) => {
                     let msg = format!("history: {}: nonnegative numeric argument required", s);
