@@ -79,8 +79,6 @@ pub enum ErrorKind {
     },
     /// Command not found error.
     CommandNotFound(String),
-    /// Missing history file error.
-    HistoryFileNotFound,
     /// No such job error.
     NoSuchJob(String),
     /// Job control not available error.
@@ -103,7 +101,6 @@ impl fmt::Display for ErrorKind {
             ErrorKind::Syntax(ref line) => write!(f, "syntax error: '{}'", line),
             ErrorKind::BuiltinCommand { ref message, .. } => write!(f, "{}", message),
             ErrorKind::CommandNotFound(ref line) => write!(f, "{}: command not found", line),
-            ErrorKind::HistoryFileNotFound => write!(f, "history file not found"),
             ErrorKind::NoSuchJob(ref job) => write!(f, "{}: no such job", job),
             ErrorKind::NoJobControl => write!(f, "no job control"),
             ErrorKind::NotSupported(ref message) => write!(f, "{}", message),

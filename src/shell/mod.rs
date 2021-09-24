@@ -189,13 +189,7 @@ impl SimpleShell {
     fn load_history(&mut self) -> Result<()> {
         self.history_file = dirs::home_dir().map(|p| p.join(HISTORY_FILE_NAME));
         if let Some(ref history_file) = self.history_file {
-            self.editor.load_history(&history_file).or_else(|e| {
-                if let ErrorKind::HistoryFileNotFound = *e.kind() {
-                    return Ok(());
-                }
-
-                Err(e)
-            })?;
+            self.editor.load_history(&history_file)?;
         } else {
             warn!("unable to get home directory")
         }
