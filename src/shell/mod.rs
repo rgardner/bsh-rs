@@ -299,7 +299,7 @@ impl Shell for SimpleShell {
                 Ok(None) => break,
                 e => {
                     log_if_err!(e, "prompt");
-                    continue;
+                    break;
                 }
             };
 
