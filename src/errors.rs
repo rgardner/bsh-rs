@@ -5,14 +5,17 @@ use std::result;
 
 use failure::{Backtrace, Context, Fail};
 
+/// Bsh result alias.
 pub type Result<T> = result::Result<T, Error>;
 
+/// Bsh error type.
 #[derive(Debug)]
 pub struct Error {
     ctx: Context<ErrorKind>,
 }
 
 impl Error {
+    /// Returns the corresponding [`ErrorKind`] for this error.
     pub fn kind(&self) -> &ErrorKind {
         self.ctx.get_context()
     }
@@ -62,18 +65,35 @@ impl fmt::Display for Error {
     }
 }
 
+/// Bsh error kinds.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ErrorKind {
+    /// Syntax error.
     Syntax(String),
-    BuiltinCommand { message: String, code: i32 },
+    /// Builtin command error.
+    BuiltinCommand {
+        /// Error message.
+        message: String,
+        /// Error code.
+        code: i32,
+    },
+    /// Command not found error.
     CommandNotFound(String),
+    /// Missing history file error.
     HistoryFileNotFound,
+    /// No such job error.
     NoSuchJob(String),
+    /// Job control not available error.
     NoJobControl,
+    /// Operation not supported error.
     NotSupported(String),
+    /// Underlying error from the Docopt crate.
     Docopt,
+    /// I/O error.
     Io,
+    /// Underlying error from the Nix crate.
     Nix,
+    /// Underlying error from the Readline crate.
     Readline,
 }
 

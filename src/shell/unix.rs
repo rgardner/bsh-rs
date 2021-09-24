@@ -291,6 +291,8 @@ impl fmt::Debug for JobControlShell {
     }
 }
 
+/// Creates a new shell with job control and terminal handling features
+/// enabled.
 pub fn create_shell(config: ShellConfig) -> Result<Box<dyn Shell>> {
     let shell = JobControlShell::new(config)?;
     Ok(Box::new(shell))

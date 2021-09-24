@@ -46,6 +46,7 @@ pub trait Job {
     fn processes(&self) -> &Vec<Box<dyn Process>>;
 }
 
+/// A shell is a collection of jobs.
 pub trait Shell {
     /// Runs a job from a command string.
     fn execute_command_string(&mut self, input: &str) -> Result<()>;
@@ -66,9 +67,16 @@ pub trait Shell {
     /// command executed.
     fn exit(&mut self, n: Option<ExitStatus>) -> !;
 
+    /// Returns `true` if the shell is in interactive mode
     fn is_interactive(&self) -> bool;
+
+    /// Returns `true` if job control features are enabled.
     fn is_job_control_enabled(&self) -> bool;
+
+    /// Returns [`Editor`] for the shell.
     fn editor(&self) -> &Editor;
+
+    /// Returns mutable [`Editor`] for the shell.
     fn editor_mut(&mut self) -> &mut Editor;
 
     /// Returns the shell's jobs (running and stopped).
@@ -375,6 +383,10 @@ impl Shell for SimpleShell {
     }
 }
 
+/// Creates a new `SimpleShell` instance.
+///
+/// `SimpleShell` is cross-platform and has job control and terminal handling
+/// features disabled.
 pub fn create_simple_shell(config: ShellConfig) -> Result<Box<dyn Shell>> {
     let shell = SimpleShell::new(config)?;
     Ok(Box::new(shell))
