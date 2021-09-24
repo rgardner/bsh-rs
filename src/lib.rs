@@ -36,11 +36,8 @@ macro_rules! log_if_err {
 mod builtins;
 mod core;
 mod editor;
-#[allow(missing_docs)]
 pub mod errors;
 #[allow(unsafe_code)]
 mod execute_command;
-// TODO: remove this once the dust has settled
-#[allow(missing_docs)]
 mod shell;
 mod util;
