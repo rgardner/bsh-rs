@@ -8,10 +8,6 @@ name = "bsh"
 readme = "README.md"
 version = "0.1.0"
 
-[[bin]]
-name = "bsh"
-path = "src/bin/bsh.rs"
-
 [build-dependencies]
 lalrpop = "0.19.6"
 
