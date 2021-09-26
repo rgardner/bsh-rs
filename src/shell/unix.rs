@@ -201,7 +201,7 @@ impl Shell for JobControlShell {
                 Ok(None) => break,
                 e => {
                     log_if_err!(e, "prompt");
-                    continue;
+                    break;
                 }
             };
 
