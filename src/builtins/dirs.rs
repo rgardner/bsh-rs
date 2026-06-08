@@ -40,7 +40,11 @@ cd: cd [dir]
             Some(val) => Path::new(val).to_path_buf(),
         };
 
-        env::set_var("OLDPWD", env::current_dir().context(ErrorKind::Io)?);
+        // SAFETY: bsh is single threaded
+        #[allow(unsafe_code)]
+        unsafe {
+            env::set_var("OLDPWD", env::current_dir().context(ErrorKind::Io)?)
+        }
         env::set_current_dir(dir).context(ErrorKind::Io)?;
         Ok(())
     }

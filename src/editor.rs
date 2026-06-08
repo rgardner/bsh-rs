@@ -5,14 +5,13 @@ use std::str;
 
 use failure::{Fail, ResultExt};
 use rustyline::{
-    self,
+    self, CompletionType, Config, Helper,
     completion::{Completer, FilenameCompleter, Pair},
     error::ReadlineError,
     highlight::Highlighter,
     hint::Hinter,
     history,
     validate::Validator,
-    CompletionType, Config, Helper,
 };
 
 use crate::errors::{Error, ErrorKind, Result};
@@ -91,10 +90,10 @@ impl Editor {
         match self.internal.load_history(path) {
             Ok(()) => Ok(()),
             Err(e) => {
-                if let ReadlineError::Io(ref inner) = e {
-                    if inner.kind() == io::ErrorKind::NotFound {
-                        return Ok(());
-                    }
+                if let ReadlineError::Io(ref inner) = e
+                    && inner.kind() == io::ErrorKind::NotFound
+                {
+                    return Ok(());
                 }
 
                 Err(e.context(ErrorKind::Readline).into())

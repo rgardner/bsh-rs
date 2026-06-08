@@ -14,11 +14,8 @@ pub struct Jobs;
 
 #[derive(Debug, Deserialize)]
 struct JobsArgs {
-    arg_jobspec: Vec<i32>,
     flag_l: bool,
     flag_p: bool,
-    flag_r: bool,
-    flag_s: bool,
 }
 
 impl builtins::BuiltinCommand for Jobs {

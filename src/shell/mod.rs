@@ -14,7 +14,7 @@ use crate::{
     core::{intermediate_representation as ir, parser::Command, variable_expansion},
     editor::Editor,
     errors::{Error, ErrorKind, Result},
-    execute_command::{spawn_processes, Process, ProcessStatus},
+    execute_command::{Process, ProcessStatus, spawn_processes},
     util::BshExitStatusExt,
 };
 
@@ -59,7 +59,7 @@ pub trait Shell {
 
     /// Exit the shell.
     ///
-    /// Valid exit codes are between 0 and 255. Like bash and its descendents, it automatically
+    /// Valid exit codes are between 0 and 255. Like bash and its descendants, it automatically
     /// converts exit codes to a u8 such that positive n becomes n & 256 and negative n becomes
     /// (256 + n) % 256.
     ///
@@ -73,10 +73,10 @@ pub trait Shell {
     /// Returns `true` if job control features are enabled.
     fn is_job_control_enabled(&self) -> bool;
 
-    /// Returns [`Editor`] for the shell.
+    /// Returns the line editor for the shell.
     fn editor(&self) -> &Editor;
 
-    /// Returns mutable [`Editor`] for the shell.
+    /// Returns the mutable line editor for the shell.
     fn editor_mut(&mut self) -> &mut Editor;
 
     /// Returns the shell's jobs (running and stopped).
@@ -98,7 +98,7 @@ pub trait Shell {
 }
 
 /// Policy object to control a Shell's behavior
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Default)]
 pub struct ShellConfig {
     /// Determines if new command entries will be added to the shell's command history.
     ///
@@ -140,17 +140,6 @@ impl ShellConfig {
     /// - Fewer messages are displayed
     pub fn noninteractive() -> Self {
         Default::default()
-    }
-}
-
-impl Default for ShellConfig {
-    fn default() -> Self {
-        Self {
-            enable_command_history: false,
-            command_history_capacity: 0,
-            enable_job_control: false,
-            display_messages: false,
-        }
     }
 }
 
@@ -323,15 +312,14 @@ impl Shell for SimpleShell {
             code % 256
         };
 
-        if self.config.enable_command_history {
-            if let Some(ref history_file) = self.history_file {
-                if let Err(e) = self.editor.save_history(&history_file) {
-                    error!(
-                        "error: failed to save history to file during shutdown: {}",
-                        e
-                    );
-                }
-            }
+        if self.config.enable_command_history
+            && let Some(ref history_file) = self.history_file
+            && let Err(e) = self.editor.save_history(&history_file)
+        {
+            error!(
+                "error: failed to save history to file during shutdown: {}",
+                e
+            );
         }
 
         info!("bsh has shut down");

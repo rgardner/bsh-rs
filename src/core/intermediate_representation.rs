@@ -3,17 +3,12 @@ use crate::core::parser::{
     ast::{self, visit::Visitor},
 };
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Default)]
 pub enum Stdio {
+    #[default]
     Inherit,
     FileDescriptor(i32),
     Filename(String),
-}
-
-impl Default for Stdio {
-    fn default() -> Self {
-        Stdio::Inherit
-    }
 }
 
 impl From<ast::Redirect> for Stdio {
@@ -102,13 +97,13 @@ impl Visitor<Command> for Interpreter {
     fn visit_command(&mut self, command: &ast::Command) -> Command {
         match command {
             ast::Command::Simple {
-                ref words,
-                ref redirects,
+                words,
+                redirects,
                 background,
             } => self.visit_simple_command(words, redirects, *background),
             ast::Command::Connection {
-                ref first,
-                ref second,
+                first,
+                second,
                 connector,
             } => self.visit_connection_command(first, second, *connector),
         }

@@ -24,10 +24,10 @@ history: history [-c] [-s size] [n]
         match args.first().unwrap().as_ref() {
             "-c" => shell.editor_mut().clear_history(),
             "-s" => {
-                if let Some(s) = args.get(2) {
-                    if let Ok(n) = s.as_ref().parse::<usize>() {
-                        shell.editor_mut().set_history_max_size(n);
-                    }
+                if let Some(s) = args.get(2)
+                    && let Ok(n) = s.as_ref().parse::<usize>()
+                {
+                    shell.editor_mut().set_history_max_size(n);
                 }
             }
             s => match s.parse::<usize>() {

@@ -3,7 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::core::parser::ast::{visit::Visitor, Command, Connector, Redirect, Redirectee};
+use crate::core::parser::ast::{Command, Connector, Redirect, Redirectee, visit::Visitor};
 
 pub fn expand_variables<I, P, K, V>(command: &Command, home_dir: Option<P>, vars: I) -> Command
 where
@@ -93,13 +93,13 @@ impl Visitor<Command> for VariableExpander {
     fn visit_command(&mut self, command: &Command) -> Command {
         match command {
             Command::Simple {
-                ref words,
-                ref redirects,
+                words,
+                redirects,
                 background,
             } => self.visit_simple_command(words, redirects, *background),
             Command::Connection {
-                ref first,
-                ref second,
+                first,
+                second,
                 connector,
             } => self.visit_connection_command(first, second, *connector),
         }

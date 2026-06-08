@@ -2,14 +2,14 @@
 authors = ["Bob Gardner <bob.hn.gardner@gmail.com>"]
 build = "build.rs"
 description = "Command line shell"
-edition = "2018"
+edition = "2024"
 license = "MIT or Apache-2.0"
 name = "bsh"
 readme = "README.md"
 version = "0.1.0"
 
 [build-dependencies]
-lalrpop = "0.19.6"
+lalrpop = "0.23.1"
 
 [dependencies]
 atty = "0.2.14"
@@ -18,7 +18,7 @@ dirs = "4.0.0"
 docopt = "1.1.1"
 failure = "0.1.8"
 fern = "0.6.0"
-lalrpop-util = "0.19.6"
+lalrpop-util = "0.23.1"
 libc = "0.2.102"
 log = "0.4.14"
 nix = "0.22.1"

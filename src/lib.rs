@@ -12,7 +12,7 @@
 )]
 
 pub use crate::errors::{Error, ErrorKind, Result};
-pub use crate::shell::{create_shell, create_simple_shell, Shell, ShellConfig};
+pub use crate::shell::{Shell, ShellConfig, create_shell, create_simple_shell};
 pub use crate::util::BshExitStatusExt;
 
 macro_rules! log_if_err {

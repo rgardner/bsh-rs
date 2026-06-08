@@ -72,8 +72,8 @@ match {
 
 Word: String = {
     r#"[^|;<>&\s'"]+"# => <>.to_string(),
-    r#"'[^']+'"# => <>[1..<>.len()-1].to_string(),
-    r#""[^"]+""# => <>[1..<>.len()-1].to_string(),
+    <s:r#"'[^']+'"#> => s[1..s.len()-1].to_string(),
+    <s:r#""[^"]+""#> => s[1..s.len()-1].to_string(),
 };
 
 // vim: ft=rust

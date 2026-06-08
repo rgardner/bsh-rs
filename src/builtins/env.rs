@@ -22,7 +22,9 @@ declare: declare [name[=value] ...]
             let key_value: Vec<&str> = arg.as_ref().splitn(2, '=').collect();
             match key_value.first() {
                 Some(&"") | None => bad_args.push(arg),
-                Some(s) => env::set_var(s, key_value.get(1).unwrap_or(&"")),
+                // SAFETY: bsh is single threaded
+                #[allow(unsafe_code)]
+                Some(s) => unsafe { env::set_var(s, key_value.get(1).unwrap_or(&"")) },
             }
         }
 
@@ -58,7 +60,11 @@ unset: unset [name ...]
             if arg.as_ref().is_empty() || arg.as_ref().contains('=') {
                 bad_args.push(arg);
             } else {
-                env::remove_var(OsStr::new(arg.as_ref()));
+                // SAFETY: bsh is single threaded
+                #[allow(unsafe_code)]
+                unsafe {
+                    env::remove_var(OsStr::new(arg.as_ref()));
+                }
             }
         }
 
@@ -83,7 +89,7 @@ mod tests {
     use std::io;
 
     use crate::builtins::BuiltinCommand;
-    use crate::shell::{create_shell, ShellConfig};
+    use crate::shell::{ShellConfig, create_shell};
 
     macro_rules! generate_unique_env_key {
         () => {
@@ -100,12 +106,14 @@ mod tests {
 
         let key = generate_unique_env_key!();
         let value = "bar";
-        assert!(Declare::run(
-            &mut *shell,
-            &["=baz", &format!("{}={}", key, value), "=baz"],
-            &mut io::sink(),
-        )
-        .is_err());
+        assert!(
+            Declare::run(
+                &mut *shell,
+                &["=baz", &format!("{}={}", key, value), "=baz"],
+                &mut io::sink(),
+            )
+            .is_err()
+        );
         assert_eq!(env::var(key).unwrap(), value);
     }
 
@@ -118,21 +126,25 @@ mod tests {
         assert_eq!(&env::var(&key).unwrap(), "");
 
         let value1 = "bar";
-        assert!(Declare::run(
-            &mut *shell,
-            &[&format!("{}={}", key, value1)],
-            &mut io::sink(),
-        )
-        .is_ok());
+        assert!(
+            Declare::run(
+                &mut *shell,
+                &[&format!("{}={}", key, value1)],
+                &mut io::sink(),
+            )
+            .is_ok()
+        );
         assert_eq!(env::var(&key).unwrap(), value1);
 
         let value2 = "baz";
-        assert!(Declare::run(
-            &mut *shell,
-            &[format!("{}={}", key, value2)],
-            &mut io::sink(),
-        )
-        .is_ok());
+        assert!(
+            Declare::run(
+                &mut *shell,
+                &[format!("{}={}", key, value2)],
+                &mut io::sink(),
+            )
+            .is_ok()
+        );
         assert_eq!(env::var(&key).unwrap(), value2);
     }
 
@@ -143,12 +155,14 @@ mod tests {
         let key1 = generate_unique_env_key!();
         let key2 = generate_unique_env_key!();
         let value = "baz";
-        assert!(Declare::run(
-            &mut *shell,
-            &[format!("{}={}", key1, value), format!("{}={}", key2, value)],
-            &mut io::sink(),
-        )
-        .is_ok());
+        assert!(
+            Declare::run(
+                &mut *shell,
+                &[format!("{}={}", key1, value), format!("{}={}", key2, value)],
+                &mut io::sink(),
+            )
+            .is_ok()
+        );
         assert_eq!(env::var(&key1).unwrap(), value);
         assert_eq!(env::var(&key2).unwrap(), value);
     }

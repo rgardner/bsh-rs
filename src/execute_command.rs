@@ -86,6 +86,7 @@ impl Output {
                 OpenOptions::new()
                     .write(true)
                     .create(true)
+                    .truncate(true)
                     .open(filename)
                     .context(ErrorKind::Io)?,
             )),
@@ -103,6 +104,7 @@ impl Output {
                 OpenOptions::new()
                     .write(true)
                     .create(true)
+                    .truncate(true)
                     .open(filename)
                     .context(ErrorKind::Io)?,
             )),
@@ -330,13 +332,15 @@ pub fn spawn_processes(
     })
 }
 
+type Processes = Vec<Box<dyn Process>>;
+
 fn _spawn_processes(
     shell: &mut dyn Shell,
     command: &ir::Command,
     stdin: Option<Stdin>,
     stdout: Option<Output>,
     pgid: Option<u32>,
-) -> Result<(Vec<Box<dyn Process>>, Option<u32>)> {
+) -> Result<(Processes, Option<u32>)> {
     match command {
         ir::Command::Simple(simple_command) => {
             let stdin = Stdin::new(&simple_command.stdin, stdin)?;
@@ -354,8 +358,8 @@ fn _spawn_processes(
             Ok((vec![result], pgid))
         }
         ir::Command::Connection {
-            ref first,
-            ref second,
+            first,
+            second,
             connector,
         } => run_connection_command(shell, first, second, *connector, stdin, stdout, pgid),
     }
@@ -389,7 +393,7 @@ fn run_connection_command(
     stdin: Option<Stdin>,
     stdout: Option<Output>,
     pgid: Option<u32>,
-) -> Result<(Vec<Box<dyn Process>>, Option<u32>)> {
+) -> Result<(Processes, Option<u32>)> {
     match connector {
         ast::Connector::Pipe => {
             let (mut first_result, pgid) =
@@ -583,18 +587,18 @@ where
                 unistd::close(stdin).expect("failed to close stdin");
             }
 
-            if let Some(fd) = stdout_fd {
-                if fd != libc::STDOUT_FILENO {
-                    unistd::dup2(fd, libc::STDOUT_FILENO).expect("failed to dup stdout");
-                    unistd::close(fd).expect("failed to close stdout");
-                }
+            if let Some(fd) = stdout_fd
+                && fd != libc::STDOUT_FILENO
+            {
+                unistd::dup2(fd, libc::STDOUT_FILENO).expect("failed to dup stdout");
+                unistd::close(fd).expect("failed to close stdout");
             }
 
-            if let Some(fd) = stderr_fd {
-                if fd != libc::STDERR_FILENO {
-                    unistd::dup2(fd, libc::STDERR_FILENO).expect("failed to dup stderr");
-                    unistd::close(fd).expect("failed to close stderr");
-                }
+            if let Some(fd) = stderr_fd
+                && fd != libc::STDERR_FILENO
+            {
+                unistd::dup2(fd, libc::STDERR_FILENO).expect("failed to dup stderr");
+                unistd::close(fd).expect("failed to close stderr");
             }
 
             Ok(())

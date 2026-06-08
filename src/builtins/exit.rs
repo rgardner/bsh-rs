@@ -21,7 +21,7 @@ exit: exit [n]
             return Err(Error::builtin_command("There are stopped jobs.", 1));
         }
         let status_code = args
-            .get(0)
+            .first()
             .map(|arg| {
                 arg.as_ref().parse::<i32>().unwrap_or_else(|_| {
                     eprintln!("bsh: exit: {}: numeric argument required", arg.as_ref());

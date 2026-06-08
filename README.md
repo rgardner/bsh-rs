@@ -85,7 +85,7 @@ target/debug/bsh --help
 cargo check
 # build
 cargo build
-run lints
+# run lints
 cargo clippy
 # run tests
 cargo test

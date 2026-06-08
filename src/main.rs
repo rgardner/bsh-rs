@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 use std::process::{self, ExitStatus};
 
 use bsh::errors::*;
-use bsh::{create_shell, BshExitStatusExt, Shell, ShellConfig};
+use bsh::{BshExitStatusExt, Shell, ShellConfig, create_shell};
 use docopt::Docopt;
 use log::{debug, error};
 use serde_derive::Deserialize;

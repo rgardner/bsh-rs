@@ -22,14 +22,14 @@ use nix::{
 };
 
 use super::{
-    Job, JobId, Shell, ShellConfig, COMMAND_NOT_FOUND_EXIT_STATUS, HISTORY_FILE_NAME,
-    SYNTAX_ERROR_EXIT_STATUS,
+    COMMAND_NOT_FOUND_EXIT_STATUS, HISTORY_FILE_NAME, Job, JobId, SYNTAX_ERROR_EXIT_STATUS, Shell,
+    ShellConfig,
 };
 use crate::{
     core::{intermediate_representation as ir, parser::Command, variable_expansion},
     editor::Editor,
     errors::{Error, ErrorKind, Result},
-    execute_command::{spawn_processes, Process, ProcessGroup, ProcessStatus},
+    execute_command::{Process, ProcessGroup, ProcessStatus, spawn_processes},
     util::{self, BshExitStatusExt},
 };
 
@@ -225,15 +225,14 @@ impl Shell for JobControlShell {
             code % 256
         };
 
-        if self.config.enable_command_history {
-            if let Some(ref history_file) = self.history_file {
-                if let Err(e) = self.editor.save_history(&history_file) {
-                    error!(
-                        "error: failed to save history to file during shutdown: {}",
-                        e
-                    );
-                }
-            }
+        if self.config.enable_command_history
+            && let Some(ref history_file) = self.history_file
+            && let Err(e) = self.editor.save_history(&history_file)
+        {
+            error!(
+                "error: failed to save history to file during shutdown: {}",
+                e
+            );
         }
 
         info!("bsh has shut down");
@@ -450,10 +449,8 @@ impl JobManager {
             self.jobs[job_index].pgid()
         };
 
-        if cont {
-            if let Some(ref pgid) = job_pgid {
-                signal::kill(Pid::from_raw(-pgid), Signal::SIGCONT).context(ErrorKind::Nix)?;
-            }
+        if cont && let Some(ref pgid) = job_pgid {
+            signal::kill(Pid::from_raw(-pgid), Signal::SIGCONT).context(ErrorKind::Nix)?;
         }
 
         self.current_job = Some(job_id);
