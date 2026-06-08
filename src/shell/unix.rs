@@ -2,13 +2,14 @@
 //! in addition to the normal shell abilities such as managing the command
 //! history.
 
-use std::env;
-use std::fmt;
-use std::fs::File;
-use std::path::{Path, PathBuf};
-use std::process::{self, ExitStatus};
+use std::{
+    env, fmt,
+    fs::File,
+    io::{self, IsTerminal},
+    path::{Path, PathBuf},
+    process::{self, ExitStatus},
+};
 
-use atty::{self, Stream};
 use dirs;
 use failure::ResultExt;
 use libc;
@@ -55,7 +56,7 @@ impl JobControlShell {
             job_manager: Default::default(),
             last_exit_status: ExitStatus::from_success(),
             config,
-            is_interactive: atty::is(Stream::Stdin),
+            is_interactive: io::stdin().is_terminal(),
         };
 
         if shell.is_interactive {

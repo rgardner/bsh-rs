@@ -12,7 +12,6 @@ version = "0.1.0"
 lalrpop = "0.23.1"
 
 [dependencies]
-atty = "0.2.14"
 cfg-if = "1.0.0"
 dirs = "4.0.0"
 docopt = "1.1.1"

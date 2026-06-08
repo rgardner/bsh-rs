@@ -1,11 +1,11 @@
 use std::{
     env, fmt,
     fs::File,
+    io::{self, IsTerminal},
     path::{Path, PathBuf},
     process::{self, ExitStatus},
 };
 
-use atty::{self, Stream};
 use cfg_if::cfg_if;
 use failure::ResultExt;
 use log::{error, info, warn};
@@ -164,7 +164,7 @@ impl SimpleShell {
             history_file: None,
             last_exit_status: ExitStatus::from_success(),
             config,
-            is_interactive: atty::is(Stream::Stdin),
+            is_interactive: io::stdin().is_terminal(),
         };
 
         if config.enable_command_history {
