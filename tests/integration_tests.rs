@@ -4,30 +4,31 @@ use std::ffi::OsStr;
 use std::fs::File;
 use std::io::{self, Read};
 use std::path::PathBuf;
+use std::sync::LazyLock;
 
 use assert_cmd::prelude::*;
 use chrono::{DateTime, Local};
-use lazy_static::lazy_static;
 use predicates::prelude::*;
 use tempfile::TempDir;
 
-lazy_static! {
-    static ref LOG_FILE_NAME: PathBuf = {
-        let local: DateTime<Local> = Local::now();
-        let log_name = local.format("%F.%H-%M-%S");
-        [
-            env!("CARGO_MANIFEST_DIR"),
-            "log",
-            &format!("test-{}.log", log_name),
-        ]
-        .iter()
-        .collect()
-    };
-    static ref BIN_UNDER_TEST: escargot::CargoRun = escargot::CargoBuild::new()
+static LOG_FILE_NAME: LazyLock<PathBuf> = LazyLock::new(|| {
+    let local: DateTime<Local> = Local::now();
+    let log_name = local.format("%F.%H-%M-%S");
+    [
+        env!("CARGO_MANIFEST_DIR"),
+        "log",
+        &format!("test-{}.log", log_name),
+    ]
+    .iter()
+    .collect()
+});
+
+static BIN_UNDER_TEST: LazyLock<escargot::CargoRun> = LazyLock::new(|| {
+    escargot::CargoBuild::new()
         .bin("bsh")
         .run()
-        .expect("failed to build `cargo run` command");
-}
+        .expect("failed to build `cargo run` command")
+});
 
 #[test]
 fn test_simple_echo() {

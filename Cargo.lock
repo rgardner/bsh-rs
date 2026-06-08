@@ -135,7 +135,6 @@ dependencies = [
  "fern",
  "lalrpop",
  "lalrpop-util",
- "lazy_static",
  "libc",
  "log",
  "nix 0.22.3",
