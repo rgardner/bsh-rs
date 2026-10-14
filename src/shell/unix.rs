@@ -675,13 +675,13 @@ impl fmt::Debug for JobImpl {
 }
 
 /// RAII struct to encapsulate manipulating terminal state.
-struct TerminalState {
+pub(crate) struct TerminalState {
     prev_pgid: Pid,
     prev_tmodes: Option<Termios>,
 }
 
 impl TerminalState {
-    fn new(new_pgid: Pid) -> TerminalState {
+    pub(crate) fn new(new_pgid: Pid) -> TerminalState {
         debug!("setting terminal process group to job's process group");
         let shell_terminal = util::unix::get_terminal();
         unistd::tcsetpgrp(shell_terminal, new_pgid).unwrap();

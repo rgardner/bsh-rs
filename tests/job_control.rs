@@ -114,6 +114,31 @@ impl TerminalShell {
         );
         output
     }
+    fn run_with_input(&mut self, command: &str, input: &str) {
+        self.send(&format!("{command}\n"));
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while unistd::tcgetpgrp(self.terminal.as_raw_fd()).unwrap() == self.shell_pgid {
+            // Drain the echoed command: leaving output pending can block the line
+            // editor's TCSADRAIN restoration before the foreground process starts.
+            let mut buffer = [0; 4096];
+            match self.terminal.read(&mut buffer) {
+                Ok(_) => {}
+                Err(error) if error.kind() == io::ErrorKind::WouldBlock => {}
+                Err(error) => panic!("terminal read failed: {error}"),
+            }
+            assert!(
+                Instant::now() < deadline,
+                "foreground job never took terminal control"
+            );
+            thread::sleep(Duration::from_millis(10));
+        }
+        self.send(input);
+        self.wait_for_prompt();
+        assert_eq!(
+            unistd::tcgetpgrp(self.terminal.as_raw_fd()).unwrap(),
+            self.shell_pgid
+        );
+    }
 }
 
 impl Drop for TerminalShell {
@@ -163,29 +188,48 @@ fn background_jobs_preserve_prompt_and_input() {
 
     // Foreground readers must still receive terminal input and return ownership
     // to the shell once they finish.
-    shell.send("cat >foreground\n");
-    let deadline = Instant::now() + Duration::from_secs(5);
-    while unistd::tcgetpgrp(shell.terminal.as_raw_fd()).unwrap() == shell.shell_pgid {
-        // Drain the echoed command: leaving output pending can block the line
-        // editor's TCSADRAIN restoration before the foreground process starts.
-        let mut buffer = [0; 4096];
-        match shell.terminal.read(&mut buffer) {
-            Ok(_) => {}
-            Err(error) if error.kind() == io::ErrorKind::WouldBlock => {}
-            Err(error) => panic!("terminal read failed: {error}"),
-        }
-        assert!(
-            Instant::now() < deadline,
-            "foreground job never took terminal control"
-        );
-        thread::sleep(Duration::from_millis(10));
-    }
-    shell.send("foreground input\n\x04");
-    shell.wait_for_prompt();
+    shell.run_with_input("cat >foreground", "foreground input\n\x04");
+
     assert_eq!(
         fs::read_to_string(shell.directory.path().join("foreground")).unwrap(),
         "foreground input\n"
     );
+    shell.run_with_input(
+        "cat >before-background ; sleep 0 &",
+        "before background\n\x04",
+    );
+    assert_eq!(
+        fs::read_to_string(shell.directory.path().join("before-background")).unwrap(),
+        "before background\n"
+    );
+    shell.run_with_input(
+        "sleep 0 & ; cat >after-background",
+        "after background\n\x04",
+    );
+    assert_eq!(
+        fs::read_to_string(shell.directory.path().join("after-background")).unwrap(),
+        "after background\n"
+    );
     let output = shell.run("echo still-running");
     assert!(output.contains("\r\nstill-running\r\n"), "{output}");
+}
+
+#[test]
+fn foreground_input_survives_a_later_background_list() {
+    let directory = tempfile::tempdir().unwrap();
+    let mut child = Command::new(env!("CARGO_BIN_EXE_bsh"))
+        .args([
+            "--log",
+            directory.path().join("shell.log").to_str().unwrap(),
+            "-c",
+            "cat ; sleep 0 &",
+        ])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .unwrap();
+    child.stdin.take().unwrap().write_all(b"payload\n").unwrap();
+    let output = child.wait_with_output().unwrap();
+    assert!(output.status.success());
+    assert_eq!(output.stdout, b"payload\n");
 }

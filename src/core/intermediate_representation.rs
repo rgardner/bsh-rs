@@ -22,6 +22,7 @@ impl From<ast::Redirect> for Stdio {
 
 #[derive(Debug, PartialEq)]
 pub struct SimpleCommand {
+    pub background: bool,
     pub program: String,
     pub args: Vec<String>,
     pub stdin: Stdio,
@@ -39,6 +40,24 @@ pub enum Command {
     },
 }
 
+impl Command {
+    /// Whether the final command list runs asynchronously. Semicolons separate
+    /// lists; pipes and logical connectors keep the same foreground policy.
+    pub fn background(&self) -> bool {
+        match self {
+            Self::Simple(command) => command.background,
+            Self::Connection {
+                first,
+                second,
+                connector,
+            } => match connector {
+                ast::Connector::Semicolon => second.background(),
+                _ => first.background() || second.background(),
+            },
+        }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub struct CommandGroup {
     pub input: String,
@@ -47,9 +66,7 @@ pub struct CommandGroup {
 }
 
 #[derive(Debug)]
-pub struct Interpreter {
-    background: bool,
-}
+pub struct Interpreter {}
 
 impl Visitor<Command> for Interpreter {
     fn visit_simple_command<S: AsRef<str>>(
@@ -58,12 +75,9 @@ impl Visitor<Command> for Interpreter {
         redirects: &[ast::Redirect],
         background: bool,
     ) -> Command {
-        if !self.background && background {
-            self.background = background;
-        }
-
         let (program, args) = words.split_first().unwrap();
         Command::Simple(SimpleCommand {
+            background,
             program: program.as_ref().to_string(),
             args: args.iter().map(|arg| arg.as_ref().to_string()).collect(),
             stdin: get_stdin_redirect(redirects)
@@ -112,16 +126,17 @@ impl Visitor<Command> for Interpreter {
 
 impl Interpreter {
     fn new() -> Interpreter {
-        Interpreter { background: false }
+        Interpreter {}
     }
 
     pub fn parse(input: parser::Command) -> CommandGroup {
         let mut interpreter = Interpreter::new();
         let command = interpreter.visit_command(&input.inner);
+        let background = command.background();
         CommandGroup {
             input: input.input,
             command,
-            background: interpreter.background,
+            background,
         }
     }
 }
@@ -185,6 +200,7 @@ mod tests {
     impl SimpleCommandBuilder {
         fn new(program: &str) -> Self {
             SimpleCommandBuilder(SimpleCommand {
+                background: false,
                 program: program.into(),
                 args: vec![],
                 stdin: Stdio::Inherit,
@@ -496,7 +512,10 @@ mod tests {
             }),
             CommandGroup {
                 input: single_ampersand_input,
-                command: Command::Simple(SimpleCommandBuilder::new("cmd1").build()),
+                command: Command::Simple(SimpleCommand {
+                    background: true,
+                    ..SimpleCommandBuilder::new("cmd1").build()
+                }),
                 background: true,
             }
         );

@@ -428,8 +428,18 @@ fn run_connection_command(
             Ok((first_result, pgid))
         }
         ast::Connector::Semicolon => {
-            let (mut first_result, _) = _spawn_processes(shell, first, stdin, None, context)?;
-            first_result.last_mut().unwrap().wait()?;
+            let first_context = SpawnContext {
+                foreground: !first.background(),
+                ..context
+            };
+            let (mut first_result, first_pgid) =
+                _spawn_processes(shell, first, stdin, None, first_context)?;
+            wait_for_command(
+                shell,
+                &mut first_result,
+                first_pgid,
+                first_context.foreground,
+            )?;
             let (second_result, pgid) = _spawn_processes(
                 shell,
                 second,
@@ -437,15 +447,16 @@ fn run_connection_command(
                 stdout,
                 SpawnContext {
                     pgid: None,
-                    ..context
+                    foreground: !second.background(),
                 },
             )?;
             first_result.extend(second_result);
             Ok((first_result, pgid))
         }
         ast::Connector::And => {
-            let (mut first_result, _) = _spawn_processes(shell, first, stdin, None, context)?;
-            first_result.last_mut().unwrap().wait()?;
+            let (mut first_result, first_pgid) =
+                _spawn_processes(shell, first, stdin, None, context)?;
+            wait_for_command(shell, &mut first_result, first_pgid, context.foreground)?;
             let pgid = if first_result
                 .last()
                 .unwrap()
@@ -471,8 +482,9 @@ fn run_connection_command(
             Ok((first_result, pgid))
         }
         ast::Connector::Or => {
-            let (mut first_result, _) = _spawn_processes(shell, first, stdin, None, context)?;
-            first_result.last_mut().unwrap().wait()?;
+            let (mut first_result, first_pgid) =
+                _spawn_processes(shell, first, stdin, None, context)?;
+            wait_for_command(shell, &mut first_result, first_pgid, context.foreground)?;
             let pgid = if !first_result
                 .last()
                 .unwrap()
@@ -498,6 +510,26 @@ fn run_connection_command(
             Ok((first_result, pgid))
         }
     }
+}
+
+fn wait_for_command(
+    shell: &dyn Shell,
+    processes: &mut Processes,
+    pgid: Option<u32>,
+    foreground: bool,
+) -> Result<()> {
+    // Intermediate foreground commands also need to return the terminal before
+    // a subsequent background list starts (the job manager only waits last).
+    #[cfg(unix)]
+    let _terminal_state = if foreground && shell.is_job_control_enabled() {
+        pgid.map(|pgid| {
+            crate::shell::unix::TerminalState::new(nix::unistd::Pid::from_raw(pgid as i32))
+        })
+    } else {
+        None
+    };
+    processes.last_mut().unwrap().wait()?;
+    Ok(())
 }
 
 fn run_builtin_command<S1, S2>(
