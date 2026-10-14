@@ -41,6 +41,28 @@ pub enum Command {
 }
 
 impl Command {
+    fn connect(first: Command, second: Command, connector: ast::Connector) -> Self {
+        // The parser's right-recursive tree can put a semicolon underneath a
+        // pipe or logical connector. Lift it to the list boundary so a later
+        // asynchronous list cannot change the current list's stdin or terminal.
+        match second {
+            Self::Connection {
+                first: next,
+                second: rest,
+                connector: ast::Connector::Semicolon,
+            } if connector != ast::Connector::Semicolon => Self::Connection {
+                first: Box::new(Self::connect(first, *next, connector)),
+                second: rest,
+                connector: ast::Connector::Semicolon,
+            },
+            second => Self::Connection {
+                first: Box::new(first),
+                second: Box::new(second),
+                connector,
+            },
+        }
+    }
+
     /// Whether the final command list runs asynchronously. Semicolons separate
     /// lists; pipes and logical connectors keep the same foreground policy.
     pub fn background(&self) -> bool {
@@ -101,11 +123,11 @@ impl Visitor<Command> for Interpreter {
         second: &ast::Command,
         connector: ast::Connector,
     ) -> Command {
-        Command::Connection {
-            first: Box::new(self.visit_command(first)),
-            second: Box::new(self.visit_command(second)),
+        Command::connect(
+            self.visit_command(first),
+            self.visit_command(second),
             connector,
-        }
+        )
     }
 
     fn visit_command(&mut self, command: &ast::Command) -> Command {

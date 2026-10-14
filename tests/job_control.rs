@@ -210,6 +210,14 @@ fn background_jobs_preserve_prompt_and_input() {
         fs::read_to_string(shell.directory.path().join("after-background")).unwrap(),
         "after background\n"
     );
+    shell.run_with_input(
+        "cat | cat >pipeline-foreground ; sleep 0 &",
+        "pipeline foreground\n\x04",
+    );
+    assert_eq!(
+        fs::read_to_string(shell.directory.path().join("pipeline-foreground")).unwrap(),
+        "pipeline foreground\n"
+    );
     let output = shell.run("echo still-running");
     assert!(output.contains("\r\nstill-running\r\n"), "{output}");
 }
@@ -217,19 +225,26 @@ fn background_jobs_preserve_prompt_and_input() {
 #[test]
 fn foreground_input_survives_a_later_background_list() {
     let directory = tempfile::tempdir().unwrap();
-    let mut child = Command::new(env!("CARGO_BIN_EXE_bsh"))
-        .args([
-            "--log",
-            directory.path().join("shell.log").to_str().unwrap(),
-            "-c",
-            "cat ; sleep 0 &",
-        ])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .spawn()
-        .unwrap();
-    child.stdin.take().unwrap().write_all(b"payload\n").unwrap();
-    let output = child.wait_with_output().unwrap();
-    assert!(output.status.success());
-    assert_eq!(output.stdout, b"payload\n");
+    for (command, expected) in [
+        ("cat ; sleep 0 &", "payload\n"),
+        ("cat | cat ; sleep 0 &", "payload\n"),
+        ("cat && echo done ; sleep 0 &", "payload\ndone\n"),
+        ("cat || echo unexpected ; sleep 0 &", "payload\n"),
+    ] {
+        let mut child = Command::new(env!("CARGO_BIN_EXE_bsh"))
+            .args([
+                "--log",
+                directory.path().join("shell.log").to_str().unwrap(),
+                "-c",
+                command,
+            ])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .spawn()
+            .unwrap();
+        child.stdin.take().unwrap().write_all(b"payload\n").unwrap();
+        let output = child.wait_with_output().unwrap();
+        assert!(output.status.success(), "{command}");
+        assert_eq!(output.stdout, expected.as_bytes(), "{command}");
+    }
 }
