@@ -324,7 +324,11 @@ pub fn spawn_processes(
     shell: &mut dyn Shell,
     command_group: &ir::CommandGroup,
 ) -> Result<ProcessGroup> {
-    let (processes, pgid) = _spawn_processes(shell, &command_group.command, None, None, None)?;
+    let context = SpawnContext {
+        pgid: None,
+        foreground: !command_group.background,
+    };
+    let (processes, pgid) = _spawn_processes(shell, &command_group.command, None, None, context)?;
     Ok(ProcessGroup {
         id: pgid,
         processes,
@@ -334,15 +338,30 @@ pub fn spawn_processes(
 
 type Processes = Vec<Box<dyn Process>>;
 
+#[derive(Clone, Copy)]
+struct SpawnContext {
+    pgid: Option<u32>,
+    foreground: bool,
+}
+
 fn _spawn_processes(
     shell: &mut dyn Shell,
     command: &ir::Command,
     stdin: Option<Stdin>,
     stdout: Option<Output>,
-    pgid: Option<u32>,
+    context: SpawnContext,
 ) -> Result<(Processes, Option<u32>)> {
     match command {
         ir::Command::Simple(simple_command) => {
+            #[cfg(unix)]
+            let stdin = if !context.foreground
+                && matches!(simple_command.stdin, ir::Stdio::Inherit)
+                && stdin.is_none()
+            {
+                Some(Stdin::File(File::open("/dev/null").context(ErrorKind::Io)?))
+            } else {
+                stdin
+            };
             let stdin = Stdin::new(&simple_command.stdin, stdin)?;
             let stdout = Output::new_stdout(&simple_command.stdout, stdout)?;
             let stderr = Output::new_stderr(&simple_command.stderr, None /*pipe*/)?;
@@ -353,7 +372,7 @@ fn _spawn_processes(
                 stdin,
                 stdout,
                 stderr,
-                pgid,
+                context,
             )?;
             Ok((vec![result], pgid))
         }
@@ -361,7 +380,7 @@ fn _spawn_processes(
             first,
             second,
             connector,
-        } => run_connection_command(shell, first, second, *connector, stdin, stdout, pgid),
+        } => run_connection_command(shell, first, second, *connector, stdin, stdout, context),
     }
 }
 
@@ -372,16 +391,16 @@ fn run_simple_command<S1, S2>(
     stdin: Stdin,
     stdout: Output,
     stderr: Output,
-    pgid: Option<u32>,
+    context: SpawnContext,
 ) -> Result<(Box<dyn Process>, Option<u32>)>
 where
     S1: AsRef<str>,
     S2: AsRef<str>,
 {
     if builtins::is_builtin(&program) {
-        run_builtin_command(shell, program, args, stdout, pgid)
+        run_builtin_command(shell, program, args, stdout, context.pgid)
     } else {
-        run_external_command(shell, program, args, stdin, stdout, stderr, pgid)
+        run_external_command(shell, program, args, stdin, stdout, stderr, context)
     }
 }
 
@@ -392,31 +411,40 @@ fn run_connection_command(
     connector: ast::Connector,
     stdin: Option<Stdin>,
     stdout: Option<Output>,
-    pgid: Option<u32>,
+    context: SpawnContext,
 ) -> Result<(Processes, Option<u32>)> {
     match connector {
         ast::Connector::Pipe => {
             let (mut first_result, pgid) =
-                _spawn_processes(shell, first, stdin, Some(Output::CreatePipe), pgid)?;
+                _spawn_processes(shell, first, stdin, Some(Output::CreatePipe), context)?;
             let (second_result, pgid) = _spawn_processes(
                 shell,
                 second,
                 first_result.last_mut().unwrap().stdout(),
                 stdout,
-                pgid,
+                SpawnContext { pgid, ..context },
             )?;
             first_result.extend(second_result);
             Ok((first_result, pgid))
         }
         ast::Connector::Semicolon => {
-            let (mut first_result, _) = _spawn_processes(shell, first, stdin, None, pgid)?;
+            let (mut first_result, _) = _spawn_processes(shell, first, stdin, None, context)?;
             first_result.last_mut().unwrap().wait()?;
-            let (second_result, pgid) = _spawn_processes(shell, second, None, stdout, None)?;
+            let (second_result, pgid) = _spawn_processes(
+                shell,
+                second,
+                None,
+                stdout,
+                SpawnContext {
+                    pgid: None,
+                    ..context
+                },
+            )?;
             first_result.extend(second_result);
             Ok((first_result, pgid))
         }
         ast::Connector::And => {
-            let (mut first_result, _) = _spawn_processes(shell, first, stdin, None, pgid)?;
+            let (mut first_result, _) = _spawn_processes(shell, first, stdin, None, context)?;
             first_result.last_mut().unwrap().wait()?;
             let pgid = if first_result
                 .last()
@@ -425,7 +453,16 @@ fn run_connection_command(
                 .unwrap()
                 .success()
             {
-                let (second_result, pgid) = _spawn_processes(shell, second, None, stdout, None)?;
+                let (second_result, pgid) = _spawn_processes(
+                    shell,
+                    second,
+                    None,
+                    stdout,
+                    SpawnContext {
+                        pgid: None,
+                        ..context
+                    },
+                )?;
                 first_result.extend(second_result);
                 pgid
             } else {
@@ -434,7 +471,7 @@ fn run_connection_command(
             Ok((first_result, pgid))
         }
         ast::Connector::Or => {
-            let (mut first_result, _) = _spawn_processes(shell, first, stdin, None, pgid)?;
+            let (mut first_result, _) = _spawn_processes(shell, first, stdin, None, context)?;
             first_result.last_mut().unwrap().wait()?;
             let pgid = if !first_result
                 .last()
@@ -443,7 +480,16 @@ fn run_connection_command(
                 .unwrap()
                 .success()
             {
-                let (second_result, pgid) = _spawn_processes(shell, second, None, stdout, None)?;
+                let (second_result, pgid) = _spawn_processes(
+                    shell,
+                    second,
+                    None,
+                    stdout,
+                    SpawnContext {
+                        pgid: None,
+                        ..context
+                    },
+                )?;
                 first_result.extend(second_result);
                 pgid
             } else {
@@ -497,7 +543,7 @@ fn run_external_command<S1, S2>(
     stdin: Stdin,
     stdout: Output,
     stderr: Output,
-    pgid: Option<u32>,
+    context: SpawnContext,
 ) -> Result<(Box<dyn Process>, Option<u32>)>
 where
     S1: AsRef<str>,
@@ -512,6 +558,7 @@ where
 
     use crate::util;
 
+    let pgid = context.pgid;
     let mut command = Command::new(OsStr::new(program.as_ref()));
     command.args(args.iter().map(AsRef::as_ref).map(OsStr::new));
 
@@ -558,7 +605,10 @@ where
                 //     pipeline, as Command::stdin configures stdin *before*
                 //     before_exec runs.
                 // 3) incorrect permissions
-                unistd::tcsetpgrp(shell_terminal, pgid).expect("tcsetpgrp failed");
+                // Background jobs must leave the shell in control of the terminal.
+                if context.foreground {
+                    unistd::tcsetpgrp(shell_terminal, pgid).expect("tcsetpgrp failed");
+                }
 
                 // Reset job control signal handling back to default
                 // signal(3) failing represents programmer error, e.g.
@@ -654,7 +704,7 @@ fn run_external_command<S1, S2>(
     stdin: Stdin,
     stdout: Output,
     stderr: Output,
-    pgid: Option<u32>,
+    context: SpawnContext,
 ) -> Result<(Box<Process>, Option<u32>)>
 where
     S1: AsRef<str>,
@@ -674,6 +724,7 @@ where
         ));
     }
 
+    let pgid = context.pgid;
     let mut command = Command::new(OsStr::new(program.as_ref()));
     command.args(args.iter().map(AsRef::as_ref).map(OsStr::new));
     command.stdin(stdin);
